@@ -363,7 +363,7 @@ var V_DEFAULTS = {
   // roof (×), how far its eaves stand out (×), its roof's height (×), how much its corners turn up (×), mist on it, the
   // low mist at its foot, the shadows it and the firs cast on the snow, its lamps after dusk and their light on the snow
   hallShow: true, hallTurn: 15, hallSnow: 1, hallEave: 1, hallRoof: 1, hallSori: 1, hallHaze: 0.12, hallFootMist: 0.8,
-  hallShadow: 1, hallLamps: 1, hallSpill: 1,
+  hallShadow: 1, hallLamps: 1, hallSpill: 1, hallWeather: 1, hallRidge: true, hallRailing: true, hallRope: true,
   // the firs beside the hall (right of it, in the mist): shown, which trees (seed), their size and width (×), snow on
   // them, the mist on them
   hfShow: true, hfSeed: 5, hfSize: 1, hfWidth: 1.3, hfSnow: 0.8, hfHaze: 0.5,
@@ -442,6 +442,8 @@ var V_DEFAULTS = {
     pagodaRed: '#C24A2E',
     hallPlaster: '#E8DDC8',
     hallTimber: '#4B2E22',
+    hallRed: '#A8432E',
+    hallGreen: '#4E8A78',
     hallStone: '#9C978F'
   }
 };
@@ -986,7 +988,8 @@ function startHall() {
     yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, riseFront: V.hallRiseFront, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
     haze: V.hallHaze, footMist: V.hallFootMist, shadow: V.hallShadow, lit: lampLevel() * V.hallLamps, spill: V.hallSpill,
     lampCol: hex(V.colours.flame), light: L,
-    colours: { plaster: V.colours.hallPlaster, timber: V.colours.hallTimber, stone: V.colours.hallStone },
+    colours: { plaster: V.colours.hallPlaster, timber: V.colours.hallTimber, stone: V.colours.hallStone, red: V.colours.hallRed, green: V.colours.hallGreen },
+    weather: V.hallWeather, ridge: V.hallRidge, railing: V.hallRailing, rope: V.hallRope,
     dof: { on: V.hallDof, focus: V.hallFocus, strength: V.hallDofStrength, max: V.hallDofMax },
     field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: light(mix(hex(V.colours.mist), [222, 210, 204], 0.45)),
              haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis },
@@ -3363,6 +3366,10 @@ var G = [
     { o: 'V', k: 'hallShadow', label: 'Shadows on the snow', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'The hall\'s and the firs\' shadows, cast along the sun\'s direction (they follow the time of day).' },
     { o: 'V', k: 'hallLamps', label: 'Lamps after dusk', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'They come on with the pagoda\'s, as the autumn pagoda\'s do: fading in from about 38 minutes before sunset to full about 6 minutes after.' },
     { o: 'V', k: 'hallSpill', label: 'Lamplight on the snow', min: 0, max: 2, step: 0.01, re: 'hall' },
+    { o: 'V', k: 'hallWeather', label: 'Weathering', min: 0, max: 1.5, step: 0.01, re: 'hall', note: '0 = new; 1 = old: rain-stained plaster, grime at the wall\'s foot, paint worn through to the wood, verdigris streaks under the copper, moss and lichen on the stone base.' },
+    { chk: 'V', k: 'hallRidge', label: 'Raised ridge with gilt crests and copper end plates', re: 'hall' },
+    { chk: 'V', k: 'hallRailing', label: 'Vermilion veranda railing (with copper knobs)', re: 'hall' },
+    { chk: 'V', k: 'hallRope', label: 'Sacred rope with paper streamers, and the name plaque, over the doors', re: 'hall' },
     { o: 'V', k: 'hallRiseFront', label: 'The rise it stands on: length of its slope in front (m)', min: 14, max: 120, step: 1, re: 'hall trail', note: 'The hall stands 2.5 m above the snow field (where the reference has it). The path climbs this slope to its steps: longer is gentler.' },
     { chk: 'V', k: 'hfShow', label: 'Show the firs beside it', re: 'hall' },
     { o: 'V', k: 'hfSeed', label: 'Which firs (seed)', min: 1, max: 99, step: 1, re: 'hall', note: 'Every fir is its own tree from this.' },
@@ -3370,7 +3377,7 @@ var G = [
     { o: 'V', k: 'hfWidth', label: 'Firs: width (×)', min: 0.5, max: 1.8, step: 0.01, re: 'hall' },
     { o: 'V', k: 'hfSnow', label: 'Firs: snow on them', min: 0, max: 1.6, step: 0.01, re: 'hall' },
     { o: 'V', k: 'hfHaze', label: 'Firs: mist on them', min: 0, max: 1, step: 0.01, re: 'hall', note: 'More on the right-hand ones, farther into the mist.' } ,
-    { col: 'V', keys: [['hallPlaster', 'Hall plaster walls'], ['hallTimber', 'Hall posts and beams'], ['hallStone', 'Hall stone base']], re: 'hall' }
+    { col: 'V', keys: [['hallPlaster', 'Hall plaster walls'], ['hallTimber', 'Hall posts (bare timber)'], ['hallStone', 'Hall stone base'], ['hallRed', 'Hall vermilion (beams, brackets, door frames, railing)'], ['hallGreen', 'Hall green (window lattices, copper)']], re: 'hall' }
   ]).concat(dofCtls('hall', 'hall', 'The hall stands about 200 m away, the firs beside it a little farther (each blurs by its own distance; the Report gives the hall\'s).')) },
   { name: 'Plum branches (step 10)', note: 'From winter2.html; placed as in the reference in step 10.', ctls: [
     { o: 'V', k: 'branchCount', label: 'Branches each side', min: 0, max: 3, step: 1, re: 'branches' },

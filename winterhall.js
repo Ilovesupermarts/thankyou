@@ -79,7 +79,12 @@ function shadeC(base, n, L, sunK) {
 
 var PAL_BASE = { plaster: hex('#E8DDC8'), post: hex('#4B2E22'), beam: hex('#553326'), floor: hex('#3A2620'), stone: hex('#9C978F'),
             soffit: hex('#5A3828'), bracket: hex('#6E4430'), fascia: hex('#2E2A2E'), step: hex('#8E8A84'),
-            paper: hex('#EDE6D6'), lattice: hex('#3A2419') };
+            paper: hex('#EDE6D6'), lattice: hex('#3A2419'),
+            // the painted and metal parts: aged vermilion (丹塗り), verdigris (緑青: the copper and the green-painted
+            // window lattices), gilt fittings, the white of the painted rafter ends (胡粉), the sacred rope's straw,
+            // the paper streamers (紙垂), the name plaque's dark board, moss on the stone
+            red: hex('#A8432E'), green: hex('#4E8A78'), gold: hex('#C49A48'), gofun: hex('#E9E2D0'), straw: hex('#C8AD6A'),
+            shide: hex('#F4F1E8'), plaque: hex('#2B2220'), moss: hex('#6B7752') };
 var GLOW = [255, 182, 96];
 
 function job(o) {
@@ -89,12 +94,17 @@ function job(o) {
   if (o.colours) {
     if (o.colours.plaster) PAL.plaster = hex(o.colours.plaster);
     if (o.colours.stone) PAL.stone = hex(o.colours.stone);
+    if (o.colours.red) PAL.red = hex(o.colours.red);
+    if (o.colours.green) PAL.green = hex(o.colours.green);
     if (o.colours.timber) { var tm = hex(o.colours.timber); PAL.post = tm; PAL.beam = [0, 1, 2].map(function (i) { return clamp(tm[i] * PAL0.beam[i] / Math.max(1, PAL0.post[i]), 0, 255); }); }
   }
   var F = o.cam.F, cx = o.cam.cx, hy = o.cam.hy, PR = o.PR || 1, W = o.W, H = o.H;
   var snowK = o.snow === undefined ? 1 : o.snow, lit = clamp(o.lit || 0, 0, 1.5), lampCol = o.lampCol || GLOW;
   var shadowK = o.shadow === undefined ? 1 : o.shadow, spill = o.spill === undefined ? 1 : o.spill;
   var hz = o.haze || 0, mistC = o.light.haze;
+  // how weathered it is (0 new … 1 old … 1.5 very old) and its ornaments (each can be switched off)
+  var WE = o.weather === undefined ? 1 : clamp(o.weather, 0, 1.5);
+  var orn = { ridge: o.ridge !== false, railing: o.railing !== false, rope: o.rope !== false };
 
   /* ---------- the hall, in metres: x across its front (right +), y up from the snow at its foot, z toward its back ---------- */
   var ww = 7.0, wd = 4.6;                               // the walls: 14 m × 9.2 m (five bays by three)
@@ -314,6 +324,7 @@ function job(o) {
   function grow(p) { bx0 = Math.min(bx0, p[0]); by0 = Math.min(by0, p[1]); bx1 = Math.max(bx1, p[0]); by1 = Math.max(by1, p[1]); }
   [-1, 1].forEach(function (a) { [-1, 1].forEach(function (b) {
     grow(Pl(a * (ex + lo), edgeY + lift + Tn, b * (ez + lo))); grow(Pl(a * rl, yRoofMax, b * 0.5)); grow(Pl(a * bw, -0.6, b * bd));
+    if (orn.ridge) grow(Pl(a * (rl + 0.6), yRoofMax + 1.4, b * 0.6));
   }); });
   grow(Pl(0, 0, -bd - stepN * stepD - 1));
   // the rise's slope down to the field, and its sides (where its edge is on the screen)
@@ -654,8 +665,131 @@ function job(o) {
   group(stepSnow);
   for (var k1 = 1; k1 <= stepN; k1++) box(BOX[4 + k1], 'step', { front: 'riser', top: 'none', bottom: 'none', back: 'none' });
 
+  // the veranda's railing (高欄) round the edge of the floor, vermilion: a kerb rail (地覆), a middle rail (平桁) and a
+  // top rail (架木) between posts, short balusters (束) between them, the corner and end posts capped with copper
+  // onion knobs (擬宝珠) gone green; open in front of the steps. Only the sides turned toward the eye are built (the
+  // others are behind the walls). Snow lies along the top rail and on each knob.
+  var RAILS = [], KNOBS = [];
+  var rO = ww + 0.8, rZ = wd + 0.8, rH = 0.78, gap = stepW + 0.2;
+  function sideSeen(nx, nz) {
+    var p = Wp(nx * rO, fh, nz * rZ), nw = [nx * cs + nz * sn, 0, -nx * sn + nz * cs];
+    return -dot(nw, p) > 0;
+  }
+  function railRun(x0, z0, x1, z1, endPosts) {
+    var alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0), L = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
+    function bx(u0, u1, y0, y1, half) {
+      var a0 = alongX ? Math.min(x0, x1) + u0 : x0 - half, a1 = alongX ? Math.min(x0, x1) + u1 : x0 + half;
+      var c0 = alongX ? z0 - half : Math.min(z0, z1) + u0, c1 = alongX ? z0 + half : Math.min(z0, z1) + u1;
+      return [a0, fh + y0, c0, a1, fh + y1, c1];
+    }
+    box(bx(0, L, 0, 0.11, 0.07), 'red', { top: 'none' });
+    box(bx(0, L, 0.36, 0.44, 0.04), 'red', { top: 'none' });
+    box(bx(0, L, rH - 0.08, rH, 0.05), 'red', { top: 'none' });
+    RAILS.push({ a: alongX ? [Math.min(x0, x1), z0] : [x0, Math.min(z0, z1)], b: alongX ? [Math.max(x0, x1), z0] : [x0, Math.max(z0, z1)], y: fh + rH, alongX: alongX });
+    var nbal = Math.max(1, Math.round(L / 1.1));
+    for (var i = 1; i < nbal; i++) { var u = L * i / nbal; box(bx(u - 0.035, u + 0.035, 0.11, rH - 0.08, 0.035), 'red', { top: 'none', bottom: 'none' }); }
+    endPosts.forEach(function (ep) {
+      var u = ep ? L : 0, px = alongX ? Math.min(x0, x1) + u : x0, pz = alongX ? z0 : Math.min(z0, z1) + u;
+      box([px - 0.075, fh, pz - 0.075, px + 0.075, fh + rH + 0.08, pz + 0.075], 'red', { top: 'none', bottom: 'none' });
+      KNOBS.push([px, fh + rH + 0.08, pz]);
+    });
+  }
+  if (orn.railing) {
+    group(railSnow);
+    if (sideSeen(0, -1)) { railRun(-rO, -rZ, -gap, -rZ, [0, 1]); railRun(gap, -rZ, rO, -rZ, [0, 1]); }
+    if (sideSeen(1, 0)) railRun(rO, -rZ, rO, rZ, [1]);
+    if (sideSeen(-1, 0)) railRun(-rO, -rZ, -rO, rZ, [1]);
+  }
+  // snow along the top rail (its rounded front edge shows from below) and on each knob, which is drawn here too
+  function railSnow() {
+    var c = bc, top = snowLight([0, 1, 0], 1, 1, [0, 0, 0]), under = snowLight(toShadeN(norm([0, 0.3, -1])), 1, 0.85, [0, 0, 0]);
+    c.save(); c.filter = 'blur(' + (0.3 * PR).toFixed(2) + 'px)';
+    RAILS.forEach(function (R) {
+      var N = 16, up = [], dn = [];
+      for (var i = 0; i <= N; i++) {
+        var u = i / N, x = lerp(R.a[0], R.b[0], u), z = lerp(R.a[1], R.b[1], u), wob = 0.02 * Math.sin(u * 17 + R.a[0]) * WE;
+        var ox = R.alongX ? 0 : (x > 0 ? 0.06 : -0.06), oz = R.alongX ? -0.06 : 0;
+        up.push(Pl(x + ox, R.y + 0.09 + wob, z + oz)); dn.push(Pl(x + ox, R.y - 0.015, z + oz));
+      }
+      var g = c.createLinearGradient(0, Math.min(up[0][1], up[N][1]), 0, Math.max(dn[0][1], dn[N][1]) + 0.01);
+      g.addColorStop(0, css(fin(top))); g.addColorStop(1, css(fin(under)));
+      c.beginPath(); up.forEach(function (p, i) { if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); });
+      for (var j = N; j >= 0; j--) c.lineTo(dn[j][0], dn[j][1]);
+      c.closePath(); c.fillStyle = g; c.fill();
+    });
+    c.restore();
+    var nK = toShadeN([0, 0, -1]), nW = toWorldN([0, 0, -1]), knob = faceCol(PAL.green, nW, 1);
+    KNOBS.forEach(function (k) {
+      var p = Pl(k[0], k[1] + 0.12, k[2]), r = Math.max(0.6, 0.11 * F / Wp(k[0], k[1], k[2])[2]);
+      c.beginPath(); c.ellipse(p[0], p[1], r, r * 1.1, 0, 0, 2 * PI); c.fillStyle = css(fin(knob)); c.fill();
+      c.beginPath(); c.moveTo(p[0] - r * 0.3, p[1] - r); c.lineTo(p[0], p[1] - r * 2.2); c.lineTo(p[0] + r * 0.3, p[1] - r); c.closePath(); c.fill();
+      c.beginPath(); c.ellipse(p[0] - r * 0.25, p[1] + r * 0.1, r * 0.35, r * 0.5, 0, 0, 2 * PI); c.fillStyle = css(fin(mix(knob, [240, 255, 245], 0.3))); c.fill();
+      c.beginPath(); c.ellipse(p[0], p[1] - r * 1.1, r * 0.95, r * 0.55, 0, PI, 2 * PI); c.fillStyle = css(fin(top)); c.fill();
+    });
+  }
+
+  // over the doors: the sacred straw rope (注連縄), thicker in the middle and twisted, hung between the two middle posts,
+  // with straw tassels (〆の子) and white paper streamers (紙垂) hanging from it; above it on the bracket band, the name
+  // plaque (扁額): a dark board in a gilt frame with two gilt characters
+  if (orn.rope) group(ropeAndPlaque);
+  function ropeAndPlaque() {
+    var c = bc, nW = toWorldN([0, 0, -1]);
+    var straw = faceCol(PAL.straw, nW, 1), strawD = mix(straw, [40, 28, 16], 0.45), white = faceCol(PAL.shide, nW, 1);
+    var zr = -wd - 0.14, x0 = -1.4, x1 = 1.4, N = 28, cen = [], th = [];
+    for (var i = 0; i <= N; i++) {
+      var u = i / N, x = lerp(x0, x1, u), sag = 4 * u * (1 - u);
+      cen.push([x, 3.98 - 0.38 * sag, zr]); th.push(0.07 + 0.12 * Math.pow(sag, 0.8));
+    }
+    var up = [], dn = [];
+    cen.forEach(function (p, i) { up.push(Pl(p[0], p[1] + th[i], p[2])); dn.push(Pl(p[0], p[1] - th[i], p[2])); });
+    var gy0 = Pl(0, cen[N / 2][1] + th[N / 2], zr)[1], gy1 = Pl(0, cen[N / 2][1] - th[N / 2], zr)[1];
+    var g = c.createLinearGradient(0, gy0, 0, gy1 + 0.01);
+    g.addColorStop(0, css(fin(mix(straw, [255, 244, 210], 0.15)))); g.addColorStop(0.55, css(fin(straw))); g.addColorStop(1, css(fin(strawD)));
+    c.beginPath(); up.forEach(function (p, i) { if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); });
+    for (var j = N; j >= 0; j--) c.lineTo(dn[j][0], dn[j][1]);
+    c.closePath(); c.fillStyle = g; c.fill();
+    // the twist: dark grooves slanting across it
+    c.save(); c.clip();
+    c.strokeStyle = css(fin(strawD), 0.8); c.lineWidth = Math.max(0.35, 0.03 * F / Wp(0, 3.6, zr)[2]); c.beginPath();
+    for (var tw = 0; tw <= 24; tw++) {
+      var u2 = tw / 24, k = Math.round(u2 * N), A = Pl(cen[k][0] - 0.06, cen[k][1] + th[k], zr), B = Pl(cen[k][0] + 0.1, cen[k][1] - th[k], zr);
+      c.moveTo(A[0], A[1]); c.lineTo(B[0], B[1]);
+    }
+    c.stroke(); c.restore();
+    // tassels of straw and the paper streamers, hanging from the rope's underside
+    [0.25, 0.5, 0.75].forEach(function (u) {
+      var k = Math.round(u * N), p = cen[k], t0 = p[1] - th[k] * 0.8;
+      var a = Pl(p[0] - 0.08, t0, zr - 0.02), b = Pl(p[0] + 0.08, t0, zr - 0.02), e = Pl(p[0] + 0.05, t0 - 0.42, zr - 0.02), f2 = Pl(p[0] - 0.05, t0 - 0.42, zr - 0.02);
+      var gt = c.createLinearGradient(0, a[1], 0, e[1] + 0.01); gt.addColorStop(0, css(fin(straw))); gt.addColorStop(1, css(fin(mix(strawD, straw, 0.4))));
+      c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(e[0], e[1]); c.lineTo(f2[0], f2[1]); c.closePath(); c.fillStyle = gt; c.fill();
+    });
+    [0.125, 0.375, 0.625, 0.875].forEach(function (u) {
+      var k = Math.round(u * N), p = cen[k], y = p[1] - th[k] * 0.7, x = p[0], hw = 0.09, steps = 4, len = 0.5;
+      c.beginPath();
+      var pts = [];
+      for (var q = 0; q <= steps; q++) { var yy = y - len * q / steps, dx = (q % 2 ? 1 : -1) * hw * 0.5; pts.push([x + dx, yy]); }
+      pts.forEach(function (pp, qi) { var P0 = Pl(pp[0] - hw / 2, pp[1], zr - 0.03); if (qi) c.lineTo(P0[0], P0[1]); else c.moveTo(P0[0], P0[1]); });
+      for (q = steps; q >= 0; q--) { var P1 = Pl(pts[q][0] + hw / 2, pts[q][1] - 0.04, zr - 0.03); c.lineTo(P1[0], P1[1]); }
+      c.closePath(); c.fillStyle = css(fin(white)); c.fill();
+      c.strokeStyle = css(fin(mix(white, [60, 60, 80], 0.3)), 0.6); c.lineWidth = 0.3; c.stroke();
+    });
+    // the plaque, hung on the bracket band over the doors, its top tilted a little toward you
+    var zp = -(wd + brOut + 0.12), pwid = 0.38, yb = wallTop - 0.28, yt = brTop - 0.03;
+    var q0 = Pl(-pwid, yb, zp), q1 = Pl(pwid, yb, zp), q2 = Pl(pwid, yt, zp - 0.12), q3 = Pl(-pwid, yt, zp - 0.12);
+    var goldC = faceCol(PAL.gold, nW, 1), board = faceCol(PAL.plaque, nW, 1);
+    if (lit > 0) { goldC = mix(goldC, lampCol, 0.25 * lit); board = mix(board, lampCol, 0.08 * lit); }
+    var QP = [q0, q1, q2, q3];
+    quad(c, QP, 0, 1, 0, 1, css(fin(goldC)));
+    quad(c, QP, 0.1, 0.9, 0.08, 0.92, css(fin(board)));
+    var gl = css(fin(mix(goldC, [255, 246, 214], 0.2)));
+    [[0.3, 0.62], [0.68, 0.38]].forEach(function (ch, ci) {
+      quad(c, QP, 0.38, 0.62, ch[0] - 0.13, ch[0] + 0.13, gl);
+      quad(c, QP, 0.42, 0.58, ch[0] - 0.05, ch[0] + 0.05, css(fin(board)));
+    });
+  }
+
   // how each material's colour runs across its face, from its foot to its top (the shade under the eaves comes separately)
-  var RAMP = { plaster: [1.0, 0.92], post: [1, 0.9], stone: [0.92, 1.04], floor: [0.9, 1.08], bracket: [1.08, 0.82], soffit: [0.75, 1.1], fascia: [0.9, 1.1], step: [0.85, 1.05] };
+  var RAMP = { red: [0.9, 1.06], plaster: [1.0, 0.92], post: [1, 0.9], stone: [0.92, 1.04], floor: [0.9, 1.08], bracket: [1.08, 0.82], soffit: [0.75, 1.1], fascia: [0.9, 1.1], step: [0.85, 1.05] };
   function P2(pts, s, t) {                              // a point in a quad (0 bottom-left, 1 bottom-right, 2 top-right, 3 top-left)
     var bl = pts[0], br = pts[1], tr = pts[2], tl = pts[3];
     return [lerp(lerp(bl[0], br[0], s), lerp(tl[0], tr[0], s), t), lerp(lerp(bl[1], br[1], s), lerp(tl[1], tr[1], s), t)];
@@ -689,12 +823,13 @@ function job(o) {
       gx.addColorStop(litLeft ? 0 : 1, 'rgba(255,238,215,0.06)'); gx.addColorStop(litLeft ? 1 : 0, 'rgba(25,18,40,0.1)');
       poly(c, pts); c.fillStyle = gx; c.fill();
     }
-    if (f.det === 'front') wallDetail(c, pts, n, 5, 2);
-    else if (f.det === 'side') wallDetail(c, pts, n, 3, -1);
-    else if (f.det === 'stone') stoneDetail(c, pts, col);
-    else if (f.det === 'bracket') bracketDetail(c, pts, col);
+    var sd = Math.round(f.l[0][0] * 3.1 + f.l[0][2] * 7.3 + f.l[0][1] * 1.7);
+    if (f.det === 'front') wallDetail(c, pts, n, 5, 2, sd);
+    else if (f.det === 'side') wallDetail(c, pts, n, 3, -1, sd);
+    else if (f.det === 'stone') stoneDetail(c, pts, col, n, sd);
+    else if (f.det === 'bracket') bracketDetail(c, pts, col, n, sd);
     else if (f.det === 'rafters') rafterDetail(c, pts, col);
-    else if (f.det === 'fascia') fasciaDetail(c, pts, col);
+    else if (f.det === 'fascia') fasciaDetail(c, pts, col, n, sd);
     else if (f.det === 'riser') riserDetail(c, pts);
     // a wall in the sun: the eave's shadow cast on it, as low as the sun's angle takes it
     if ((m === 'plaster' || m === 'stone') && f.info && f.info.off !== undefined) eaveShadow(c, f, pts, n, base);
@@ -717,13 +852,24 @@ function job(o) {
     quad(c, pts, 0, 1, Math.max(0, ts - 0.03), 1, g);
     c.restore();
   }
-  // the front (five bays: windows either side, the doors in the middle) and the sides (three bays of windows)
-  function wallDetail(c, Q, n, bays, door) {
+  // the front (five bays: windows either side, the doors in the middle) and the sides (three bays of windows), built as a
+  // carpenter builds a shrine hall: posts standing on the floor, a vermilion sill (地長押) and tie beam (内法長押) laid
+  // across them with gilt covers on the nails at each post, a vermilion head beam (頭貫) along the top, lattice windows
+  // (連子窓) with green-painted bars, lattice doors in vermilion frames with gilt hinge plates; then weathered: the lime
+  // plaster stained by rain run off the beams and the sills, grimed at its foot, blotched with damp; the paint worn
+  // through to the wood here and there; the posts darker toward their feet
+  function wallDetail(c, Q, n, bays, door, sd) {
     var w = Math.hypot(Q[1][0] - Q[0][0], Q[1][1] - Q[0][1]);
     if (w < 3) return;
-    var post = css(fin(faceCol(PAL.post, n, 1))), beam = css(fin(faceCol(PAL.beam, n, 1))), bar = css(fin(mix(faceCol(PAL.lattice, n, 1), [0, 0, 0], 0.1)));
-    var pw = 0.28 / (bays === 5 ? 2 * ww : 2 * wd);                    // a post is 28 cm wide
+    var faceM = bays === 5 ? 2 * ww : 2 * wd;                          // the face's width in metres
+    var postC = faceCol(PAL.post, n, 1), post = css(fin(postC));
+    var redC = faceCol(PAL.red, n, 1), red = css(fin(redC)), greenC = faceCol(PAL.green, n, 1), goldC = faceCol(PAL.gold, n, 1);
+    var bar = css(fin(mix(greenC, [0, 0, 0], 0.18))), frameG = css(fin(mix(greenC, [0, 0, 0], 0.32)));
+    var doorFrame = red, doorBar = css(fin(mix(redC, postC, 0.55)));
+    var pw = 0.28 / faceM;                                              // a post is 28 cm wide
     var paper = faceCol(PAL.paper, n, 1), lampK = clamp(lit, 0, 1);
+    function m2s(m) { return m / faceM; }
+    weatherPlaster(c, Q, w, bays, faceM, sd);
     function pane(s0, s1, t0, t1, isDoor) {
       // the paper behind the bars: in the day the shaded paper; after dusk lit from inside, brightest in the middle
       var base2 = lampK > 0 ? mix(paper, lampCol, lampK) : paper;
@@ -734,52 +880,178 @@ function job(o) {
         g.addColorStop(0, css([255, 236, 190], 0.55 * lampK)); g.addColorStop(1, css([255, 236, 190], 0));
         quadPath(c, Q, s0, s1, t0, t1); c.fillStyle = g; c.fill();
       }
-      // its frame and its bars (a lattice of squares on the doors, upright bars in the windows)
-      c.strokeStyle = bar; c.lineWidth = Math.max(0.35, w * 0.0035);
+      // its bars (a lattice of squares on the doors, close upright bars in the windows) and its frame
+      c.strokeStyle = isDoor ? doorBar : bar; c.lineWidth = Math.max(0.35, w * 0.0035);
       c.beginPath();
-      var nv = isDoor ? Math.max(3, Math.round(w * (s1 - s0) / 3.2)) : Math.max(3, Math.round(w * (s1 - s0) / 2.2));
+      var nv = isDoor ? Math.max(3, Math.round(w * (s1 - s0) / 3.2)) : Math.max(4, Math.round(w * (s1 - s0) / 1.8));
       for (var v = 1; v < nv; v++) { var sv = lerp(s0, s1, v / nv), a = P2(Q, sv, t0), b = P2(Q, sv, t1); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
       if (isDoor) {
         var nh = Math.max(4, Math.round(nv * (t1 - t0) / (s1 - s0) * 0.45));
         for (var hh = 1; hh < nh; hh++) { var tv = lerp(t0, t1, hh / nh), l = P2(Q, s0, tv), r = P2(Q, s1, tv); c.moveTo(l[0], l[1]); c.lineTo(r[0], r[1]); }
       }
       c.stroke();
-      c.lineWidth = Math.max(0.6, w * 0.007);
-      quadPath(c, Q, s0, s1, t0, t1); c.stroke();
-      if (isDoor) { var m0 = P2(Q, (s0 + s1) / 2, t0), m1 = P2(Q, (s0 + s1) / 2, t1); c.beginPath(); c.moveTo(m0[0], m0[1]); c.lineTo(m1[0], m1[1]); c.stroke(); }
+      // the frame: a broad band round it (green round the windows, vermilion round the doors)
+      var fs = m2s(0.09), ft = 0.09 / (wallTop - fh);
+      c.fillStyle = isDoor ? doorFrame : frameG;
+      quadPath(c, Q, s0 - fs, s1 + fs, t1, t1 + ft); c.fill(); quadPath(c, Q, s0 - fs, s1 + fs, t0 - ft, t0); c.fill();
+      quadPath(c, Q, s0 - fs, s0, t0, t1); c.fill(); quadPath(c, Q, s1, s1 + fs, t0, t1); c.fill();
+      if (isDoor) {
+        var mid = (s0 + s1) / 2;
+        quadPath(c, Q, mid - fs * 0.5, mid + fs * 0.5, t0, t1); c.fill();
+        // gilt hinge plates (八双金具) across each leaf, near its top and its foot
+        var gd = css(fin(goldC));
+        [0.12, 0.84].forEach(function (tt) {
+          quad(c, Q, s0, s0 + (s1 - s0) * 0.22, lerp(t0, t1, tt), lerp(t0, t1, tt) + ft * 0.9, gd);
+          quad(c, Q, s1 - (s1 - s0) * 0.22, s1, lerp(t0, t1, tt), lerp(t0, t1, tt) + ft * 0.9, gd);
+        });
+      } else {
+        // the window's sill catches a little light on its top edge
+        quad(c, Q, s0 - fs, s1 + fs, t0 - ft * 0.25, t0, css(fin(mix(greenC, [255, 248, 230], 0.18))));
+      }
     }
     for (var j = 0; j < bays; j++) {
       var a = j / bays, b = (j + 1) / bays, mid = (a + b) / 2, bw2 = b - a;
-      if (j === door) pane(mid - bw2 * 0.38, mid + bw2 * 0.38, 0.06, 0.84, true);
+      if (j === door) pane(mid - bw2 * 0.36, mid + bw2 * 0.36, 0.07, 0.83, true);
       else pane(mid - bw2 * 0.24, mid + bw2 * 0.24, 0.42, 0.72, false);
     }
-    // the sill along the foot, the tie beams, the posts
-    quad(c, Q, 0, 1, 0, 0.05, beam);
-    quad(c, Q, 0, 1, 0.86, 0.93, beam);
-    for (var i = 0; i <= bays; i++) { var s = i / bays; quad(c, Q, Math.max(0, s - pw / 2), Math.min(1, s + pw / 2), 0, 1, post); }
+    // the posts, darker toward their feet (damp wicks up the end grain) and streaked along the grain
+    for (var i = 0; i <= bays; i++) {
+      var s = i / bays, p0 = Math.max(0, s - pw / 2), p1 = Math.min(1, s + pw / 2);
+      quad(c, Q, p0, p1, 0, 1, post);
+      if (WE > 0) {
+        var A = P2(Q, s, 0), B = P2(Q, s, 0.3), gp = c.createLinearGradient(A[0], A[1], B[0], B[1] + 0.01);
+        gp.addColorStop(0, css([20, 12, 10], 0.4 * WE)); gp.addColorStop(1, css([20, 12, 10], 0));
+        quad(c, Q, p0, p1, 0, 0.3, gp);
+        for (var gq = 0; gq < 2; gq++) {
+          var gs = lerp(p0, p1, 0.25 + 0.5 * hash(i, gq, sd + 3)), lt = hash(i, gq + 5, sd + 3) < 0.5;
+          quad(c, Q, gs - pw * 0.06, gs + pw * 0.06, 0.05 + 0.3 * hash(i, gq + 9, sd), 0.95, css(lt ? [200, 190, 175] : [10, 6, 6], (lt ? 0.12 : 0.18) * WE));
+        }
+      }
+    }
+    // the vermilion beams laid across the posts: the sill, the tie beam over the doors and windows, the head beam on top
+    var BEAMS = [[0, 0.055], [0.855, 0.925], [0.965, 1]];
+    BEAMS.forEach(function (bm, bi) {
+      quad(c, Q, 0, 1, bm[0], bm[1], red);
+      // its top edge catches the light; its underside is darker
+      quad(c, Q, 0, 1, bm[1] - (bm[1] - bm[0]) * 0.18, bm[1], css(fin(mix(redC, [255, 236, 214], 0.16))));
+      quad(c, Q, 0, 1, bm[0], bm[0] + (bm[1] - bm[0]) * 0.22, css(fin(mix(redC, [0, 0, 0], 0.25))));
+      if (WE <= 0) return;
+      // the paint worn and flaked through to the dark wood, and faded paler where the weather reaches it
+      var nf = Math.round(bays * 4 * WE);
+      for (var k = 0; k < nf; k++) {
+        var fs0 = hash(k, bi, sd + 11), fw = m2s(0.08 + 0.35 * hash(k, bi + 4, sd + 11)), ft0 = lerp(bm[0], bm[1], 0.15 + 0.6 * hash(k, bi + 8, sd + 11));
+        var dark = hash(k, bi + 12, sd + 11) < 0.55;
+        quad(c, Q, fs0, Math.min(1, fs0 + fw), ft0, Math.min(bm[1], ft0 + (bm[1] - bm[0]) * (0.25 + 0.4 * hash(k, bi + 16, sd))),
+             dark ? css(fin(mix(postC, [0, 0, 0], 0.2)), 0.55 * Math.min(1, WE)) : css(fin(mix(redC, [236, 196, 170], 0.45)), 0.4 * Math.min(1, WE)));
+      }
+    });
+    // gilt covers on the nails at each post (釘隠し), on the tie beam and the sill: a little rosette catching the light
+    var rG = Math.max(0.65, 0.085 * w / faceM), gold = css(fin(goldC)), glint = css(fin(mix(goldC, [255, 248, 220], 0.5)));
+    for (var i2 = 0; i2 <= bays; i2++) {
+      [0.89, 0.028].forEach(function (tt) {
+        var C = P2(Q, i2 / bays, tt);
+        c.beginPath(); c.arc(C[0], C[1], rG, 0, 2 * PI); c.fillStyle = gold; c.fill();
+        c.beginPath(); c.arc(C[0] - rG * 0.3, C[1] - rG * 0.3, rG * 0.4, 0, 2 * PI); c.fillStyle = glint; c.fill();
+      });
+    }
     // the sky's light cut off under the deep eaves: the wall darkens toward its top (less so when the lamps are on)
-    var A = P2(Q, 0.5, 1), B = P2(Q, 0.5, 0.25), g2 = c.createLinearGradient(A[0], A[1], B[0], B[1] + 0.01);
+    var A2 = P2(Q, 0.5, 1), B2 = P2(Q, 0.5, 0.25), g2 = c.createLinearGradient(A2[0], A2[1], B2[0], B2[1] + 0.01);
     g2.addColorStop(0, 'rgba(14,8,10,' + (0.42 * (1 - 0.5 * lampK)).toFixed(3) + ')'); g2.addColorStop(1, 'rgba(14,8,10,0)');
     quad(c, Q, 0, 1, 0.25, 1, g2);
   }
-  function stoneDetail(c, Q, col) {
+  // the lime plaster weathered: splashed grime at its foot, soft blotches of damp and old patching, streaks of rain run
+  // down from under the tie beam and from each window's sill, a hairline crack here and there (all from the hall's own
+  // fixed random numbers: the same every time it is drawn)
+  function weatherPlaster(c, Q, w, bays, faceM, sd) {
+    if (WE <= 0) return;
+    c.save(); quadPath(c, Q, 0, 1, 0, 1); c.clip();
+    var A = P2(Q, 0.5, 0), B = P2(Q, 0.5, 0.26), g = c.createLinearGradient(A[0], A[1], B[0], B[1] + 0.01);
+    g.addColorStop(0, css([84, 70, 56], 0.5 * WE)); g.addColorStop(1, css([84, 70, 56], 0));
+    quad(c, Q, 0, 1, 0, 0.3, g);
+    var bayPx = w / bays;
+    for (var j = 0; j < bays; j++) {
+      var a = j / bays, b = (j + 1) / bays;
+      for (var k = 0; k < 4; k++) {
+        var C = P2(Q, lerp(a, b, 0.1 + 0.8 * hash(j, k, sd)), 0.08 + 0.84 * hash(j, k + 7, sd)), r = (0.1 + 0.22 * hash(j, k + 13, sd)) * bayPx;
+        var dark = hash(j, k + 19, sd) < 0.7, col = dark ? [98, 86, 72] : [255, 250, 238];
+        var gg = c.createRadialGradient(C[0], C[1], 0, C[0], C[1], r);
+        gg.addColorStop(0, css(col, (dark ? 0.26 : 0.16) * WE)); gg.addColorStop(1, css(col, 0));
+        c.fillStyle = gg; c.fillRect(C[0] - r, C[1] - r, 2 * r, 2 * r);
+      }
+      var ns = 3 + Math.floor(4 * hash(j, 31, sd));
+      for (k = 0; k < ns; k++) {
+        var s0 = lerp(a, b, 0.06 + 0.88 * hash(j, k + 40, sd)), sw = (0.05 + 0.12 * hash(j, k + 50, sd)) / faceM;
+        var fromSill = Math.abs(s0 - (a + b) / 2) < (b - a) * 0.24 && hash(j, k + 60, sd) < 0.6;
+        var tS = fromSill ? 0.4 : 0.85, tE = Math.max(0.02, tS - (0.12 + 0.4 * hash(j, k + 70, sd)));
+        var P0 = P2(Q, s0, tS), P1 = P2(Q, s0, tE), gs = c.createLinearGradient(P0[0], P0[1], P1[0], P1[1] + 0.01);
+        gs.addColorStop(0, css([86, 76, 66], (0.22 + 0.22 * hash(j, k + 80, sd)) * WE)); gs.addColorStop(1, css([86, 76, 66], 0));
+        quad(c, Q, s0 - sw / 2, s0 + sw / 2, tE, tS, gs);
+      }
+      if (hash(j, 90, sd) < 0.55 * WE) {
+        var cs0 = lerp(a, b, 0.15 + 0.7 * hash(j, 91, sd)), ct = 0.15 + 0.6 * hash(j, 92, sd), P3 = P2(Q, cs0, ct);
+        c.beginPath(); c.moveTo(P3[0], P3[1]);
+        for (var q = 0; q < 4; q++) { cs0 += (hash(j, 93 + q, sd) - 0.5) * 0.02; ct += (hash(j, 97 + q, sd) - 0.3) * 0.07; P3 = P2(Q, cs0, ct); c.lineTo(P3[0], P3[1]); }
+        c.strokeStyle = css([70, 60, 52], 0.3 * WE); c.lineWidth = 0.35; c.stroke();
+      }
+    }
+    c.restore();
+  }
+  // the stone base: dressed blocks in two courses, each a little different in tone, the joints dark, moss and lichen
+  // grown up from the ground and along the joints where the damp stays, the top edge catching the light
+  function stoneDetail(c, Q, col, n, sd) {
     var w = Math.hypot(Q[1][0] - Q[0][0], Q[1][1] - Q[0][1]);
     if (w < 6) return;
-    var n = clamp(Math.round(w / 7), 3, 30), r = 0;
-    c.strokeStyle = css(fin(mix(col, [0, 0, 0], 0.35)), 0.5); c.lineWidth = 0.4; c.beginPath();
-    for (var i = 1; i < n; i++) { var s = (i + (hash(i, 3, 1) - 0.5) * 0.3) / n, a = P2(Q, s, 0), b = P2(Q, s, 1); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
+    var nb = clamp(Math.round(w / 7), 3, 30);
+    c.save(); quadPath(c, Q, 0, 1, 0, 1); c.clip();
+    if (WE > 0) {
+      for (var row = 0; row < 2; row++) for (var i = 0; i < nb; i++) {
+        var hsh = hash(i, row, sd + 21), off = row ? 0.5 / nb : 0;
+        quad(c, Q, i / nb + off, (i + 1) / nb + off, row ? 0.55 : 0, row ? 1 : 0.55, hsh < 0.5 ? css([30, 26, 30], 0.16 * hsh * WE) : css([250, 244, 230], 0.12 * (hsh - 0.5) * WE));
+      }
+      var moss = faceCol(PAL.moss, n, 1), nm = Math.round(nb * 1.6 * WE);
+      for (var k = 0; k < nm; k++) {
+        var C = P2(Q, hash(k, 1, sd + 23), 0.35 * Math.pow(hash(k, 2, sd + 23), 1.6)), r = (0.25 + 0.6 * hash(k, 3, sd + 23)) * w / nb;
+        var g = c.createRadialGradient(C[0], C[1], 0, C[0], C[1], r);
+        g.addColorStop(0, css(fin(moss), 0.45 * Math.min(1, WE))); g.addColorStop(1, css(fin(moss), 0));
+        c.fillStyle = g; c.fillRect(C[0] - r, C[1] - r, 2 * r, 2 * r);
+      }
+      for (k = 0; k < nb * 3; k++) {                           // lichen: small pale spots
+        var L = P2(Q, hash(k, 5, sd + 27), 0.15 + 0.8 * hash(k, 6, sd + 27));
+        c.fillStyle = css(fin(mix(col, [236, 232, 205], 0.5)), 0.3 * Math.min(1, WE)); c.fillRect(L[0], L[1], 0.6, 0.5);
+      }
+    }
+    c.strokeStyle = css(fin(mix(col, [0, 0, 0], 0.4)), 0.6); c.lineWidth = 0.45; c.beginPath();
+    for (var i2 = 1; i2 < nb; i2++) {
+      var s0 = (i2 + (hash(i2, 3, 1) - 0.5) * 0.3) / nb, a0 = P2(Q, s0, 0), b0 = P2(Q, s0, 0.55); c.moveTo(a0[0], a0[1]); c.lineTo(b0[0], b0[1]);
+      var s1 = Math.min(1, s0 + 0.5 / nb), a1 = P2(Q, s1, 0.55), b1 = P2(Q, s1, 1); c.moveTo(a1[0], a1[1]); c.lineTo(b1[0], b1[1]);
+    }
     var m0 = P2(Q, 0, 0.55), m1 = P2(Q, 1, 0.55); c.moveTo(m0[0], m0[1]); c.lineTo(m1[0], m1[1]);
     c.stroke();
+    c.restore();
     // the top's edge catches the light
     c.strokeStyle = css(fin(mix(col, [255, 250, 240], 0.25)), 0.6); c.lineWidth = 0.5;
     var t0 = P2(Q, 0, 0.97), t1 = P2(Q, 1, 0.97); c.beginPath(); c.moveTo(t0[0], t0[1]); c.lineTo(t1[0], t1[1]); c.stroke();
   }
-  function bracketDetail(c, Q, col) {
+  // the band of brackets (組物) under the eaves: a vermilion head beam at its foot, on it a row of bracket sets (a big
+  // bearing block, a vermilion arm, three small blocks on the arm, their ends painted white), the small walls between
+  // them painted verdigris green, the dark wall plate (桁) on top; the paint dulled and flaked with age
+  function bracketDetail(c, Q, col, n, sd) {
     var w = Math.hypot(Q[1][0] - Q[0][0], Q[1][1] - Q[0][1]);
     if (w < 6) return;
-    var n = clamp(Math.round(w / 3.2), 4, 60), lt = css(fin(mix(col, [255, 226, 180], lit > 0 ? 0.35 : 0.18))), dk = css(fin(mix(col, [0, 0, 0], 0.5)));
-    quad(c, Q, 0, 1, 0.45, 0.58, dk);
-    for (var i = 0; i < n; i++) { var s0 = (i + 0.25) / n, s1 = (i + 0.75) / n; quad(c, Q, s0, s1, 0.12, 0.42, lt); quad(c, Q, s0 + 0.1 / n, s1 - 0.1 / n, 0.62, 0.9, lt); }
+    var warm = lit > 0 ? 0.3 : 0;
+    function L(cc) { return css(fin(mix(cc, [255, 226, 180], warm))); }
+    var redC = faceCol(PAL.red, n, 1), greenC = faceCol(PAL.green, n, 1), capC = faceCol(PAL.gofun, n, 1);
+    quad(c, Q, 0, 1, 0.18, 0.86, L(mix(greenC, [0, 0, 0], 0.38)));
+    quad(c, Q, 0, 1, 0, 0.18, L(redC));
+    quad(c, Q, 0, 1, 0.86, 1, L(mix(col, [0, 0, 0], 0.35)));
+    var nn = clamp(Math.round(w / 3.4), 4, 60), red = L(redC), dk = L(mix(redC, [0, 0, 0], 0.3)), cap = L(mix(capC, col, 0.25));
+    for (var i = 0; i < nn; i++) {
+      var s = (i + 0.5) / nn, h = 1 / nn;
+      quad(c, Q, s - h * 0.16, s + h * 0.16, 0.18, 0.4, dk);             // the big bearing block (大斗)
+      quad(c, Q, s - h * 0.42, s + h * 0.42, 0.4, 0.55, red);            // the arm (肘木)
+      [-0.3, 0, 0.3].forEach(function (o3) { quad(c, Q, s + h * (o3 - 0.1), s + h * (o3 + 0.1), 0.55, 0.76, red); quad(c, Q, s + h * (o3 - 0.1), s + h * (o3 + 0.1), 0.55, 0.6, cap); });
+      if (WE > 0 && hash(i, 1, sd + 31) < 0.35 * WE) quad(c, Q, s - h * 0.3, s + h * 0.1, 0.42, 0.53, css(fin(mix(col, [0, 0, 0], 0.3)), 0.6));
+    }
   }
   function rafterDetail(c, Q, col) {
     var w = Math.hypot(Q[1][0] - Q[0][0], Q[1][1] - Q[0][1]);
@@ -789,11 +1061,31 @@ function job(o) {
     for (var i = 1; i < n; i++) { var a = P2(Q, i / n, 0), b = P2(Q, i / n, 1); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
     c.stroke();
   }
-  function fasciaDetail(c, Q, col) {                    // the rafters' ends in a row along the fascia's foot
+  // the eave's edge: the ends of the two tiers of rafters (二軒: round ones below, square ones above), painted white
+  // (胡粉) and dulled by the weather, under the copper-clad edge board (茅負) gone green, with green streaks where the
+  // rain off the copper has run down the wood
+  function fasciaDetail(c, Q, col, n, sd) {
     var w = Math.hypot(Q[1][0] - Q[0][0], Q[1][1] - Q[0][1]);
-    if (w < 4) return;
-    var n = clamp(Math.round(w / 2.2), 2, 14), lt = css(fin(mix(col, [200, 180, 160], 0.22)));
-    for (var i = 0; i < n; i++) quad(c, Q, (i + 0.3) / n, (i + 0.7) / n, 0.05, 0.4, lt);
+    if (w < 3) return;
+    var greenC = faceCol(PAL.green, n, 1), capC = faceCol(PAL.gofun, n, 1);
+    var nr = clamp(Math.round(w / 2.2), 2, 14);
+    for (var i = 0; i < nr; i++) {
+      var dull = 0.3 + 0.35 * WE * hash(i, 2, sd + 41);
+      var cl = css(fin(mix(capC, col, clamp(dull, 0, 0.85))));
+      quad(c, Q, (i + 0.3) / nr, (i + 0.7) / nr, 0.04, 0.3, cl);
+      quad(c, Q, (i + 0.32) / nr, (i + 0.68) / nr, 0.38, 0.6, cl);
+    }
+    quad(c, Q, 0, 1, 0.68, 1, css(fin(greenC)));
+    quad(c, Q, 0, 1, 0.92, 1, css(fin(mix(greenC, [240, 250, 240], 0.25))));
+    if (WE > 0) {
+      var ns = Math.max(1, Math.round(w / 3 * WE));
+      for (var k = 0; k < ns; k++) {
+        var s0 = hash(k, 3, sd + 43), sw = 0.01 + 0.03 * hash(k, 4, sd + 43), tE = 0.68 - (0.2 + 0.5 * hash(k, 5, sd + 43));
+        var A = P2(Q, s0, 0.68), B = P2(Q, s0, tE), g = c.createLinearGradient(A[0], A[1], B[0], B[1] + 0.01);
+        g.addColorStop(0, css(fin(greenC), 0.5 * Math.min(1, WE))); g.addColorStop(1, css(fin(greenC), 0));
+        quad(c, Q, s0, Math.min(1, s0 + sw), Math.max(0, tE), 0.68, g);
+      }
+    }
   }
   function riserDetail(c, Q) {
     var A = P2(Q, 0.5, 0), B = P2(Q, 0.5, 1), g = c.createLinearGradient(A[0], A[1], B[0], B[1] + 0.01);
@@ -834,6 +1126,95 @@ function job(o) {
       vis2.forEach(function (v) { paintFace(c, v.f, v.n); });
       if (itm.post) itm.post();
     });
+  }
+
+  /* ---------- the ridge: a raised box ridge (箱棟) clad in copper gone green, three gilt crests (紋) on its face, snow
+     along its top, and at each end a copper end plate (鬼板) with flared horns and a gilt boss. It stands up out of the
+     roof's snow: seen from below, nothing of the roof is in front of it, so it is drawn over the roof's snow, its foot
+     following the snow's own surface, with the snow banked softly against it. ---------- */
+  function ridgeOrnaments(c) {
+    if (!orn.ridge) return;
+    c.save(); c.setTransform(PR, 0, 0, PR, -bx0 * PR, -by0 * PR);
+    var hb = 0.32, rx = rl + 0.1, yT = roofTop(0, 0) + Tn + 0.42, N = 24;
+    var nF = toWorldN([0, 0, -1]), nR = toWorldN([1, 0, 0]), nL = toWorldN([-1, 0, 0]);
+    var greenF = faceCol(PAL.green, nF, 1), greenR = faceCol(PAL.green, nR, 1), greenL = faceCol(PAL.green, nL, 1), goldC = faceCol(PAL.gold, nF, 1);
+    var top = snowLight([0, 1, 0], 1, 1, [0, 0, 0]), under = snowLight(toShadeN(norm([0, 0.3, -1])), 1, 0.85, [0, 0, 0]);
+    function snowY(x, z) { return snowTop(clamp(x, -ex, ex), clamp(z, -ez, ez)); }
+    // the end plates: the far one first, the near one last
+    function plate(sx2, col) {
+      var x = sx2 * (rx + 0.04), y0 = snowY(x, 0) - 0.1;
+      var prof = [[-0.36, y0], [-0.26, yT], [-0.46, yT + 0.36], [-0.3, yT + 0.6], [-0.12, yT + 0.42], [0, yT + 0.5], [0.12, yT + 0.42], [0.3, yT + 0.6], [0.46, yT + 0.36], [0.26, yT], [0.36, y0]];
+      [0.07, 0].forEach(function (dx, k) {
+        var pts = prof.map(function (q) { return Pl(x + sx2 * dx, q[1], q[0]); });
+        poly(c, pts); c.fillStyle = css(fin(k ? col : mix(col, [0, 0, 0], 0.35))); c.fill();
+        if (k) { c.strokeStyle = css(fin(mix(col, [0, 0, 0], 0.45)), 0.8); c.lineWidth = 0.4; c.stroke(); }
+      });
+      var B = Pl(x, yT + 0.22, 0), rB = Math.max(0.5, 0.1 * F / Wp(x, yT, 0)[2]);
+      c.beginPath(); c.arc(B[0], B[1], rB, 0, 2 * PI); c.fillStyle = css(fin(goldC)); c.fill();
+      // snow on the horns' tops
+      c.fillStyle = css(fin(top));
+      [[-0.3, yT + 0.6], [0.3, yT + 0.6], [0, yT + 0.5]].forEach(function (q) {
+        var P0 = Pl(x, q[1] + 0.03, q[0]), r = Math.max(0.5, 0.08 * F / Wp(x, q[1], q[0])[2]);
+        c.beginPath(); c.ellipse(P0[0], P0[1], r * 1.4, r * 0.7, 0, 0, 2 * PI); c.fill();
+      });
+    }
+    var farS = Wp(-rx, yT, 0)[2] > Wp(rx, yT, 0)[2] ? -1 : 1;
+    plate(farS, farS < 0 ? greenL : greenR);
+    // the end face turned toward the eye
+    var endS = -farS, xe = endS * rx, endPts = [Pl(xe, snowY(xe, -hb) - 0.05, -hb), Pl(xe, snowY(xe, hb) - 0.05, hb), Pl(xe, yT, hb), Pl(xe, yT, -hb)];
+    poly(c, endPts); c.fillStyle = css(fin(mix(endS > 0 ? greenR : greenL, [0, 0, 0], 0.12))); c.fill();
+    // the front face: its foot along the snow's surface, its top straight
+    var face2 = [], i;
+    for (i = 0; i <= N; i++) { var x = lerp(-rx, rx, i / N); face2.push(Pl(x, snowY(x, -hb) - 0.05, -hb)); }
+    face2.push(Pl(rx, yT, -hb)); face2.push(Pl(-rx, yT, -hb));
+    var gF = c.createLinearGradient(0, Pl(0, yT, -hb)[1], 0, Pl(0, snowY(0, -hb), -hb)[1] + 0.01);
+    gF.addColorStop(0, css(fin(mix(greenF, [0, 0, 0], 0.2)))); gF.addColorStop(1, css(fin(mix(greenF, [240, 250, 240], 0.08))));
+    poly(c, face2); c.fillStyle = gF; c.fill();
+    c.save(); poly(c, face2); c.clip();
+    // the copper's seams and the weather's streaks down it
+    var nS = Math.round(rx * 2 / 0.45);
+    for (i = 1; i < nS; i++) {
+      var xs = lerp(-rx, rx, i / nS), A = Pl(xs, yT, -hb), B2 = Pl(xs, snowY(xs, -hb), -hb);
+      c.strokeStyle = css(fin(mix(greenF, [0, 0, 0], 0.3)), 0.5); c.lineWidth = 0.3; c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(B2[0], B2[1]); c.stroke();
+      if (WE > 0 && hash(i, 1, 51) < 0.6) {
+        var xs2 = xs + 0.2 * hash(i, 2, 51), A2 = Pl(xs2, yT - 0.05, -hb), B3 = Pl(xs2, yT - 0.4, -hb), g = c.createLinearGradient(A2[0], A2[1], B3[0], B3[1] + 0.01);
+        g.addColorStop(0, css([30, 40, 36], 0.35 * Math.min(1, WE))); g.addColorStop(1, css([30, 40, 36], 0));
+        c.fillStyle = g; c.fillRect(A2[0] - 0.4, A2[1], 0.8, B3[1] - A2[1]);
+      }
+    }
+    // the gilt crests: a ring and a boss in each, catching the light
+    [-0.62, 0, 0.62].forEach(function (u) {
+      var x2 = u * rl, C = Pl(x2, (yT + snowY(x2, -hb)) / 2 + 0.04, -hb - 0.02), r = Math.max(0.7, 0.19 * F / Wp(x2, yT, -hb)[2]);
+      c.beginPath(); c.arc(C[0], C[1], r, 0, 2 * PI); c.fillStyle = css(fin(goldC)); c.fill();
+      c.beginPath(); c.arc(C[0], C[1], r * 0.62, 0, 2 * PI); c.fillStyle = css(fin(mix(goldC, [60, 40, 20], 0.45))); c.fill();
+      c.beginPath(); c.arc(C[0], C[1], r * 0.32, 0, 2 * PI); c.fillStyle = css(fin(goldC)); c.fill();
+      c.beginPath(); c.arc(C[0] - r * 0.35, C[1] - r * 0.35, r * 0.25, 0, 2 * PI); c.fillStyle = css(fin(mix(goldC, [255, 250, 225], 0.55))); c.fill();
+    });
+    c.restore();
+    // the copper coping along its top edge, lighter
+    var cp0 = Pl(-rx, yT, -hb - 0.03), cp1 = Pl(rx, yT, -hb - 0.03), cpT = Math.max(0.5, 0.06 * F / Wp(0, yT, -hb)[2]);
+    c.fillStyle = css(fin(mix(greenF, [230, 250, 236], 0.25)));
+    c.beginPath(); c.moveTo(cp0[0], cp0[1] - cpT); c.lineTo(cp1[0], cp1[1] - cpT); c.lineTo(cp1[0], cp1[1] + cpT); c.lineTo(cp0[0], cp0[1] + cpT); c.closePath(); c.fill();
+    // the snow: banked softly against its foot, and lying along its top (its rounded front edge seen from below)
+    c.save(); c.filter = 'blur(' + (0.35 * PR).toFixed(2) + 'px)';
+    var bank = [], bTop = [];
+    for (i = 0; i <= N; i++) { var xb = lerp(-rx - 0.1, rx + 0.1, i / N), sy0 = snowY(xb, -hb); bank.push(Pl(xb, sy0 - 0.08, -hb - 0.12)); bTop.push(Pl(xb, sy0 + 0.1 + 0.03 * Math.sin(i * 1.7), -hb - 0.02)); }
+    c.beginPath(); bank.forEach(function (p, k) { if (k) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); });
+    for (i = N; i >= 0; i--) c.lineTo(bTop[i][0], bTop[i][1]);
+    c.closePath(); c.fillStyle = css(fin(mix(top, under, 0.35))); c.fill();
+    var sT = [], sB = [];
+    for (i = 0; i <= N; i++) {
+      var xt = lerp(-rx - 0.12, rx + 0.12, i / N), e2 = Math.abs(xt) / (rx + 0.12), rnd = Math.sqrt(Math.max(0, 1 - Math.pow(e2, 8)));
+      sT.push(Pl(xt, yT + (0.06 + 0.24 * rnd) * (0.9 + 0.1 * Math.sin(i * 2.3)), -hb - 0.06)); sB.push(Pl(xt, yT - 0.05 * rnd, -hb - 0.06));
+    }
+    var gs = c.createLinearGradient(0, sT[N >> 1][1], 0, sB[N >> 1][1] + 0.01);
+    gs.addColorStop(0, css(fin(top))); gs.addColorStop(1, css(fin(under)));
+    c.beginPath(); sT.forEach(function (p, k) { if (k) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); });
+    for (i = N; i >= 0; i--) c.lineTo(sB[i][0], sB[i][1]);
+    c.closePath(); c.fillStyle = gs; c.fill();
+    c.restore();
+    plate(endS, endS < 0 ? greenL : greenR);
+    c.restore();
   }
 
   /* ---------- after dusk: the warm glow round the door and the windows, in the air ---------- */
@@ -893,6 +1274,7 @@ function job(o) {
     var RC = mkLayer(); toCanvas(roofI, RC); roofI = null;
     bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0); bc.filter = 'blur(' + (0.35 * PR).toFixed(2) + 'px)'; bc.drawImage(RC, 0, 0); bc.restore();
     bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0); bc.drawImage(RC, 0, 0); bc.restore();   // (sharp over its own soft copy: a soft edge, no see-through)
+    ridgeOrnaments(bc);
     footMist(bc);
     // all of it laid down: the snow behind and under the hall, the firs and the hall, the snow in front of it, the lamps' glow
     var oc = OUT.getContext('2d');
