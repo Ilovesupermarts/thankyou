@@ -395,9 +395,9 @@ function job(o) {
   }
   // the light on snow before any roll-off (sun and sky, the sky's light thrown up off the snow below), summed over the
   // three colours: for the ratio of a slope's light to level snow's
-  function rawLight(nS, occ, sky) {
+  function rawLight(nS, occ, sky, only) {
     var dl = Math.max(0, nS[0] * Lsh[0] + nS[1] * Lsh[1] + nS[2] * Lsh[2]) * occ, sk = (0.5 + 0.5 * nS[1]) * sky + 0.22 * (0.5 - 0.5 * nS[1]), t = 0;
-    for (var ch = 0; ch < 3; ch++) t += FS.snow[ch] * FS.sun[ch] * dl * 1.25 + shadeS[ch] * sk;
+    for (var ch = 0; ch < 3; ch++) if (only < 0 || only === ch) t += FS.snow[ch] * FS.sun[ch] * dl * 1.25 + shadeS[ch] * sk;
     return t;
   }
   function fieldHaze(zw, sY) {
@@ -541,7 +541,7 @@ function job(o) {
       var occP = pass ? Math.max(0, 1 - clamp(shadowK, 0, 1.5)) : 1;
       snowLight(nS, occP * pSunK, sky, COL, pfl, pNear ? pBounce : 0);
       // (as the snow field: level snow's brightness rolled off toward white, the slope's light laid over it as a ratio)
-      var rtL = rawLight(nS, occP * pSunK, sky) / Math.max(1, rawLight([0, 1, 0], 1, 1));
+      var rtL = rawLight(nS, occP * pSunK, sky, -1) / Math.max(1, rawLight([0, 1, 0], 1, 1, -1));
       snowLight([0, 1, 0], 1, 1, COL, pfl, 0);
       // where it melts into the field (which shows the path too), the field's colour carries the path's light and shade
       if (pNear && fk > 0) snowLight(nSF, occP, skyF, COLF, 0, 0);
@@ -549,7 +549,11 @@ function job(o) {
         var v = lerp(COL[ch] + lampCol[ch] * lamp * 0.85, FS.groundMist[ch], hzF);
         v += FS.sunRGB[ch] * FS.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((px - FS.sunX) / (W * 0.42), 2));
         var fc = pNear && fk > 0 ? FC[ch] * (COL[0] + COL[1] + COL[2]) / Math.max(3, COLF[0] + COLF[1] + COLF[2]) : FC[ch];
-        outA[pass * 4 + ch] = lerp(tone(v) * (1 + (rtL - 1) * 0.6 * (1 - hzF)), fk > 0 ? tone(fc) : fc, fk);
+        // (darker than level snow: in the blue of the snow's shade, no deeper than the near snow's shade; brighter: by
+        // brightness alone)
+        var SW = [1.55, 0.9, 0.35][ch];
+        var rkc = rtL < 1 ? 1 - Math.min(1 - rtL, 0.15) * 0.7 * SW : 1 + (rtL - 1) * 0.3 * (1 - hzF);
+        outA[pass * 4 + ch] = lerp(tone(v) * rkc, fk > 0 ? tone(fc) : fc, fk);
       }
     }
     // the snow field's own grain (the same pattern, on the field's own grid of pixels), so the two textures run on

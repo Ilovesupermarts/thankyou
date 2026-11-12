@@ -62,6 +62,9 @@ function rng(seed) {
    last few levels, so the brightest snow stays just short of white and its shading still shows. (winterhall.js uses
    the same curve, so the hall's snow meets the field's without a seam.) */
 var TONE_KNEE = 228, TONE_ROOM = 24;
+// how much each colour drops in the snow's shade, red most and blue least (measured on the near snow's own shade,
+// about 0.89 : 0.94 : 0.98 of the lit snow): far away, where the shading is laid on as a ratio, its shade is this blue
+var SHADE_W = [1.55, 0.9, 0.35];
 function tone(v) { return v > TONE_KNEE ? TONE_KNEE + (v - TONE_KNEE) * TONE_ROOM / (v - TONE_KNEE + TONE_ROOM) : v; }
 /* smooth value noise, 0 … 1, and its sum over a few sizes, −1 … 1 */
 function hash(i, j, s) {
@@ -333,7 +336,10 @@ function groundJob(c, o) {
         if (vF > 226) vF = 226 + (vF - 226) * 26 / (vF - 226 + 26);
         // the low sun's warmth on the far snow under it
         var gl = glowCol[ch] * o.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((sx - o.sunX) / (W * 0.42), 2));
-        var vOld = tone(lerp(vA, mist[ch], hz) + gl), vNew = tone(lerp(vF, mist[ch], hz) + gl) * rk;
+        // (where a slope gets less light than level snow, it is darkened by its own colour of light: less of the warm sun,
+        // the sky's blue left, so its shade is blue as near you; where it gets more, by brightness alone, so no yellow)
+        var rkc = rL < 1 ? 1 - Math.min(1 - rL, 0.15) * 0.7 * SHADE_W[ch] : 1 + (rL - 1) * 0.3 * (1 - hz);
+        var vOld = tone(lerp(vA, mist[ch], hz) + gl), vNew = tone(lerp(vF, mist[ch], hz) + gl) * rkc;
         D[k + ch] = clamp(lerp(vOld, vNew, wF) * g, 0, 255);
       }
       D[k + 3] = 255;
@@ -653,5 +659,5 @@ function steam(S, c, o, t, dt) {
   c.restore();
 }
 
-return { shore: shore, bakeGround: bakeGround, groundJob: groundJob, bakeMirror: bakeMirror, bakeStill: bakeStill, steam: steam, heightAt: heightAt };
+return { shore: shore, bakeGround: bakeGround, groundJob: groundJob, bakeMirror: bakeMirror, bakeStill: bakeStill, steam: steam, heightAt: heightAt, SHADE_W: SHADE_W };
 })();
