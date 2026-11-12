@@ -377,7 +377,7 @@ var V_DEFAULTS = {
   // size and speed, the simulated waves (fftwaves.js) and the wind over the water (m/s), the sun's sparkle, the
   // picture's resolution; then the cold: thin ice along the shores (how much, how wide, m), the mist on the far
   // water, the steam rising off it (how much, how high)
-  lakeMirror: 0.95, lakeCalm: 0.6, lakeWaves: 0.25, lakeWaveSize: 1, lakeSpeed: 0.2, lakeFft: true, lakeWind: 0.45, lakeSparkle: 1, lakeRes: 0.75,
+  lakeMirror: 0.95, lakeCalm: 0, lakeWaves: 0.7, lakeWaveSize: 1, lakeSpeed: 0.2, lakeFft: true, lakeWind: 1, lakeSparkle: 1, lakeRes: 0.75,
   thinIce: 0.7, iceWidth: 1.2, lakeMist: 0.5, steam: 0.8, steamRise: 1,
   // step 7, the right bank's roped pines and firs (yukitsuri.js; the user's sheet of five variants and their scene picture):
   // shown, the forest's seed, snow, ropes (× how many), variant 1's crown width, props, softness, haze, the shadows (the
@@ -574,13 +574,16 @@ function merge(dst, src, def) {
 try {
   var saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
   if (saved) {
+    // the water's calm, wind and wave strength saved before ver 4 were the damped first settings (the waves barely
+    // showed): not read, so the new defaults take effect
+    if (saved.V && !(saved.ver >= 4)) { delete saved.V.lakeCalm; delete saved.V.lakeWind; delete saved.V.lakeWaves; }
     merge(V, saved.V || {}, V_DEFAULTS);
     // the sun and the clouds saved before step 1, and the mountains saved before step 2, were winter2.html's: not read
     if (saved.ver >= 2) { merge(CLOUD, saved.CLOUD || {}, CLOUD_DEFAULTS); merge(SUN, saved.SUN || {}, SDEF); }
     if (saved.ver >= 3) merge(MT, saved.MT || {}, MT_DEFAULTS);
   }
 } catch (e) { /* a private window: the defaults */ }
-function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 3, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
+function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 4, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
 
 /* Toolbar date and time (Nagoya). */
 function tickClock() {
@@ -2380,8 +2383,10 @@ function lakeBody() {
 }
 function lakeFft() {
   if (!V.lakeFft) return null;
-  return { size: 256, wind: V.lakeWind, dir: 120, fetch: 600, spread: 0.6, L0: 90, L1: 12, eye: 0.9, height: 0.9, chop: 0.8,
-           detail: 0.5, far: 0.2, shade: 0.12 };
+  // the autumn lake's simulated waves (app.js LAKE.fft…): the same tiles, fetch, height, sharpness far away and light and
+  // shade on each wave, so the waves read across the whole surface; the wind is the winter lake's own (lakeWind, m/s)
+  return { size: 256, wind: V.lakeWind, dir: 120, fetch: 1340, spread: 0.53, L0: 132, L1: 16.5, eye: 0.9, height: 0.94, chop: 0.85,
+           detail: 0.28, far: 0.28, shade: 0.47 };
 }
 var lakeInfo = '';
 function drawLake(t, dt) {
