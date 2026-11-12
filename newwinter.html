@@ -2928,6 +2928,19 @@ window.winterLab = {
     (what === 'all' ? ['mtn', 'hill', 'hall', 'branches', 'sprites', 'sun', 'lake', 'pines'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
     dirtyAt = nowT;
   },
+  phaseNames: PHASE_NAMES,
+  phase: function () { return CLK ? CLK.phase : 'day'; },
+  // the middle of each phase today (the hour the clock gives the phase for: see lightAt)
+  phaseHour: function (ph) {
+    var sun = sunTimes(nagoyaToday()), h;
+    if (ph === 'night') h = sun.set + 2.5;
+    else if (ph === 'dawn') h = sun.rise + 0.3;
+    else if (ph === 'morning') h = Math.min(sun.rise + 3, 10.5);
+    else if (ph === 'golden') h = sun.set - 1;
+    else if (ph === 'dusk') h = sun.set + 0.25;
+    else h = sun.noon;
+    return Math.round(clamp(h, 4, 22) * 20) / 20;
+  },
   setHour: function () {
     applyHour();
     note('time: ' + V.hour.toFixed(2) + ' h · ' + PHASE_NAMES[CLK.phase] + ' · sun ' + CLK.a.alt.toFixed(1) + '° up');
@@ -3463,6 +3476,7 @@ var G = [
   { name: 'Colours of the new scene', note: 'The brief\'s colours: snow, water, vermilion torii, stone, pine needles, straw ropes, lamplight.', ctls: [
     { col: 'V', keys: [['snow', 'Snow'], ['water', 'Water'], ['vermilion', 'Torii vermilion'], ['stone', 'Stone'], ['needle', 'Pine needles'], ['rope', 'Straw ropes'], ['flame', 'Lamplight']], re: 'all' } ] },
   { name: 'Time and weather', ctls: [
+    { sel: 'phase' },
     { o: 'V', k: 'hour', label: 'Time (hour in Nagoya, today)', min: 4, max: 22, step: 0.05, re: 'time', note: 'As the app: the sun\'s place and the sky\'s colour follow the hour. 15.5 = late afternoon, the app\'s golden hour.' },
     { sel: 'condition' },
     { o: 'V', k: 'wind', label: 'Wind', min: 0, max: 4, step: 0.05, re: 'live' },
@@ -3646,8 +3660,25 @@ function build() {
     host.appendChild(sec);
   });
 }
+var phaseSel = null, hourCtl = null;
 function control(c) {
   var row;
+  if (c.sel === 'phase') {
+    // step 4 of the plan's clock: choose a phase of the day and the hour jumps to its middle (today's sun times); the slider
+    // below still sets any hour, and this choice follows it
+    row = document.createElement('label'); row.className = 'sp-colour'; row.textContent = 'Time phase';
+    var ps = document.createElement('select');
+    Object.keys(lab.phaseNames).forEach(function (k) { var op = document.createElement('option'); op.value = k; op.textContent = lab.phaseNames[k]; ps.appendChild(op); });
+    ps.value = lab.phase();
+    ps.addEventListener('change', function () {
+      OBJ.V.hour = lab.phaseHour(ps.value);
+      if (hourCtl) { hourCtl.inp.value = OBJ.V.hour; hourCtl.vs.textContent = fmt(hourCtl.c, OBJ.V.hour); }
+      lab.changed('time');
+    });
+    phaseSel = ps;
+    row.appendChild(ps);
+    return row;
+  }
   if (c.sel) {
     row = document.createElement('label'); row.className = 'sp-colour';
     var sel = document.createElement('select'), opts, val;
@@ -3704,7 +3735,11 @@ function control(c) {
   var lb = document.createElement('label'); lb.textContent = c.label;
   var vs = document.createElement('span'); vs.textContent = fmt(c, O[c.k]); lb.appendChild(vs);
   var inp = document.createElement('input'); inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = O[c.k];
-  inp.addEventListener('input', function () { O[c.k] = parseFloat(inp.value); vs.textContent = fmt(c, O[c.k]); lab.changed(c.re); });
+  inp.addEventListener('input', function () {
+    O[c.k] = parseFloat(inp.value); vs.textContent = fmt(c, O[c.k]); lab.changed(c.re);
+    if (c.k === 'hour' && phaseSel) phaseSel.value = lab.phase();                // the phase follows the hour
+  });
+  if (c.o === 'V' && c.k === 'hour') hourCtl = { inp: inp, vs: vs, c: c };
   row.appendChild(lb); row.appendChild(inp);
   if (c.note) { var n = document.createElement('small'); n.textContent = c.note; row.appendChild(n); }
   return row;
@@ -3719,6 +3754,7 @@ document.getElementById('spCopy').addEventListener('click', function () {
       if (c.o) parts.push(c.label + ' ' + fmt(c, OBJ[c.o][c.k]));
       else if (c.chk) parts.push(c.label + ' ' + (OBJ[c.chk][c.k] ? 'on' : 'off'));
       else if (c.col) c.keys.forEach(function (kk) { parts.push(kk[1] + ' ' + OBJ[c.col].colours[kk[0]]); });
+      else if (c.sel === 'phase') parts.push('Time phase ' + lab.phaseNames[lab.phase()]);
       else if (c.sel) parts.push('Weather ' + OBJ.SUN.condition);
     });
     lines.push(grp.name + ': ' + parts.join(', '));
