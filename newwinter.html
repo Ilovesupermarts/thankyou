@@ -375,7 +375,7 @@ var V_DEFAULTS = {
   trailShow: true, trailToHall: true,
   trail1X: 0.150, trail1Y: 1.01, trail2X: 0.1575, trail2Y: 0.92, trail3X: 0.1725, trail3Y: 0.85, trail4X: 0.1925, trail4Y: 0.785,
   trail5X: 0.2225, trail5Y: 0.735, trailBend: 1,
-  trailWidth: 4, trailDepth: 0.12, trailWall: 0.22, trailBerm: 0.03, trailWobble: 1, trailTrod: 1, trailGrey: 0.5, trailShadow: 1, trailBounce: 0.65,
+  trailWidth: 4, trailDepth: 0.24, trailWall: 0.22, trailBerm: 0.03, trailWobble: 1, trailTrod: 1, trailGrey: 0.5, trailShadow: 1, trailBounce: 0.65,
   // the valley mist: its middle (share of the height, as on the reference), its height and strength
   mistY: 0.645, mistHeight: 0.14, mistStrength: 0.85,
   // the snow ground and the lake (step 6, winterlake.js): the eye's height above the snow (m), the banks' height above
@@ -590,13 +590,15 @@ try {
     // the pagoda's depth of field strength and most blur saved before ver 5 were the first, faint settings (1.7 px at the
     // pagoda's distance): not read, so the stronger defaults take effect (its on / off and focus are kept)
     if (saved.V && !(saved.ver >= 5)) { delete saved.V.pagodaDofStrength; delete saved.V.pagodaDofMax; }
+    // (ver 6: the path's walls doubled to 0.24 m: a height saved before is not read)
+    if (saved.V && !(saved.ver >= 6)) delete saved.V.trailDepth;
     merge(V, saved.V || {}, V_DEFAULTS);
     // the sun and the clouds saved before step 1, and the mountains saved before step 2, were winter2.html's: not read
     if (saved.ver >= 2) { merge(CLOUD, saved.CLOUD || {}, CLOUD_DEFAULTS); merge(SUN, saved.SUN || {}, SDEF); }
     if (saved.ver >= 3) merge(MT, saved.MT || {}, MT_DEFAULTS);
   }
 } catch (e) { /* a private window: the defaults */ }
-function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 5, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
+function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 6, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
 
 /* Toolbar date and time (Nagoya). */
 function tickClock() {
@@ -3163,7 +3165,7 @@ function trailCtls() {
   }
   return out.concat([
     { o: 'V', k: 'trailWidth', label: 'Width (m)', min: 1, max: 8, step: 0.05, re: 'trail' },
-    { o: 'V', k: 'trailDepth', label: 'Side walls: height (m; ankle deep is about 0.12)', min: 0, max: 0.5, step: 0.005, re: 'trail' },
+    { o: 'V', k: 'trailDepth', label: 'Side walls: height (m)', min: 0, max: 0.5, step: 0.005, re: 'trail' },
     { o: 'V', k: 'trailWall', label: 'Side walls: how wide their slope is (m)', min: 0.04, max: 1, step: 0.01, re: 'trail', note: 'Small: steep, crisp walls; large: soft, rounded ones.' },
     { o: 'V', k: 'trailBerm', label: 'Snow pushed aside along the top (m)', min: 0, max: 0.2, step: 0.005, re: 'trail' },
     { o: 'V', k: 'trailWobble', label: 'How much its edges wander', min: 0, max: 2, step: 0.05, re: 'trail' },
