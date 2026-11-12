@@ -18,3 +18,7 @@ Added in the step 8 session (each script's first line says how to call it):
 - `path-geometry.js` — the hall's rise numbers and the path's centre line in metres.
 - `water-evict.js`, `water-apppath.js` — the lake water losing its graphics context (too many contexts open) and recovering (test bed) or latching (as the app).
 - `pagoda-dof.js` — the pagoda's depth of field at several focus distances.
+
+Added at the end of the step 8 session (run from this folder; each script's first line says how):
+- `user-scene.js` + `user-values.json` — the test bed with the user's own panel values (now the page's defaults), any overrides, saves PREFIX-full.png. The quick check for path / hall / snow changes: SCALE 1 and `{"V":{"ytShow":false,"showMountains":false,"hillShow":false,"pagodaShow":false}}`, about 2.5 min. The full check is SCALE 2 without the overrides except `ytShow:false` (about 7 min; it needs `timeout 1700` and `run_in_background`).
+- `field-probe.js` — what a line of sight through a screen point meets in the snow field's path code. `path-band.js` — the path's edges on the screen. `hall-field-layers.js` — the hall's and the field's own pictures.

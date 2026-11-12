@@ -12,9 +12,8 @@
      each its own size, turn and depth, many overlapping), softened
      older prints, and the trodden line a little lower in the middle;
    - each side a wall of snow: rounded at its top lip, its foot meeting
-     the floor in a soft curve, its line wandering (no ruler edges), here
-     and there a notch where a foot stepped out, and clumps broken off it
-     lying at its foot;
+     the floor in a soft curve, its line wandering (no ruler edges), clumps
+     broken off it lying at its foot;
    - beyond the wall a low ridge of snow pushed aside, fading into the
      untouched snow.
    It is not a picture: the painters that draw the snow (winterlake.js
@@ -126,7 +125,7 @@ function build(o) {
   // the half width along it: wandering a little (each side its own), narrowing to endHalf at the end
   function halfW(s, side) {
     var w = W0 + wob * (0.13 * n1(s / 3.1, seed + side * 7) + 0.05 * n1(s / 0.9, seed + 3 + side * 7));
-    if (endHalf > 0) w = lerp(w, endHalf, smooth(L - 12, L - 1, s));
+    if (endHalf > 0) w = lerp(w, endHalf, smooth(L - 5, L - 1, s));          // (only where it goes in under the steps)
     return w;
   }
   function depthAt(s) { return D0 * (1 + 0.22 * wob * n1(s / 5.3, seed + 21)); }
@@ -161,12 +160,9 @@ function build(o) {
     // the edge as a rounded end where it stops (after its last point)
     var dU = au - hw, dS = s - L;
     var a = dS > 0 ? (dU > 0 ? Math.hypot(dU, dS) : Math.max(dU, dS)) : dU;
-    // a notch here and there where a foot stepped out over the edge (each its own size; most stretches have none)
-    var nk = Math.floor(s / 2.3), nr = hash2(nk, side, seed + 41);
-    if (nr < 0.22 * trod) {
-      var nc = (nk + 0.15 + 0.7 * hash2(nk, side, seed + 43)) * 2.3, nw = 0.16 + 0.22 * hash2(nk, side, seed + 45), nd = (s - nc) / nw;
-      a -= (0.08 + 0.14 * hash2(nk, side, seed + 47)) * Math.exp(-nd * nd) * smooth(0.5, -0.1, a);
-    }
+    // (there were notches here where feet stepped out over the edge, then broad scoops: seen from 20 m and more, each
+    // showed the shaded wall face as a thin dark sliver or crescent that read as a mistake in the drawing; the wall's
+    // own wandering edge (halfW) and the clumps at its foot give it its unevenness)
     Q.a = a;
     if (a > wallW + 1.2) return 0;
     var D = depthAt(s), ww = wallW * (0.85 + 0.3 * n1(s / 2.3, seed + 31 + side));
@@ -266,7 +262,7 @@ function build(o) {
     }
     return clamp(1 - 0.5 * occ, 0, 1);
   }
-  return { delta: delta, near: near, sun: sun, sky: sky, Q: Q, maxRise: maxRise, maxDrop: maxDrop, length: L,
+  return { delta: delta, near: near, sun: sun, sky: sky, Q: Q, maxRise: maxRise, maxDrop: maxDrop, length: L, trod: trod,
            ends: [[X[0], Z[0]], [X[N - 1], Z[N - 1]]], at: function (s) { var i = clamp(Math.round(s / ds), 0, N - 1); return [X[i], Z[i]]; },
            sAt: function (x, z) { return locate(x, z) ? Q.s : -1; } };
 }

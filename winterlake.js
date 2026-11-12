@@ -56,6 +56,22 @@ function rng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+/* The final colour of the snow, rolled off softly toward white: the haze and the low sun's warm glow are added after
+   the snow's own soft shoulder, and far away under the sun they took it past 255, where every shade was cut off (the
+   far path and its walls read as flat paper white). Below KNEE nothing changes; above it the rest is squeezed into the
+   last few levels, so the brightest snow stays just short of white and its shading still shows. (winterhall.js uses
+   the same curve, so the hall's snow meets the field's without a seam.) */
+var TONE_KNEE = 228, TONE_ROOM = 24;
+// how much each colour drops in the snow's shade, red most and blue least (measured on the near snow's own shade,
+// about 0.89 : 0.94 : 0.98 of the lit snow): far away, where the shading is laid on as a ratio, its shade is this blue
+var SHADE_W = [1.55, 0.9, 0.35];
+// how much light a shade of depth d (0 … 1) leaves in each colour: light shade in that blue, deep shadow greyer-blue
+// as the reference paints its path's shadows (176,183,199 against lit 235,240,245: red 25 %, green 24 %, blue 19 % down)
+function shadeMul(d, ch) {
+  var k = smooth(0.06, 0.25, d), w = lerp(SHADE_W[ch], [1.05, 1.0, 0.8][ch], k);
+  return Math.max(0, 1 - d * w);
+}
+function tone(v) { return v > TONE_KNEE ? TONE_KNEE + (v - TONE_KNEE) * TONE_ROOM / (v - TONE_KNEE + TONE_ROOM) : v; }
 /* smooth value noise, 0 … 1, and its sum over a few sizes, −1 … 1 */
 function hash(i, j, s) {
   var h = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(s, 982451653)) | 0;
@@ -160,6 +176,13 @@ function heightAt(x, z, o, fz, dk) {
       var rr = 1 - Math.abs(Math.sin(u * PI));
       h += rr * rr * (0.55 + 0.45 * fbm(x / 6, z / 6, s + 7, 2)) * 0.11 * o.drifts * fade * (dk === undefined ? 1 : dk);
     }
+    // and long low drifts, tens of metres apart: far away (toward the hall) the small ones are finer than a pixel and
+    // fade out, and the snow there read as plain white; these still shade it in soft bands as the wind laid them
+    var fadeF = 1 - smooth(8, 20, fz);
+    if (fadeF > 0) {
+      var w2 = fbm(x / 40 + 1.7, z / 40, s + 13, 2), u2 = (z * 0.95 + x * 0.3) / 34 + w2 * 1.6, r2 = 1 - Math.abs(Math.sin(u2 * PI));
+      h += r2 * r2 * (0.5 + 0.5 * fbm(x / 25, z / 25, s + 17, 2)) * 0.3 * o.drifts * fadeF * (dk === undefined ? 1 : dk);
+    }
   }
   return h;
 }
@@ -183,13 +206,49 @@ function groundJob(c, o) {
      facing you shows, the one facing away hides behind its own lip, the floor sinks a little up the screen). ---- */
   var PT = o.path || null, PO = o.pathLook || {}, Ls = [L[0], L[1], -L[2]];          // toward the sun, z away
   var pGrey = PO.grey === undefined ? 0.5 : PO.grey, pShade = PO.shadow === undefined ? 1 : PO.shadow, pBounce = PO.bounce === undefined ? 0.5 : PO.bounce;
-  var kA = PT ? 1 - PT.maxRise / eye : 1, kB = PT ? 1 + PT.maxDrop / eye : 1, HK = 0, nPath = 0;
+  var kA = PT ? Math.max(0.02, 1 - PT.maxRise / eye) : 1, kB = PT ? 1 + PT.maxDrop / eye : 1, HK = 0, nPath = 0;
   var dlFlat = Math.max(0, L[1]);                                                     // the sun on level snow
+  function farRatio(dl, sk) {
+    var a = 0, b = 0;
+    for (var ch = 0; ch < 3; ch++) { a += snow[ch] * sun[ch] * dl * 1.25 + shade[ch] * sk; b += snow[ch] * sun[ch] * dlFlat * 1.25 + shade[ch]; }
+    return a / Math.max(1, b);
+  }
   function pathHit(x, z, fz) {
     var r0 = Math.hypot(x, z);
+    // a path over raised ground (up the hall's rise, o.path.riseBox: where the ground stands above the field): the line
+    // of sight meets that ground before it reaches the field's level, so it is followed over it from where it comes
+    // above the box, in steps as long as its height above the snow allows, then halved down to the surface
+    if (PT.riseBox) { var rh = riseHit(x, z, fz); if (rh >= 0) return rh; }
+    return pathHit1(x, z, fz, r0);
+  }
+  function riseHit(x, z, fz) {
+    // (it starts where the line of sight is still above the highest snow there could be: at the rise's near edge it
+    // is already down at the field's level, and starting there took the edge itself for the snow's surface)
+    // It starts 5 m in front of the box (where only the path's own shallow shape lies, and the line of sight is above
+    // it), and never steps more than 1.5 m of ground at a time (the rise climbs under the line of sight: a step sized
+    // for level ground jumped clean over it)
+    var B = PT.riseBox, kTop = 1 - (PT.maxRise + 0.05) / eye;
+    var kS = Math.max(0.02, Math.min((B.z0 - 5) / z, kTop)), kE = Math.min(kB, (B.z1 + 1) / z);
+    if (kS >= kE) return -1;
+    var k = kS, prev = kS, minStep = 0.25 / z, maxStep = 1.5 / z, n = 0;
+    while (k <= kE && n++ < 600) {
+      var px = x * k, pz = z * k;
+      var g = eye * (1 - k) - PT.delta(px, pz, fz, true);
+      if (g <= 0) {
+        var lo = prev, hi = k;
+        for (var b = 0; b < 8; b++) { var m = (lo + hi) / 2; if (eye * (1 - m) - PT.delta(x * m, z * m, fz, true) > 0) lo = m; else hi = m; }
+        HK = hi;
+        return PT.near(x * hi, z * hi, 0) ? 1 : 0;        // (away from the path the hall's own snow lies over it)
+      }
+      prev = k;
+      k += clamp(g / (eye * 1.25), minStep, maxStep);
+    }
+    return -1;
+  }
+  function pathHit1(x, z, fz, r0) {
     if (!PT.near(x, z, r0 * (kB - kA) + 0.5)) return 0;
     // steps of about a pixel over the stretch of screen the path's depth covers here, then halving to the surface
-    var parPx = (PT.maxDrop + PT.maxRise) * F / z * res, n = clamp(Math.ceil(parPx / 2) + 2, 3, 24);
+    var parPx = (kB - kA) * eye * F / z * res, n = clamp(Math.ceil(parPx / 2) + 2, 3, 64);
     var prevK = kA;
     if (eye * (1 - kA) - PT.delta(x * kA, z * kA, fz, true) <= 0) { HK = kA; return 1; }
     for (var q = 1; q <= n; q++) {
@@ -239,15 +298,31 @@ function groundJob(c, o) {
     var hzv = clamp((1 - Math.exp(-Math.pow(hz / hazeM, 1.6))) * o.haze + smooth(8, 0, F * eye / hz) * 0.7, 0, 1);
     var gfar = 1 - Math.exp(-hz / 70), sx = (i + 0.5) / res;
     var kk2 = (i + j * gw) * 4, g = gs ? 1 + (hash(i, j, 5) - 0.5) * 0.035 * gs * (1 + fl) : 1;
-    // trodden snow: packed and a little greyer and cooler than the fresh snow round it
+    // trodden snow: packed and a little greyer and cooler than the fresh snow round it. Its footprints shade it too, but
+    // they grow smaller than a pixel with distance and fade out (winterpath.js): their shading is kept as a tone, so the
+    // floor stays the same grey-blue all the way to the hall (and the near wall's lip shows against it)
     var alb = 1 - 0.07 * pGrey * fl, cool = 0.1 * pGrey * fl;
+    // (and after the roll-off toward white, a fixed grey-blue tint for packed snow, so it reads the same at every
+    // distance: far away, where the floor is lit nearly as bright as the snow round it, the roll-off squeezed the
+    // difference away and the far floor went as white as the fresh snow, its near wall's lip lost against it)
+    var tk = fl * pGrey * 2, tint0 = 1 - 0.065 * tk, tint1 = 1 - 0.045 * tk, tint2 = 1 - 0.015 * tk;
+    // (shaded at every distance as the far snow round it is: level snow's brightness rolled off toward white, the light of the
+    // wall or floor laid on as a ratio in the blue of the snow's shade; drawn the old way, the wall's shadow came out
+    // grey against the blue-shaded snow beside it)
+    var wFp = 1, rLp = farRatio(dl, sk * (1 - 0.04 * pGrey * fl)) * alb;
     for (var ch = 0; ch < 3; ch++) {
       var sc = lerp(snow[ch], shade[ch] * 1.15, cool) * alb;
       var v = sc * sun[ch] * dl * 1.25 + shade[ch] * sk * (1 - 0.04 * pGrey * fl);
       if (v > 226) v = 226 + (v - 226) * 26 / (v - 226 + 26);
-      v = lerp(v, mist[ch], hzv);
-      v += glowCol[ch] * o.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((sx - o.sunX) / (W * 0.42), 2));
-      D[kk2 + ch] = clamp(v * g, 0, 255);
+      var gl = glowCol[ch] * o.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((sx - o.sunX) / (W * 0.42), 2));
+      var vOld = tone(lerp(v, mist[ch], hzv) + gl);
+      if (wFp > 0) {
+        var vF = snow[ch] * sun[ch] * dlFlat * 1.25 + shade[ch];
+        if (vF > 226) vF = 226 + (vF - 226) * 26 / (vF - 226 + 26);
+        var rkp = rLp < 1 ? shadeMul(Math.min(1 - rLp, 0.45) * 0.75, ch) : 1 + (rLp - 1) * 0.3 * (1 - hzv);
+        vOld = lerp(vOld, tone(lerp(vF, mist[ch], hzv) + gl) * rkp, wFp);
+      }
+      D[kk2 + ch] = clamp(vOld * g * (ch === 0 ? tint0 : ch === 1 ? tint1 : tint2), 0, 255);
     }
     D[kk2 + 3] = 255;
   }
@@ -267,14 +342,21 @@ function groundJob(c, o) {
       nx /= nl; ny /= nl; nz /= nl;
       var dl = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]), sk = 0.5 + 0.5 * ny;
       var k = (i + j * gw) * 4, g = gs ? 1 + (hash(i, j, 5) - 0.5) * 0.035 * gs : 1;
+      // (far away the brightness is found for level snow, rolled off toward white, and the slope's light laid over it as
+      // a ratio of brightness: rolled off with the rest, the far snow's shading was squeezed to a third and it read as
+      // plain white. Near you, where it showed, the snow is drawn exactly as before)
+      var wF = smooth(45, 110, z), rL = farRatio(dl, sk) , rk = 1 + (rL - 1) * 0.6 * (1 - hz);
       for (var ch = 0; ch < 3; ch++) {
-        var v = snow[ch] * sun[ch] * dl * 1.25 + shade[ch] * sk;
-        // a soft shoulder, so the brightest snow does not flatten to pure white
-        if (v > 226) v = 226 + (v - 226) * 26 / (v - 226 + 26);
-        v = lerp(v, mist[ch], hz);
+        var vA = snow[ch] * sun[ch] * dl * 1.25 + shade[ch] * sk, vF = snow[ch] * sun[ch] * dlFlat * 1.25 + shade[ch];
+        if (vA > 226) vA = 226 + (vA - 226) * 26 / (vA - 226 + 26);
+        if (vF > 226) vF = 226 + (vF - 226) * 26 / (vF - 226 + 26);
         // the low sun's warmth on the far snow under it
-        v += glowCol[ch] * o.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((sx - o.sunX) / (W * 0.42), 2));
-        D[k + ch] = clamp(v * g, 0, 255);
+        var gl = glowCol[ch] * o.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((sx - o.sunX) / (W * 0.42), 2));
+        // (where a slope gets less light than level snow, it is darkened by its own colour of light: less of the warm sun,
+        // the sky's blue left, so its shade is blue as near you; where it gets more, by brightness alone, so no yellow)
+        var rkc = rL < 1 ? shadeMul(Math.min(1 - rL, 0.15) * 0.7, ch) : 1 + (rL - 1) * 0.3 * (1 - hz);
+        var vOld = tone(lerp(vA, mist[ch], hz) + gl), vNew = tone(lerp(vF, mist[ch], hz) + gl) * rkc;
+        D[k + ch] = clamp(lerp(vOld, vNew, wF) * g, 0, 255);
       }
       D[k + 3] = 255;
     }
@@ -317,7 +399,16 @@ function groundJob(c, o) {
       finish(); done = true; cpu += performance.now() - t0; return true;
     },
     cancel: function () { done = true; },
-    info: function () { return { rows: gh, pathPixels: nPath, cpu: cpu }; }
+    info: function () { return { rows: gh, pathPixels: nPath, cpu: cpu }; },
+    // (for checking: what the line of sight through a point of the screen (CSS px) meets)
+    probe: function (sx, sy) {
+      var d = Math.max(0.3, sy - hy), z = eye * F / d, x = (sx - W / 2) * z / F, fz = eye * F / (d * d) / Math.max(0.3, res / PR);
+      var r = { z: z, x: x }; if (!PT) return r;
+      r.box = PT.riseBox || null; r.rise = PT.riseBox ? riseHit(x, z, fz) : -2; r.HKrise = HK;
+      r.hit = pathHit(x, z, fz); r.HK = HK; r.near = PT.near(x * HK, z * HK, 0);
+      r.delta = PT.delta(x * HK, z * HK, fz, true); r.a = PT.Q.a; r.far = PT.Q.far; r.ray = eye * (1 - HK);
+      return r;
+    }
   };
 }
 /* How much a thing at screen height y is hazed into the mist (as the ground is). */
@@ -584,5 +675,5 @@ function steam(S, c, o, t, dt) {
   c.restore();
 }
 
-return { shore: shore, bakeGround: bakeGround, groundJob: groundJob, bakeMirror: bakeMirror, bakeStill: bakeStill, steam: steam };
+return { shore: shore, bakeGround: bakeGround, groundJob: groundJob, bakeMirror: bakeMirror, bakeStill: bakeStill, steam: steam, heightAt: heightAt, SHADE_W: SHADE_W, shadeMul: shadeMul };
 })();

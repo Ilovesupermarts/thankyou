@@ -15,6 +15,7 @@
 <script src="clouds.js"></script>
 <script src="snowfield.js"></script>
 <script src="snowheaps.js"></script>
+<script src="plumsnow.js"></script>
 <script src="winterhill.js"></script>
 <script src="winterhall.js"></script>
 <script src="fftwaves.js"></script>
@@ -363,14 +364,14 @@ var V_DEFAULTS = {
   // each element's place (step 0): moved across and up/down (shares of the screen) and sized about its foot
   fujiX: 0, fujiY: 0, fujiSize: 1,
   hillX: 0, hillY: 0, hillSize: 1,
-  pagodaX: 0, pagodaY: 0, pagodaSize: 1,
-  hallX: 0, hallY: 0, hallSize: 1,
+  pagodaX: 0, pagodaY: 0, pagodaSize: 0.77,
+  hallX: 0, hallY: 0, hallSize: 1.25,
   frostX: 0, frostY: 0, frostSize: 1,
   lakeX: 0, lakeY: 0, lakeSize: 1,
   pinesX: 0, pinesY: 0, pinesSize: 1,
   pathX: 0, pathY: 0, pathSize: 1,
-  gatesX: 0, gatesY: 0, gatesSize: 1,       // the three torii (not 'torii…': winter2.html's old saved toriiX / toriiSize would be read as these)
-  lanternsX: 0, lanternsY: 0, lanternsSize: 1,
+  gatesX: 0.3, gatesY: 0, gatesSize: 1,       // the three torii (not 'torii…': winter2.html's old saved toriiX / toriiSize would be read as these)
+  lanternsX: 0.3, lanternsY: 0, lanternsSize: 1,
   plumLX: 0, plumLY: 0, plumLSize: 1,
   plumRX: 0, plumRY: 0, plumRSize: 1,
   // step 3, the hill of firs (winterhill.js): which forest, rows, how close and how full, the firs' sizes at the crest and
@@ -401,16 +402,16 @@ var V_DEFAULTS = {
   // (m), the snow pushed aside along its top (m), how much its edges wander, footprints, how grey the trodden snow
   // is, and the shadows its walls cast
   trailShow: true, trailToHall: true,
-  trail1X: 0.150, trail1Y: 1.01, trail2X: 0.1575, trail2Y: 0.92, trail3X: 0.1725, trail3Y: 0.85, trail4X: 0.1925, trail4Y: 0.785,
-  trail5X: 0.2225, trail5Y: 0.735, trailBend: 1,
-  trailWidth: 4, trailDepth: 0.24, trailWall: 0.22, trailBerm: 0.03, trailWobble: 1, trailTrod: 1, trailGrey: 0.5, trailShadow: 1, trailBounce: 0.65,
+  trail1X: 0.1578, trail1Y: 0.9931, trail2X: 0.1036, trail2Y: 0.8862, trail3X: 0.1138, trail3Y: 0.7944, trail4X: 0.1678, trail4Y: 0.7387,
+  trail5X: 0.2329, trail5Y: 0.7187, trailBend: 1,
+  trailWidth: 4, trailDepth: 0.3, trailWall: 0.22, trailBerm: 0.03, trailWobble: 0.45, trailTrod: 1, trailGrey: 0.5, trailShadow: 1, trailBounce: 0.65,
   // the valley mist: its middle (share of the height, as on the reference), its height and strength
   mistY: 0.645, mistHeight: 0.14, mistStrength: 0.85,
   // the snow ground and the lake (step 6, winterlake.js): the eye's height above the snow (m), the banks' height above
   // the water (m) and how uneven their edge is; the snow's swells, wind-carved drifts, grain and sparkle, its haze
   // (how strong, and the distance (m) at which it is about two thirds mist), the low sun's warmth on the far snow
-  eyeHeight: 3, bankDrop: 0.5, bankWobble: 1,
-  fieldSwell: 1, fieldDrifts: 1, fieldGrain: 1, fieldSparkle: 1, fieldHaze: 1, fieldHazeDist: 260, fieldGlow: 0.6,
+  eyeHeight: 3, bankDrop: 0.5, bankWobble: 1.7,
+  fieldSwell: 1.75, fieldDrifts: 1.2, fieldGrain: 1, fieldSparkle: 1.35, fieldHaze: 1, fieldHazeDist: 260, fieldGlow: 0.6,
   // the water (water.js, as the autumn lake): how strongly it mirrors, how far the waves move the reflections, their
   // size and speed, the simulated waves (fftwaves.js) and the wind over the water (m/s), the sun's sparkle, the
   // picture's resolution; then the cold: thin ice along the shores (how much, how wide, m), the mist on the far
@@ -444,6 +445,10 @@ var V_DEFAULTS = {
   branchCount: 3, branchSize: 0.9, branchDroop: 1.7, branchTop: 73, blossoms: 0.9, blossomSize: 1.05, branchSnow: 1.22, sway: 2.5, swayRandom: 1.7,
   shedEvery: 3, shedAmount: 1, regrow: 2.35, petals: 2.75, barkLight: 0.6, branchDepth: 0.35,
   snowRound: 0.45, snowRelief: 1.1, snowContact: 0.6, snowGlow: 0.9, snowGrain: 0.5, snowSparkle: 0.5, branchDust: 0.6, branchForks: true,
+  // step 10: the plum branches in the scene (with the block-in too, in place of their flat shapes), and their snow drawn by
+  // plumsnow.js (one soft ridge along each limb, white on top, slate blue on its front): on, how far down the wood's front it
+  // wraps, its lumps, how dark its front face and crease
+  plumShow: true, plumSnowNew: true, plumSnowCover: 0.3, plumSnowLumps: 1, plumSnowShade: 1,
   // the falling snow (from winter2.html; step 11)
   flakes: 334, sizeFar: 0.9, sizeNear: 4.6, farBlur: 7.1, nearBlur: 0.65, fallSpeed: 0.6, flakeSway: 3.9, frontShare: 0.17,
   bokeh: 6, backlight: 0.6,
@@ -1002,14 +1007,10 @@ function startHall() {
   var hy = H * V.horizonLine, pl = blkPlace('hall'), Hb = BLK.hall;
   var cam = WinterHill.camera(W, H, hy, MT.lens);
   var L = { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) };
-  var firs = [];
-  if (V.hfShow) BLK.hallFirs.forEach(function (f, i) {
-    var top = pl.Y(f.top), foot = pl.Y(f.foot), x = pl.X(f.x), n = BLK.hallFirs.length;
-    firs.push({ x: x, foot: foot, h: (foot - top) * V.hfSize, seed: Math.round(V.hfSeed) * 100 + i * 7 + 3,
-                haze: clamp(V.hfHaze * lerp(0.75, 1.25, n > 1 ? i / (n - 1) : 0.5), 0, 0.95) });
-  });
+  var firs = hallFirList(pl);
   HALL.job = WinterHall.job({
-    path: trailFor('hall'), pathLook: { grey: V.trailGrey, shadow: V.trailShadow, bounce: V.trailBounce },
+    path: trailFor('hall'), stepBase: V.trailShow && V.trailToHall ? V.trailDepth : 0,
+    pathLook: { grey: V.trailGrey, shadow: V.trailShadow, bounce: V.trailBounce },
     W: W, H: H, PR: PR, cam: cam, place: { x0: pl.X(Hb.eave0), x1: pl.X(Hb.eave1), top: pl.Y(Hb.top), foot: pl.Y(Hb.base) },
     yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, riseFront: V.hallRiseFront, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
     haze: V.hallHaze, footMist: V.hallFootMist, shadow: V.hallShadow, lit: lampLevel() * V.hallLamps, spill: V.hallSpill,
@@ -1018,7 +1019,8 @@ function startHall() {
     weather: V.hallWeather, ridge: V.hallRidge, railing: V.hallRailing, rope: V.hallRope,
     dof: { on: V.hallDof, focus: V.hallFocus, strength: V.hallDofStrength, max: V.hallDofMax },
     field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: light(mix(hex(V.colours.mist), [222, 210, 204], 0.45)),
-             haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis },
+             haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis,
+             grain: V.fieldGrain, res: 0.6, swell: V.fieldSwell, drifts: V.fieldDrifts, seed: V.seed },
     firs: firs,
     firLook: { snow: V.hfSnow, width: V.hfWidth, tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean,
                brush: V.hillBrush, soft: V.hillSoft, needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle) }
@@ -1031,12 +1033,22 @@ function startHall() {
    (winterlake.js) and the hall's rise (winterhall.js) each carve it into their own snow and light it as the rest.
    ============================================================ */
 var TRAIL = { key: '', T: null, hall: null, cutS: Infinity, info: '' };
+function hallFirList(pl) {                               // the firs beside the hall (CSS px), for the hall and its rise
+  var firs = [];
+  if (V.hfShow) BLK.hallFirs.forEach(function (f, i) {
+    var top = pl.Y(f.top), foot = pl.Y(f.foot), x = pl.X(f.x), n = BLK.hallFirs.length;
+    firs.push({ x: x, foot: foot, h: (foot - top) * V.hfSize, seed: Math.round(V.hfSeed) * 100 + i * 7 + 3,
+                haze: clamp(V.hfHaze * lerp(0.75, 1.25, n > 1 ? i / (n - 1) : 0.5), 0, 0.95) });
+  });
+  return firs;
+}
 function trailHall() {                                   // where the hall's steps are (only the hall's place is worked out)
   if (typeof WinterHall === 'undefined') return null;
   var hy = H * V.horizonLine, pl = blkPlace('hall'), Hb = BLK.hall;
   return WinterHall.job({ locateOnly: true, W: W, H: H, PR: PR, cam: WinterHill.camera(W, H, hy, MT.lens),
     place: { x0: pl.X(Hb.eave0), x1: pl.X(Hb.eave1), top: pl.Y(Hb.top), foot: pl.Y(Hb.base) },
     yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, riseFront: V.hallRiseFront, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
+    firs: hallFirList(pl), firLook: { width: V.hfWidth },
     light: { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) } });
 }
 // the panel's point n on the screen (CSS px), then on the snow (m: x right of the eye, z away)
@@ -1066,7 +1078,7 @@ function trailLineM(PM) {
   var pts = PM.pts.slice(), hall = PM.hall;
   var dx = pts[0][0] - pts[1][0], dz = pts[0][1] - pts[1][1], dl = Math.hypot(dx, dz) || 1;
   pts.unshift([pts[0][0] + dx / dl * 14, Math.max(2, pts[0][1] + dz / dl * 14)]);
-  if (hall) pts.push(hall.foot(7), hall.foot(2.5), hall.steps, hall.under);
+  if (hall) pts.push(hall.foot(2.5), hall.steps, hall.under);
   return pts;
 }
 function trailBuild() {
@@ -1082,18 +1094,24 @@ function trailBuild() {
 // the path for one painter: the field's fades out where the hall's rise takes over (that one carries it up the rise)
 function trailFor(who) {
   if (!V.trailShow || typeof WinterPath === 'undefined') return null;
-  var key = [W, H, V.horizonLine, V.eyeHeight, V.hallRiseFront, MT.lens, V.pathX, V.pathY, V.pathSize, V.hallX, V.hallY, V.hallSize, V.hallTurn, V.hallSnow, V.hallEave,
+  var key = [W, H, V.horizonLine, V.eyeHeight, V.hallRiseFront, MT.lens, V.pathX, V.pathY, V.pathSize, V.hallX, V.hallY, V.hallSize, V.hallTurn, V.hallSnow, V.hallEave, V.hfShow, V.hfSize, V.hfWidth, V.hfSeed,
              V.hallRoof, V.hallSori, V.hallShow, V.trailToHall, V.trailBend, V.trailWidth, V.trailDepth, V.trailWall, V.trailBerm, V.trailWobble,
              V.trailTrod, V.seed, [1, 2, 3, 4, 5].map(function (n) { return V['trail' + n + 'X'] + ',' + V['trail' + n + 'Y']; }).join(';')].join('|');
   if (key !== TRAIL.key) { TRAIL.key = key; try { trailBuild(); } catch (e) { TRAIL.T = null; note('ERROR in the path: ' + e.message); } }
   var T = TRAIL.T;
   if (!T) return null;
-  if (who === 'field' && TRAIL.cutS < Infinity) {
-    // a view of the same path that fades out past the rise's foot
-    var cut = TRAIL.cutS;
-    return { delta: function (x, z, fz) { var h = T.delta(x, z, fz); if (!T.Q.far && T.Q.s > cut) h *= 1 - smoothstep(cut, cut + 2, T.Q.s); return h; },
-             near: T.near, sky: T.sky, Q: T.Q, maxRise: T.maxRise, maxDrop: T.maxDrop,
-             sun: function (x, z, h, Ls, fz) { var v = T.sun(x, z, h, Ls, fz); return v; } };
+  if (who === 'field' && TRAIL.hall && TRAIL.hall.ground) {
+    // the snow field draws the whole path, up the hall's rise to its steps: its height there is the rise's (its slope,
+    // swells and the snow banked at the base) plus the path's own; the walls' shadows and the sky they hide are worked
+    // out on the path's own shape (the rise under it is smooth over those few metres)
+    var G = TRAIL.hall.ground;
+    var base = function (x, z) { return Math.max(0, G(x, z)); };
+    // (riseBox: where the rise stands above the field, in the scene's x and z: lines of sight passing over it are
+    // followed over the rise's own surface)
+    return { delta: function (x, z, fz, coarse) { var h = T.delta(x, z, fz, coarse); return T.Q.far ? h : h + base(x, z); },
+             near: T.near, Q: T.Q, trod: T.trod, maxRise: T.maxRise, maxDrop: T.maxDrop, riseBox: TRAIL.hall.riseBox, riseTop: TRAIL.hall.drop + 0.8,
+             sky: function (x, z, h, fz) { return T.sky(x, z, h - base(x, z), fz); },
+             sun: function (x, z, h, Ls, fz) { return T.sun(x, z, h - base(x, z), Ls, fz); } };
   }
   return T;
 }
@@ -1821,7 +1839,8 @@ function umeBakeBlooms() {
 function umeBuild(left, idx) {
   var r = rngFrom(V.seed * 7919 + (left ? 0 : 101) + idx * 577);
   function M(a) { return left ? a : PI - a; }
-  var sc = Math.min(W * 0.42, H * 0.62) * V.branchSize * [1, 0.62, 0.5][idx];
+  var g0 = left ? 'plumL' : 'plumR', pA = BLK_ANCHOR[g0], pS = V.plumShow ? (V[g0 + 'Size'] || 1) : 1;   // step 10: moved and sized about its anchor
+  var sc = Math.min(W * 0.42, H * 0.62) * V.branchSize * [1, 0.62, 0.5][idx] * pS;
   var nodes = [], springs = [], blooms = [], groups = [];
   function add(parent, abs, len, w, flex, sp, g) {
     var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs, lump = [], sag = [], sp = [];
@@ -1853,6 +1872,10 @@ function umeBuild(left, idx) {
   var bx = left ? -sc * 0.04 : W + sc * 0.04, by = V.branchTop + lerp(-10, 20, r()), a0 = lerp(0.12, 0.3, r());
   if (idx === 1) { var ix = W * lerp(0.1, 0.16, r()); bx = left ? ix : W - ix; by = -sc * 0.12; a0 = lerp(0.85, 1.1, r()); }
   if (idx === 2) { by = V.branchTop + lerp(110, 170, r()); a0 = lerp(-0.1, 0.08, r()); }
+  if (V.plumShow) {
+    var ax = pA[0] * W, ay = pA[1] * H;
+    bx = ax + (bx - ax) * pS + (V[g0 + 'X'] || 0) * W; by = ay + (by - ay) * pS - (V[g0 + 'Y'] || 0) * H;
+  }
   var nM = 7, prev = -1, mains = [], las = [], i;
   for (i = 0; i < nM; i++) {
     var la = a0 + 0.075 * V.branchDroop * i + (i % 2 ? 1 : -1) * lerp(0.12, 0.28, r());
@@ -1914,6 +1937,7 @@ function snowMat(dir, haze) {
 }
 function umeBakeSnow(T) {
   if (!LT) return;
+  if (V.plumSnowNew && typeof PlumSnow !== 'undefined') { umeBakeSnowNew(T); return; }
   var C = cols(), back = T.idx > 0 ? V.branchDepth : 0, RS = PR * 1.25, kids = {}, L = LT.dir;
   T.nodes.forEach(function (n) { if (n.p >= 0) kids[n.p] = (kids[n.p] || 0) + 1; });
   var useMat = typeof SnowHeaps !== 'undefined' && typeof Snowfield !== 'undefined' && Snowfield.supported();
@@ -1952,6 +1976,59 @@ function umeBakeSnow(T) {
       c.fillStyle = g; c.fill();
     }
     return { cnv: cnv, x0: x0, y0: y0, w: w, h: h, piv: (n.w / 2 + T.endW[i]) / 2 * 0.8, ux: Math.max(0.05, Math.pow(ux0, 0.8)) };
+  });
+}
+/* Step 10: the snow drawn by plumsnow.js. The pieces of a limb are found as chains (a piece runs on into the child that
+   carries on its line), so the snow runs on along the whole limb: its height is blended across each joint and its lumps
+   follow the distance along the chain. */
+function umeBakeSnowNew(T) {
+  var C = cols(), back = T.idx > 0 ? V.branchDepth : 0, RS = PR * 1.25, ns = T.nodes, i, j;
+  var kids = ns.map(function () { return []; });
+  ns.forEach(function (n, k) { if (n.p >= 0) kids[n.p].push(k); });
+  // the child that carries on each piece's line (the straightest of its own limb, if it bends less than about 55°)
+  var next = ns.map(function (n, k) {
+    var best = -1, bd = 1.0;
+    // (only a piece of its own limb: a side shoot can leave closer to the line than the limb's next piece)
+    kids[k].forEach(function (q) { var d = Math.abs(ns[q].rel); if (ns[q].g === n.g && d < bd) { bd = d; best = q; } });
+    return best;
+  });
+  var prev = ns.map(function () { return -1; });
+  next.forEach(function (q, k) { if (q >= 0) prev[q] = k; });
+  // the snow's height on each piece, as before (thicker on thicker wood, less where it slopes)
+  var hN = ns.map(function (n) {
+    var ux0 = Math.abs(Math.cos(n.abs));
+    // about as deep as the wood is thick on the limbs, a thin line on the twigs; none on steep wood
+    var h = (n.w * 0.7 + 0.4 + T.sc * 0.0015) * V.branchSnow * Math.pow(ux0, 2);
+    if (ux0 > 0.7 && V.branchDust > 0) h = Math.max(h, 0.45 * V.branchDust * V.branchSnow);
+    return h;
+  });
+  // where each piece starts along its chain, and the chain's seed
+  var s0 = [], chain = [];
+  for (i = 0; i < ns.length; i++) {
+    j = prev[i];
+    if (j >= 0) { s0[i] = s0[j] + ns[j].len; chain[i] = chain[j]; }
+    else { s0[i] = 0; chain[i] = (V.seed * 13 + T.idx * 101 + (T.left ? 0 : 577) + i * 7.7) % 1000; }
+  }
+  // every piece starts with its full snow (the old random share per piece made the height jump at each joint); snow shaken
+  // off by the wind still leaves its piece thinner until it builds back up
+  ns.forEach(function (n) { n.snow = V.branchSnow; });
+  var mistC = light(C.mist);
+  var Lt = { dir: LT.dir, sun: LT.sun, sky: LT.sky, amb: LT.amb, snow: hex(V.colours.snow), haze: back * 0.35, hazeCol: mistC,
+             cover: V.plumSnowCover, lumps: V.plumSnowLumps, shade: V.plumSnowShade, contact: V.snowContact, grain: V.snowGrain };
+  T.snow = ns.map(function (n, k) {
+    if (n.len < 1) return null;
+    var ca = Math.cos(n.abs), sa = Math.sin(n.abs), mx = sa, my = -ca;
+    if (my > 0) { mx = -mx; my = -my; }                       // the side facing up
+    var pv = prev[k], nx = next[k];
+    var h0 = pv >= 0 ? (hN[pv] + hN[k]) / 2 : hN[k], h1 = nx >= 0 ? (hN[nx] + hN[k]) / 2 : hN[k] * 0.85;
+    var P = { len: n.len, w0: n.w / 2, w1: T.endW[k], h0: h0, h1: h1, capStart: pv < 0, capEnd: nx < 0,
+              sa: n.sa, sb: n.sb, s0: s0[k], chain: chain[k], fork: V.branchForks && kids[k].length > (nx >= 0 ? 1 : 0),
+              along: [ca, sa], up: [mx, my], RS: RS };
+    var pic = PlumSnow.bake(P, Lt);
+    if (!pic) return null;
+    pic.piv = (n.w / 2 + T.endW[k]) / 2 * 0.8;
+    pic.ux = Math.max(0.05, Math.pow(Math.abs(ca), 0.8));
+    return pic;
   });
 }
 function umePose(T, t, amp) {
@@ -2209,9 +2286,9 @@ function drawFlakes(c, from, to) {
   }
   c.globalAlpha = 1;
 }
-function drawBack(c, t) {
+function drawBack(c, t, branchesOnly) {
   if (!WS.flakeSpr.length) return;
-  drawFlakes(c, -1, nearZ());
+  if (!branchesOnly) drawFlakes(c, -1, nearZ());
   for (var i = 0; i < WS.branches.length; i++) umeDraw(c, WS.branches[i]);
   c.setTransform(PR, 0, 0, PR, 0, 0);
   for (i = 0; i < WS.puffs.length; i++) {
@@ -2440,7 +2517,7 @@ function drawBlockIn(c, part) {
 
   // 10. the plum branches: dark limbs, a line of snow along each top, red blossoms
   c.lineCap = 'round'; c.lineJoin = 'round';
-  BLK.plums.forEach(function (B, bi) {
+  if (!V.plumShow) BLK.plums.forEach(function (B, bi) {
     grp(B.pts[0][0] < 0.5 ? 'plumL' : 'plumR');
     var n = B.pts.length;
     for (var i = 1; i < n; i++) {
@@ -2459,8 +2536,8 @@ function drawBlockIn(c, part) {
       }
     }
   });
-  grp('plumL'); label('10  Plum branches', 0.20, 0.12);
-  grp('plumR'); label('10  Plum branches', 0.86, 0.12);
+  if (!V.plumShow) { grp('plumL'); label('10  Plum branches', 0.20, 0.12);
+  grp('plumR'); label('10  Plum branches', 0.86, 0.12); }
   }
 
   // the names, so each shape can be told apart (11, the snowfall, is not blocked in)
@@ -2525,7 +2602,7 @@ var LAKE_SHORE = [[0.548, 0.726], [0.628, 0.721], [0.706, 0.724], [0.68, 0.742],
   [0.747, 0.789], [0.802, 0.799], [0.856, 0.805], [0.889, 0.81], [0.896, 0.825], [0.911, 0.838], [0.947, 0.846], [1.03, 0.857],
   [1.03, 1.03], [0.729, 1.03], [0.639, 0.984], [0.548, 0.952], [0.468, 0.909], [0.413, 0.87], [0.401, 0.847], [0.399, 0.821],
   [0.413, 0.799], [0.45, 0.786], [0.493, 0.774], [0.548, 0.768], [0.58, 0.761], [0.588, 0.755], [0.575, 0.742]];
-var FIELD = mk(), FIELDN = mk(), FIELDJ = null, FIELDT0 = 0, STILL = mk(), MIRROR = mk(), LAKEW = { shore: null, steam: {}, pad: 12, res: 1 }, waterInit = false;
+var FIELD = mk(), FIELDN = mk(), FIELDJ = null, FIELDLAST = null, FIELDT0 = 0, STILL = mk(), MIRROR = mk(), LAKEW = { shore: null, steam: {}, pad: 12, res: 1 }, waterInit = false;
 function lakeLens() { return H / (2 * Math.tan(MT.lens * PI / 360)); }
 function lakeOutline() {
   var A = BLK_ANCHOR.lake, sz = V.lakeSize || 1;
@@ -2561,6 +2638,7 @@ function bakeField() {
     haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), seed: V.seed,
     path: trailFor('field'), pathLook: { grey: V.trailGrey, shadow: V.trailShadow, bounce: V.trailBounce }
   });
+  FIELDLAST = FIELDJ;
   if (!V.trailShow) stepField(1e9);
 }
 function stepField(ms) {
@@ -2842,12 +2920,26 @@ function drawPines(t, dt) {
 var dirty = {}, dirtyAt = 0;
 window.winterLab = {
   V: V, MT: MT, CLOUD: CLOUD, SUN: SUN, defaults: { V: V_DEFAULTS, MT: MT_DEFAULTS, CLOUD: CLOUD_DEFAULTS, SUN: SDEF },
+  plums: function () { return WS.branches; },                 // the plum branches (step 10), for check scripts
   changed: function (what) {
     saveAll();
     if (!what || what === 'live') return;
     if (what === 'time') { this.setHour(); return; }
     (what === 'all' ? ['mtn', 'hill', 'hall', 'branches', 'sprites', 'sun', 'lake', 'pines'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
     dirtyAt = nowT;
+  },
+  phaseNames: PHASE_NAMES,
+  phase: function () { return CLK ? CLK.phase : 'day'; },
+  // the middle of each phase today (the hour the clock gives the phase for: see lightAt)
+  phaseHour: function (ph) {
+    var sun = sunTimes(nagoyaToday()), h;
+    if (ph === 'night') h = sun.set + 2.5;
+    else if (ph === 'dawn') h = sun.rise + 0.3;
+    else if (ph === 'morning') h = Math.min(sun.rise + 3, 10.5);
+    else if (ph === 'golden') h = sun.set - 1;
+    else if (ph === 'dusk') h = sun.set + 0.25;
+    else h = sun.noon;
+    return Math.round(clamp(h, 4, 22) * 20) / 20;
   },
   setHour: function () {
     applyHour();
@@ -2874,6 +2966,7 @@ window.winterLab = {
   pines: function () { return PINES; },   // (for checking each picture on its own)
   hall: function () { return HALL; },
   trail: function () { return TRAIL; },
+  fieldProbe: function (x, y) { return FIELDLAST ? FIELDLAST.probe(x, y) : null; },
   trailEdit: TRAIL_EDIT,   // (the path, for checking)     // (the hall's picture, for checking it on its own)
   lamps: function () { return { level: lampLevel(), dark: CLK.Lt.dark, set: CLK.sun.set, tod: V.timeOfDay }; },   // (the lamps' timing, for checking)
   busy: function () { return !!mtnJob || !!hillJob || !!HALL.job || !!FIELDJ || !!PINES.job || stages.length > 0 || Object.keys(dirty).length > 0; },
@@ -2939,7 +3032,7 @@ function rebuildAll() {
   if (HALL.job) { HALL.job.cancel(); HALL.job = null; }
   buildSky();
   dirty = {};
-  stages = V.blockIn ? ['mtn', 'hill', 'field', 'hall', 'pines', 'lake'] : ['mtn', 'hill', 'field', 'hall', 'pines', 'lake', 'sprites'];   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
+  stages = V.blockIn && !V.plumShow ? ['mtn', 'hill', 'field', 'hall', 'pines', 'lake'] : ['mtn', 'hill', 'field', 'hall', 'pines', 'lake', 'sprites'];   // (step 10: the plum branches show with the block-in too)   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -2988,7 +3081,7 @@ function rebake() {
   if (dirty.lake || dirty.trail) stages.push('field');   // … and is carved into the snow field
   if (dirty.lake || dirty.pines) stages.push('pines');   // (their shadows lie on the snow ground)
   if (dirty.mtn || dirty.lake || dirty.pines) stages.push('lake');      // (the mirror shows the mountains and the trees)
-  if (!V.blockIn) {
+  if (!V.blockIn || V.plumShow) {
     if (dirty.branches) umeBuildAll();
     if (dirty.sprites || dirty.branches) stages.push('sprites');
   }
@@ -3083,6 +3176,7 @@ function frame(now) {
     drawHall();                                        // step 5: the shrine hall and the firs beside it (7c)
     drawPines(t, dt);                                  // step 7: the right bank's roped pines and firs (14d)
     drawBlockIn(ctx, 'front');
+    if (V.plumShow) { drawBack(ctx, t, true); ctx.setTransform(1, 0, 0, 1, 0, 0); }   // step 10: the plum branches, the snow they shed and their petals (the snowfall is step 11)
     nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height);
     gctx.setTransform(1, 0, 0, 1, 0, 0); gctx.clearRect(0, 0, cvG.width, cvG.height);
     requestAnimationFrame(frame);
@@ -3266,7 +3360,7 @@ function dofCtls(g, re, what) {
 function moveCtls() {
   var out = [];
   MOVE.forEach(function (m) {
-    var re = m[0] === 'fuji' ? 'mtn' : m[0] === 'hill' || m[0] === 'pagoda' ? 'hill' : m[0] === 'lake' ? 'lake' : m[0] === 'pines' ? 'pines' : m[0] === 'hall' ? 'hall' : 'live';   // the real Fuji (step 2), the hill and pagoda (step 3), the lake (step 6) and the pines (step 7) are baked again
+    var re = m[0] === 'fuji' ? 'mtn' : m[0] === 'hill' || m[0] === 'pagoda' ? 'hill' : m[0] === 'lake' ? 'lake' : m[0] === 'pines' ? 'pines' : m[0] === 'hall' ? 'hall' : m[0] === 'plumL' || m[0] === 'plumR' ? 'branches' : 'live';   // the real Fuji (step 2), the hill and pagoda (step 3), the lake (step 6) and the pines (step 7) are baked again
     out.push({ o: 'V', k: m[0] + 'X', label: m[1] + ': across', min: -0.3, max: 0.3, step: 0.005, re: re });
     out.push({ o: 'V', k: m[0] + 'Y', label: m[1] + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: re });
     out.push({ o: 'V', k: m[0] + 'Size', label: m[1] + ': size', min: 0.4, max: 2, step: 0.01, re: re });
@@ -3382,6 +3476,7 @@ var G = [
   { name: 'Colours of the new scene', note: 'The brief\'s colours: snow, water, vermilion torii, stone, pine needles, straw ropes, lamplight.', ctls: [
     { col: 'V', keys: [['snow', 'Snow'], ['water', 'Water'], ['vermilion', 'Torii vermilion'], ['stone', 'Stone'], ['needle', 'Pine needles'], ['rope', 'Straw ropes'], ['flame', 'Lamplight']], re: 'all' } ] },
   { name: 'Time and weather', ctls: [
+    { sel: 'phase' },
     { o: 'V', k: 'hour', label: 'Time (hour in Nagoya, today)', min: 4, max: 22, step: 0.05, re: 'time', note: 'As the app: the sun\'s place and the sky\'s colour follow the hour. 15.5 = late afternoon, the app\'s golden hour.' },
     { sel: 'condition' },
     { o: 'V', k: 'wind', label: 'Wind', min: 0, max: 4, step: 0.05, re: 'live' },
@@ -3495,7 +3590,8 @@ var G = [
     { o: 'V', k: 'hfHaze', label: 'Firs: mist on them', min: 0, max: 1, step: 0.01, re: 'hall', note: 'More on the right-hand ones, farther into the mist.' } ,
     { col: 'V', keys: [['hallPlaster', 'Hall plaster walls'], ['hallTimber', 'Hall posts (bare timber)'], ['hallStone', 'Hall stone base'], ['hallRed', 'Hall vermilion (beams, brackets, door frames, railing)'], ['hallGreen', 'Hall green (window lattices, copper)']], re: 'hall' }
   ]).concat(dofCtls('hall', 'hall', 'The hall stands about 200 m away, the firs beside it a little farther (each blurs by its own distance; the Report gives the hall\'s).')) },
-  { name: 'Plum branches (step 10)', note: 'From winter2.html; placed as in the reference in step 10.', ctls: [
+  { name: 'Plum branches (step 10)', note: 'From winter2.html, now in the scene (with the block-in too). Where they stand: "Layout: where each element stands", Plum branch left / right.', ctls: [
+    { chk: 'V', k: 'plumShow', label: 'Show the plum branches in the scene', re: 'block', note: 'Off: the flat block-in shapes again.' },
     { o: 'V', k: 'branchCount', label: 'Branches each side', min: 0, max: 3, step: 1, re: 'branches' },
     { o: 'V', k: 'branchSize', label: 'Size', min: 0.3, max: 1.6, step: 0.01, re: 'branches' },
     { o: 'V', k: 'branchDroop', label: 'Droop', min: 0, max: 3, step: 0.05, re: 'branches' },
@@ -3512,7 +3608,11 @@ var G = [
     { o: 'V', k: 'regrow', label: 'Snow builds back up', min: 0, max: 6, step: 0.05, re: 'live' },
     { o: 'V', k: 'petals', label: 'Petals falling', min: 0, max: 8, step: 0.05, re: 'live' },
     { col: 'V', keys: [['branch', 'Bark'], ['blossom', 'Blossom'], ['blossomDeep', 'Blossom (deep)'], ['stamen', 'Stamens']], re: 'sprites branches' } ] },
-  { name: 'Snow on the plum branches', file: 'snowfield.js · snowheaps.js', note: 'Tuned on snow-lab.html.', ctls: [
+  { name: 'Snow on the plum branches', file: 'plumsnow.js (new) · snowfield.js · snowheaps.js (old)', note: 'The new snow (plumsnow.js): one soft ridge running along each limb, white where it faces the sky, slate blue on its front, darkest where it sits on the bark. Off: the old heaps from winter2.html.', ctls: [
+    { chk: 'V', k: 'plumSnowNew', label: 'New snow (plumsnow.js)', re: 'sprites' },
+    { o: 'V', k: 'plumSnowCover', label: 'New snow: how far down the wood it wraps', min: 0, max: 0.9, step: 0.01, re: 'sprites' },
+    { o: 'V', k: 'plumSnowLumps', label: 'New snow: lumps and drips', min: 0, max: 2, step: 0.05, re: 'sprites' },
+    { o: 'V', k: 'plumSnowShade', label: 'New snow: how dark its front and crease', min: 0, max: 2, step: 0.05, re: 'sprites' },
     { o: 'V', k: 'snowRound', label: 'How round the heaps are', min: 0.15, max: 1, step: 0.01, re: 'sprites', note: 'Low = flatter, sharper edges; high = soft, pillowy heaps.' },
     { o: 'V', k: 'snowRelief', label: 'Relief', min: 0.2, max: 3, step: 0.05, re: 'sprites', note: 'How strongly the rounding shows in the light.' },
     { o: 'V', k: 'snowContact', label: 'Shade where it sits on the wood', min: 0, max: 1.5, step: 0.05, re: 'sprites' },
@@ -3560,8 +3660,25 @@ function build() {
     host.appendChild(sec);
   });
 }
+var phaseSel = null, hourCtl = null;
 function control(c) {
   var row;
+  if (c.sel === 'phase') {
+    // step 4 of the plan's clock: choose a phase of the day and the hour jumps to its middle (today's sun times); the slider
+    // below still sets any hour, and this choice follows it
+    row = document.createElement('label'); row.className = 'sp-colour'; row.textContent = 'Time phase';
+    var ps = document.createElement('select');
+    Object.keys(lab.phaseNames).forEach(function (k) { var op = document.createElement('option'); op.value = k; op.textContent = lab.phaseNames[k]; ps.appendChild(op); });
+    ps.value = lab.phase();
+    ps.addEventListener('change', function () {
+      OBJ.V.hour = lab.phaseHour(ps.value);
+      if (hourCtl) { hourCtl.inp.value = OBJ.V.hour; hourCtl.vs.textContent = fmt(hourCtl.c, OBJ.V.hour); }
+      lab.changed('time');
+    });
+    phaseSel = ps;
+    row.appendChild(ps);
+    return row;
+  }
   if (c.sel) {
     row = document.createElement('label'); row.className = 'sp-colour';
     var sel = document.createElement('select'), opts, val;
@@ -3618,7 +3735,11 @@ function control(c) {
   var lb = document.createElement('label'); lb.textContent = c.label;
   var vs = document.createElement('span'); vs.textContent = fmt(c, O[c.k]); lb.appendChild(vs);
   var inp = document.createElement('input'); inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = O[c.k];
-  inp.addEventListener('input', function () { O[c.k] = parseFloat(inp.value); vs.textContent = fmt(c, O[c.k]); lab.changed(c.re); });
+  inp.addEventListener('input', function () {
+    O[c.k] = parseFloat(inp.value); vs.textContent = fmt(c, O[c.k]); lab.changed(c.re);
+    if (c.k === 'hour' && phaseSel) phaseSel.value = lab.phase();                // the phase follows the hour
+  });
+  if (c.o === 'V' && c.k === 'hour') hourCtl = { inp: inp, vs: vs, c: c };
   row.appendChild(lb); row.appendChild(inp);
   if (c.note) { var n = document.createElement('small'); n.textContent = c.note; row.appendChild(n); }
   return row;
@@ -3633,6 +3754,7 @@ document.getElementById('spCopy').addEventListener('click', function () {
       if (c.o) parts.push(c.label + ' ' + fmt(c, OBJ[c.o][c.k]));
       else if (c.chk) parts.push(c.label + ' ' + (OBJ[c.chk][c.k] ? 'on' : 'off'));
       else if (c.col) c.keys.forEach(function (kk) { parts.push(kk[1] + ' ' + OBJ[c.col].colours[kk[0]]); });
+      else if (c.sel === 'phase') parts.push('Time phase ' + lab.phaseNames[lab.phase()]);
       else if (c.sel) parts.push('Weather ' + OBJ.SUN.condition);
     });
     lines.push(grp.name + ': ' + parts.join(', '));
