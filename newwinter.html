@@ -1073,7 +1073,7 @@ function trailLineM(PM) {
   var pts = PM.pts.slice(), hall = PM.hall;
   var dx = pts[0][0] - pts[1][0], dz = pts[0][1] - pts[1][1], dl = Math.hypot(dx, dz) || 1;
   pts.unshift([pts[0][0] + dx / dl * 14, Math.max(2, pts[0][1] + dz / dl * 14)]);
-  if (hall) pts.push(hall.foot(7), hall.foot(2.5), hall.steps, hall.under);
+  if (hall) pts.push(hall.foot(2.5), hall.steps, hall.under);
   return pts;
 }
 function trailBuild() {

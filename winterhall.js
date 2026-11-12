@@ -61,6 +61,7 @@ function norm(v) { var l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, 
 function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
 function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 function hash(i, j, s) { var h = Math.sin(i * 127.1 + j * 311.7 + s * 74.7) * 43758.5453; return h - Math.floor(h); }
+function vn1(x, s) { var i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return lerp(hash(i, 0, s), hash(i + 1, 0, s), u); }
 // winterlake.js's integer hash and final roll-off toward white, the same here so the hall's snow and the snow field's
 // carry the same grain and the same brightest whites where they meet
 function ihash(i, j, s) {
@@ -251,7 +252,9 @@ function job(o) {
     var g = -drop * smooth(0, TER.slope, terOut(x, z));
     // snow banked up against the stone base, sloping away (none in front of the steps: the way up is kept clear)
     var dx = Math.abs(x) - bw, dz = Math.abs(z) - bd, dp = Math.hypot(Math.max(dx, 0), Math.max(dz, 0)) + Math.min(0, Math.max(dx, dz));
-    var bank = dp > -0.01 ? 0.42 * Math.min(1.4, snowK) * Math.exp(-Math.max(0, dp) / 1.3) : 0;
+    // (its height and reach vary along the wall, so where it meets the stone the line is uneven, not ruler-straight)
+    var al2 = Math.abs(dz) > Math.abs(dx) ? z : x, nA = 0.6 * vn1(al2 * 0.8, 3) + 0.4 * vn1(al2 * 2.9, 7);
+    var bank = dp > -0.01 ? 0.42 * Math.min(1.4, snowK) * (0.45 + 0.8 * nA) * Math.exp(-Math.max(0, dp + (nA - 0.5) * 0.9) / 1.3) : 0;
     if (z < -bd + 0.01 && Math.abs(x) < stepW + 0.6) bank *= smooth(stepW + 0.1, stepW + 0.6, Math.abs(x));
     // the wind's soft waves in the snow
     var wav = 0.05 * Math.sin(0.21 * x + 0.13 * z + 0.7) + 0.035 * Math.sin(0.47 * x - 0.31 * z + 2.2);
@@ -1134,6 +1137,14 @@ function job(o) {
     var A = P2(Q, 0.5, 0), B = P2(Q, 0.5, 1), g = c.createLinearGradient(A[0], A[1], B[0], B[1] + 0.01);
     g.addColorStop(0, 'rgba(40,34,44,0.35)'); g.addColorStop(0.6, 'rgba(40,34,44,0.05)'); g.addColorStop(1, 'rgba(40,34,44,0)');
     quad(c, Q, 0, 1, 0, 1, g);
+    // worn stone: chips off the front edge, darker joints between the blocks, weather stains (fixed per step)
+    var sd = Math.round(Q[0][0] * 3 + Q[0][1] * 7);
+    for (var i = 0; i < 9; i++) {
+      var s0 = hash(i, 1, sd), w = 0.02 + 0.05 * hash(i, 2, sd);
+      quad(c, Q, s0, Math.min(1, s0 + w), 0.72 + 0.2 * hash(i, 3, sd), 1, 'rgba(36,30,34,' + (0.25 + 0.3 * hash(i, 4, sd)).toFixed(2) + ')');
+    }
+    for (var j = 1; j < 4; j++) { var sj = (j + (hash(j, 5, sd) - 0.5) * 0.4) / 4; quad(c, Q, sj, sj + 0.008, 0, 1, 'rgba(36,30,34,0.35)'); }
+    for (var k2 = 0; k2 < 4; k2++) { var sk = hash(k2, 6, sd); quad(c, Q, sk, Math.min(1, sk + 0.08 + 0.1 * hash(k2, 7, sd)), 0, 0.5 * hash(k2, 8, sd), 'rgba(60,54,48,0.12)'); }
   }
   // the snow lying on each step, seen at its front edge: a soft rounded band along it, lit on top, blue underneath
   function stepSnow() {
@@ -1142,10 +1153,17 @@ function job(o) {
       var yk = BOX[4 + kk][4], zf = BOX[4 + kk][2], Lp = Pl(-stepW, yk, zf), Rp = Pl(stepW, yk, zf), th = Math.max(0.6, 0.07 * F / Wp(0, yk, zf)[2]);
       var g = c.createLinearGradient(0, Lp[1] - th, 0, Lp[1] + th * 0.6);
       g.addColorStop(0, css(fin(top))); g.addColorStop(1, css(fin(under)));
+      // (uneven and patchy: thicker and thinner along the edge, swept off where feet have been)
       c.save(); c.filter = 'blur(' + (0.4 * PR).toFixed(2) + 'px)';
-      c.beginPath(); c.moveTo(Lp[0] - th * 0.4, Lp[1]); c.quadraticCurveTo((Lp[0] + Rp[0]) / 2, Lp[1] - th * 1.2, Rp[0] + th * 0.4, Rp[1]);
-      c.lineTo(Rp[0] + th * 0.2, Rp[1] + th * 0.5); c.lineTo(Lp[0] - th * 0.2, Lp[1] + th * 0.5); c.closePath();
-      c.fillStyle = g; c.fill(); c.restore();
+      var M = 16, ptsT = [], ptsB = [];
+      for (var m = 0; m <= M; m++) {
+        var u = m / M, x = lerp(Lp[0] - th * 0.4, Rp[0] + th * 0.4, u), y = lerp(Lp[1], Rp[1], u);
+        var keep = 0.15 + 0.85 * smooth(0.35, 0.6, vn1(u * 5.5 + kk * 3.7, 11)), tk = th * (0.35 + 0.9 * vn1(u * 9 + kk * 5.1, 13)) * keep;
+        ptsT.push([x, y - tk * 1.1]); ptsB.push([x, y + th * 0.5 * keep]);
+      }
+      c.beginPath(); ptsT.forEach(function (p, i) { if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); });
+      for (var m2 = M; m2 >= 0; m2--) c.lineTo(ptsB[m2][0], ptsB[m2][1]);
+      c.closePath(); c.fillStyle = g; c.fill(); c.restore();
     }
   }
   function drawBody() {

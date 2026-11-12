@@ -128,7 +128,9 @@ function build(o) {
     if (endHalf > 0) w = lerp(w, endHalf, smooth(L - 5, L - 1, s));          // (only where it goes in under the steps)
     return w;
   }
-  function depthAt(s) { return D0 * (1 + 0.22 * wob * n1(s / 5.3, seed + 21)); }
+  // (where it ends at steps (endHalf), its floor comes up to the snow's level over the last metres: sunk 0.3 m right
+  // up to the steps it bared the bottom step's riser twice as tall as the others)
+  function depthAt(s) { return D0 * (1 + 0.22 * wob * n1(s / 5.3, seed + 21)) * (endHalf > 0 ? 1 - 0.9 * smooth(L - 9, L - 2.5, s) : 1); }
 
   var Q = { a: 1e9, floor: 0, u: 0, s: 0, far: true };
   // where (x, z) is relative to the path: along it (s), across it (u, + to the right of the way it runs)
