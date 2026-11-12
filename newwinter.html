@@ -363,14 +363,14 @@ var V_DEFAULTS = {
   // each element's place (step 0): moved across and up/down (shares of the screen) and sized about its foot
   fujiX: 0, fujiY: 0, fujiSize: 1,
   hillX: 0, hillY: 0, hillSize: 1,
-  pagodaX: 0, pagodaY: 0, pagodaSize: 1,
-  hallX: 0, hallY: 0, hallSize: 1,
+  pagodaX: 0, pagodaY: 0, pagodaSize: 0.77,
+  hallX: 0, hallY: 0, hallSize: 1.25,
   frostX: 0, frostY: 0, frostSize: 1,
   lakeX: 0, lakeY: 0, lakeSize: 1,
   pinesX: 0, pinesY: 0, pinesSize: 1,
   pathX: 0, pathY: 0, pathSize: 1,
-  gatesX: 0, gatesY: 0, gatesSize: 1,       // the three torii (not 'torii…': winter2.html's old saved toriiX / toriiSize would be read as these)
-  lanternsX: 0, lanternsY: 0, lanternsSize: 1,
+  gatesX: 0.3, gatesY: 0, gatesSize: 1,       // the three torii (not 'torii…': winter2.html's old saved toriiX / toriiSize would be read as these)
+  lanternsX: 0.3, lanternsY: 0, lanternsSize: 1,
   plumLX: 0, plumLY: 0, plumLSize: 1,
   plumRX: 0, plumRY: 0, plumRSize: 1,
   // step 3, the hill of firs (winterhill.js): which forest, rows, how close and how full, the firs' sizes at the crest and
@@ -401,16 +401,16 @@ var V_DEFAULTS = {
   // (m), the snow pushed aside along its top (m), how much its edges wander, footprints, how grey the trodden snow
   // is, and the shadows its walls cast
   trailShow: true, trailToHall: true,
-  trail1X: 0.150, trail1Y: 1.01, trail2X: 0.1575, trail2Y: 0.92, trail3X: 0.1725, trail3Y: 0.85, trail4X: 0.1925, trail4Y: 0.785,
-  trail5X: 0.2225, trail5Y: 0.735, trailBend: 1,
-  trailWidth: 4, trailDepth: 0.24, trailWall: 0.22, trailBerm: 0.03, trailWobble: 1, trailTrod: 1, trailGrey: 0.5, trailShadow: 1, trailBounce: 0.65,
+  trail1X: 0.1578, trail1Y: 0.9931, trail2X: 0.1036, trail2Y: 0.8862, trail3X: 0.1138, trail3Y: 0.7944, trail4X: 0.1678, trail4Y: 0.7387,
+  trail5X: 0.2329, trail5Y: 0.7187, trailBend: 1,
+  trailWidth: 4, trailDepth: 0.3, trailWall: 0.22, trailBerm: 0.03, trailWobble: 0.45, trailTrod: 1, trailGrey: 0.5, trailShadow: 1, trailBounce: 0.65,
   // the valley mist: its middle (share of the height, as on the reference), its height and strength
   mistY: 0.645, mistHeight: 0.14, mistStrength: 0.85,
   // the snow ground and the lake (step 6, winterlake.js): the eye's height above the snow (m), the banks' height above
   // the water (m) and how uneven their edge is; the snow's swells, wind-carved drifts, grain and sparkle, its haze
   // (how strong, and the distance (m) at which it is about two thirds mist), the low sun's warmth on the far snow
-  eyeHeight: 3, bankDrop: 0.5, bankWobble: 1,
-  fieldSwell: 1, fieldDrifts: 1, fieldGrain: 1, fieldSparkle: 1, fieldHaze: 1, fieldHazeDist: 260, fieldGlow: 0.6,
+  eyeHeight: 3, bankDrop: 0.5, bankWobble: 1.7,
+  fieldSwell: 1.75, fieldDrifts: 1.2, fieldGrain: 1, fieldSparkle: 1.35, fieldHaze: 1, fieldHazeDist: 260, fieldGlow: 0.6,
   // the water (water.js, as the autumn lake): how strongly it mirrors, how far the waves move the reflections, their
   // size and speed, the simulated waves (fftwaves.js) and the wind over the water (m/s), the sun's sparkle, the
   // picture's resolution; then the cold: thin ice along the shores (how much, how wide, m), the mist on the far
