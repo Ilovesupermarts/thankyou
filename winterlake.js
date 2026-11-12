@@ -65,6 +65,12 @@ var TONE_KNEE = 228, TONE_ROOM = 24;
 // how much each colour drops in the snow's shade, red most and blue least (measured on the near snow's own shade,
 // about 0.89 : 0.94 : 0.98 of the lit snow): far away, where the shading is laid on as a ratio, its shade is this blue
 var SHADE_W = [1.55, 0.9, 0.35];
+// how much light a shade of depth d (0 … 1) leaves in each colour: light shade in that blue, deep shadow greyer-blue
+// as the reference paints its path's shadows (176,183,199 against lit 235,240,245: red 25 %, green 24 %, blue 19 % down)
+function shadeMul(d, ch) {
+  var k = smooth(0.06, 0.25, d), w = lerp(SHADE_W[ch], [1.05, 1.0, 0.8][ch], k);
+  return Math.max(0, 1 - d * w);
+}
 function tone(v) { return v > TONE_KNEE ? TONE_KNEE + (v - TONE_KNEE) * TONE_ROOM / (v - TONE_KNEE + TONE_ROOM) : v; }
 /* smooth value noise, 0 … 1, and its sum over a few sizes, −1 … 1 */
 function hash(i, j, s) {
@@ -300,13 +306,23 @@ function groundJob(c, o) {
     // distance: far away, where the floor is lit nearly as bright as the snow round it, the roll-off squeezed the
     // difference away and the far floor went as white as the fresh snow, its near wall's lip lost against it)
     var tk = fl * pGrey * 2, tint0 = 1 - 0.065 * tk, tint1 = 1 - 0.045 * tk, tint2 = 1 - 0.015 * tk;
+    // (shaded at every distance as the far snow round it is: level snow's brightness rolled off toward white, the light of the
+    // wall or floor laid on as a ratio in the blue of the snow's shade; drawn the old way, the wall's shadow came out
+    // grey against the blue-shaded snow beside it)
+    var wFp = 1, rLp = farRatio(dl, sk * (1 - 0.04 * pGrey * fl)) * alb;
     for (var ch = 0; ch < 3; ch++) {
       var sc = lerp(snow[ch], shade[ch] * 1.15, cool) * alb;
       var v = sc * sun[ch] * dl * 1.25 + shade[ch] * sk * (1 - 0.04 * pGrey * fl);
       if (v > 226) v = 226 + (v - 226) * 26 / (v - 226 + 26);
-      v = lerp(v, mist[ch], hzv);
-      v += glowCol[ch] * o.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((sx - o.sunX) / (W * 0.42), 2));
-      D[kk2 + ch] = clamp(tone(v) * g * (ch === 0 ? tint0 : ch === 1 ? tint1 : tint2), 0, 255);
+      var gl = glowCol[ch] * o.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((sx - o.sunX) / (W * 0.42), 2));
+      var vOld = tone(lerp(v, mist[ch], hzv) + gl);
+      if (wFp > 0) {
+        var vF = snow[ch] * sun[ch] * dlFlat * 1.25 + shade[ch];
+        if (vF > 226) vF = 226 + (vF - 226) * 26 / (vF - 226 + 26);
+        var rkp = rLp < 1 ? shadeMul(Math.min(1 - rLp, 0.45) * 0.75, ch) : 1 + (rLp - 1) * 0.3 * (1 - hzv);
+        vOld = lerp(vOld, tone(lerp(vF, mist[ch], hzv) + gl) * rkp, wFp);
+      }
+      D[kk2 + ch] = clamp(vOld * g * (ch === 0 ? tint0 : ch === 1 ? tint1 : tint2), 0, 255);
     }
     D[kk2 + 3] = 255;
   }
@@ -338,7 +354,7 @@ function groundJob(c, o) {
         var gl = glowCol[ch] * o.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((sx - o.sunX) / (W * 0.42), 2));
         // (where a slope gets less light than level snow, it is darkened by its own colour of light: less of the warm sun,
         // the sky's blue left, so its shade is blue as near you; where it gets more, by brightness alone, so no yellow)
-        var rkc = rL < 1 ? 1 - Math.min(1 - rL, 0.15) * 0.7 * SHADE_W[ch] : 1 + (rL - 1) * 0.3 * (1 - hz);
+        var rkc = rL < 1 ? shadeMul(Math.min(1 - rL, 0.15) * 0.7, ch) : 1 + (rL - 1) * 0.3 * (1 - hz);
         var vOld = tone(lerp(vA, mist[ch], hz) + gl), vNew = tone(lerp(vF, mist[ch], hz) + gl) * rkc;
         D[k + ch] = clamp(lerp(vOld, vNew, wF) * g, 0, 255);
       }
@@ -659,5 +675,5 @@ function steam(S, c, o, t, dt) {
   c.restore();
 }
 
-return { shore: shore, bakeGround: bakeGround, groundJob: groundJob, bakeMirror: bakeMirror, bakeStill: bakeStill, steam: steam, heightAt: heightAt, SHADE_W: SHADE_W };
+return { shore: shore, bakeGround: bakeGround, groundJob: groundJob, bakeMirror: bakeMirror, bakeStill: bakeStill, steam: steam, heightAt: heightAt, SHADE_W: SHADE_W, shadeMul: shadeMul };
 })();

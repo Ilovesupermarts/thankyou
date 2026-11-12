@@ -551,8 +551,7 @@ function job(o) {
         var fc = pNear && fk > 0 ? FC[ch] * (COL[0] + COL[1] + COL[2]) / Math.max(3, COLF[0] + COLF[1] + COLF[2]) : FC[ch];
         // (darker than level snow: in the blue of the snow's shade, no deeper than the near snow's shade; brighter: by
         // brightness alone)
-        var SW = [1.55, 0.9, 0.35][ch];
-        var rkc = rtL < 1 ? 1 - Math.min(1 - rtL, 0.15) * 0.7 * SW : 1 + (rtL - 1) * 0.3 * (1 - hzF);
+        var rkc = rtL < 1 ? WinterLake.shadeMul(Math.min(1 - rtL, 0.15) * 0.7, ch) : 1 + (rtL - 1) * 0.3 * (1 - hzF);
         outA[pass * 4 + ch] = lerp(tone(v) * rkc, fk > 0 ? tone(fc) : fc, fk);
       }
     }
