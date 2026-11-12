@@ -2009,6 +2009,9 @@ function umeBakeSnowNew(T) {
     if (j >= 0) { s0[i] = s0[j] + ns[j].len; chain[i] = chain[j]; }
     else { s0[i] = 0; chain[i] = (V.seed * 13 + T.idx * 101 + (T.left ? 0 : 577) + i * 7.7) % 1000; }
   }
+  // every piece starts with its full snow (the old random share per piece made the height jump at each joint); snow shaken
+  // off by the wind still leaves its piece thinner until it builds back up
+  ns.forEach(function (n) { n.snow = V.branchSnow; });
   var mistC = light(C.mist);
   var Lt = { dir: LT.dir, sun: LT.sun, sky: LT.sky, amb: LT.amb, snow: hex(V.colours.snow), haze: back * 0.35, hazeCol: mistC,
              cover: V.plumSnowCover, lumps: V.plumSnowLumps, shade: V.plumSnowShade, contact: V.snowContact, grain: V.snowGrain };
@@ -2917,6 +2920,7 @@ function drawPines(t, dt) {
 var dirty = {}, dirtyAt = 0;
 window.winterLab = {
   V: V, MT: MT, CLOUD: CLOUD, SUN: SUN, defaults: { V: V_DEFAULTS, MT: MT_DEFAULTS, CLOUD: CLOUD_DEFAULTS, SUN: SDEF },
+  plums: function () { return WS.branches; },                 // the plum branches (step 10), for check scripts
   changed: function (what) {
     saveAll();
     if (!what || what === 'live') return;
