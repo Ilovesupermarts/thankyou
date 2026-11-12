@@ -93,7 +93,9 @@ function bake(p, L) {
     var e = 1;
     if (p.capStart && x - xs < cap0) { var a0 = (x - xs) / cap0; e = Math.min(e, Math.sqrt(Math.max(0, 1 - (1 - a0) * (1 - a0)))); }
     if (p.capEnd && xe - x < cap1) { var a1 = (xe - x) / cap1; e = Math.min(e, Math.sqrt(Math.max(0, 1 - (1 - a1) * (1 - a1)))); }
-    if (!p.capEnd && x > len) e = Math.min(e, 1 - 0.06 * (x - len) / Math.max(0.5, ext1));   // past the joint, under the next piece's soft start
+    // past the joint it rounds off (a quarter ellipse), under the next piece's soft start: where the limb bends it fills the
+    // gap on the outer side and never stands up square above the next piece's snow
+    if (!p.capEnd && x > len) { var aj = clamp((x - len) / Math.max(0.5, ext1), 0, 1); e = Math.min(e, Math.sqrt(Math.max(0, 1 - aj * aj))); }
     // the foot: wrapping down over the upper part of the wood's front, a little further here and there (a soft drip)
     var drip = Math.max(0, noise1(s / lam2 * 0.9, p.chain + 11.3)) * lumpK;
     var fy = -w + w * 2 * clamp(cover * (0.75 + 0.5 * drip) * Math.sqrt(e), 0, 0.92);
@@ -123,7 +125,7 @@ function bake(p, L) {
     if (span <= 0.05) continue;
     var slope = (at(top, X + 0.6) - at(top, X - 0.6)) / 1.2;
     // a joined start fades in over the snow of the piece before (which reaches on past the joint), so no seam shows
-    var feather = p.capStart ? 1 : smooth(0, Math.max(1, p.w0 * 1.2 + 1), X);
+    var feather = p.capStart ? 1 : smooth(0, Math.max(0.8, (p.w0 * 1.3 + 1) * 0.45), X);
     // how far into the snow this column is from its ends (thin ends let light through and look softer)
     var endIn = Math.min(p.capStart ? X - xs : 1e9, p.capEnd ? xe - X : 1e9);
     var yA = Math.floor((yT - y0) * RS - 1), yZ = Math.ceil((yB - y0) * RS + 1);
