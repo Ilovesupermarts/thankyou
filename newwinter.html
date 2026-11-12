@@ -1008,8 +1008,10 @@ function startHall() {
     firs.push({ x: x, foot: foot, h: (foot - top) * V.hfSize, seed: Math.round(V.hfSeed) * 100 + i * 7 + 3,
                 haze: clamp(V.hfHaze * lerp(0.75, 1.25, n > 1 ? i / (n - 1) : 0.5), 0, 0.95) });
   });
+  var hallPath = trailFor('hall');
   HALL.job = WinterHall.job({
-    path: trailFor('hall'), pathLook: { grey: V.trailGrey, shadow: V.trailShadow, bounce: V.trailBounce },
+    path: hallPath, pathCut: hallPath ? TRAIL.cutS : Infinity, pathBlend: TRAIL_BLEND,
+    pathLook: { grey: V.trailGrey, shadow: V.trailShadow, bounce: V.trailBounce },
     W: W, H: H, PR: PR, cam: cam, place: { x0: pl.X(Hb.eave0), x1: pl.X(Hb.eave1), top: pl.Y(Hb.top), foot: pl.Y(Hb.base) },
     yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, riseFront: V.hallRiseFront, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
     haze: V.hallHaze, footMist: V.hallFootMist, shadow: V.hallShadow, lit: lampLevel() * V.hallLamps, spill: V.hallSpill,
@@ -1018,7 +1020,8 @@ function startHall() {
     weather: V.hallWeather, ridge: V.hallRidge, railing: V.hallRailing, rope: V.hallRope,
     dof: { on: V.hallDof, focus: V.hallFocus, strength: V.hallDofStrength, max: V.hallDofMax },
     field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: light(mix(hex(V.colours.mist), [222, 210, 204], 0.45)),
-             haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis },
+             haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis,
+             grain: V.fieldGrain, res: 0.6 },
     firs: firs,
     firLook: { snow: V.hfSnow, width: V.hfWidth, tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean,
                brush: V.hillBrush, soft: V.hillSoft, needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle) }
@@ -1031,6 +1034,10 @@ function startHall() {
    (winterlake.js) and the hall's rise (winterhall.js) each carve it into their own snow and light it as the rest.
    ============================================================ */
 var TRAIL = { key: '', T: null, hall: null, cutS: Infinity, info: '' };
+// where the hall's rise takes the path over from the snow field (at the rise's foot, cutS), the two are blended over
+// this many metres along it: the field draws its path on past the foot, the hall's comes in gradually over it (they
+// stand at the same level there: the rise climbs only a few cm in the first 10 m), so the path reads as one
+var TRAIL_BLEND = 10;
 function trailHall() {                                   // where the hall's steps are (only the hall's place is worked out)
   if (typeof WinterHall === 'undefined') return null;
   var hy = H * V.horizonLine, pl = blkPlace('hall'), Hb = BLK.hall;
@@ -1091,7 +1098,7 @@ function trailFor(who) {
   if (who === 'field' && TRAIL.cutS < Infinity) {
     // a view of the same path that fades out past the rise's foot
     var cut = TRAIL.cutS;
-    return { delta: function (x, z, fz) { var h = T.delta(x, z, fz); if (!T.Q.far && T.Q.s > cut) h *= 1 - smoothstep(cut, cut + 2, T.Q.s); return h; },
+    return { delta: function (x, z, fz) { var h = T.delta(x, z, fz); if (!T.Q.far && T.Q.s > cut + TRAIL_BLEND) h *= 1 - smoothstep(cut + TRAIL_BLEND, cut + TRAIL_BLEND + 2, T.Q.s); return h; },
              near: T.near, sky: T.sky, Q: T.Q, maxRise: T.maxRise, maxDrop: T.maxDrop,
              sun: function (x, z, h, Ls, fz) { var v = T.sun(x, z, h, Ls, fz); return v; } };
   }

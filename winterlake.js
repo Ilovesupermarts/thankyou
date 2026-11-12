@@ -56,6 +56,13 @@ function rng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+/* The final colour of the snow, rolled off softly toward white: the haze and the low sun's warm glow are added after
+   the snow's own soft shoulder, and far away under the sun they took it past 255, where every shade was cut off (the
+   far path and its walls read as flat paper white). Below KNEE nothing changes; above it the rest is squeezed into the
+   last few levels, so the brightest snow stays just short of white and its shading still shows. (winterhall.js uses
+   the same curve, so the hall's snow meets the field's without a seam.) */
+var TONE_KNEE = 228, TONE_ROOM = 24;
+function tone(v) { return v > TONE_KNEE ? TONE_KNEE + (v - TONE_KNEE) * TONE_ROOM / (v - TONE_KNEE + TONE_ROOM) : v; }
 /* smooth value noise, 0 … 1, and its sum over a few sizes, −1 … 1 */
 function hash(i, j, s) {
   var h = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(s, 982451653)) | 0;
@@ -247,7 +254,7 @@ function groundJob(c, o) {
       if (v > 226) v = 226 + (v - 226) * 26 / (v - 226 + 26);
       v = lerp(v, mist[ch], hzv);
       v += glowCol[ch] * o.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((sx - o.sunX) / (W * 0.42), 2));
-      D[kk2 + ch] = clamp(v * g, 0, 255);
+      D[kk2 + ch] = clamp(tone(v) * g, 0, 255);
     }
     D[kk2 + 3] = 255;
   }
@@ -274,7 +281,7 @@ function groundJob(c, o) {
         v = lerp(v, mist[ch], hz);
         // the low sun's warmth on the far snow under it
         v += glowCol[ch] * o.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((sx - o.sunX) / (W * 0.42), 2));
-        D[k + ch] = clamp(v * g, 0, 255);
+        D[k + ch] = clamp(tone(v) * g, 0, 255);
       }
       D[k + 3] = 255;
     }

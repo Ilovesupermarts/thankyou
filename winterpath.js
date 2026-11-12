@@ -161,11 +161,13 @@ function build(o) {
     // the edge as a rounded end where it stops (after its last point)
     var dU = au - hw, dS = s - L;
     var a = dS > 0 ? (dU > 0 ? Math.hypot(dU, dS) : Math.max(dU, dS)) : dU;
-    // a notch here and there where a foot stepped out over the edge (each its own size; most stretches have none)
+    // here and there the edge is pushed out a little where feet stepped wide: a broad, shallow scoop in the wall (each
+    // its own length and depth; most stretches have none). (They were narrow pockets cut the full depth of the wall:
+    // up close each cast a sharp dark crescent that read as a mistake in the drawing.)
     var nk = Math.floor(s / 2.3), nr = hash2(nk, side, seed + 41);
     if (nr < 0.22 * trod) {
-      var nc = (nk + 0.15 + 0.7 * hash2(nk, side, seed + 43)) * 2.3, nw = 0.16 + 0.22 * hash2(nk, side, seed + 45), nd = (s - nc) / nw;
-      a -= (0.08 + 0.14 * hash2(nk, side, seed + 47)) * Math.exp(-nd * nd) * smooth(0.5, -0.1, a);
+      var nc = (nk + 0.15 + 0.7 * hash2(nk, side, seed + 43)) * 2.3, nw = 0.55 + 0.45 * hash2(nk, side, seed + 45), nd = (s - nc) / nw;
+      a -= (0.03 + 0.05 * hash2(nk, side, seed + 47)) * Math.exp(-nd * nd) * smooth(0.6, -0.2, a);
     }
     Q.a = a;
     if (a > wallW + 1.2) return 0;
