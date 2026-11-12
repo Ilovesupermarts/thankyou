@@ -1997,8 +1997,8 @@ function umeBakeSnowNew(T) {
   var hN = ns.map(function (n) {
     var ux0 = Math.abs(Math.cos(n.abs));
     // about as deep as the wood is thick on the limbs, a thin line on the twigs; none on steep wood
-    var h = (n.w * 0.7 + 0.4 + T.sc * 0.0015) * V.branchSnow * Math.pow(ux0, 1.2);
-    if (ux0 > 0.55 && V.branchDust > 0) h = Math.max(h, 0.45 * V.branchDust * V.branchSnow);
+    var h = (n.w * 0.7 + 0.4 + T.sc * 0.0015) * V.branchSnow * Math.pow(ux0, 2);
+    if (ux0 > 0.7 && V.branchDust > 0) h = Math.max(h, 0.45 * V.branchDust * V.branchSnow);
     return h;
   });
   // where each piece starts along its chain, and the chain's seed
