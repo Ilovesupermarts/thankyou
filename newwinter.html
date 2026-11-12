@@ -367,6 +367,8 @@ var V_DEFAULTS = {
   // the firs beside the hall (right of it, in the mist): shown, which trees (seed), their size and width (×), snow on
   // them, the mist on them
   hfShow: true, hfSeed: 5, hfSize: 1, hfWidth: 1.3, hfSnow: 0.8, hfHaze: 0.5,
+  // the length (m) of the slope of the rise the hall stands on, in front of it (where the path climbs it)
+  hallRiseFront: 60,
   // step 8, the trodden path (winterpath.js): five points it curves through (across, how far down: fractions of the
   // screen as on the reference, moved and sized by the layout's "Snow path"), how much it bends between its ends (×),
   // and on to the hall's steps; its width (m), the walls' height (m: about ankle deep), how wide each wall's slope is
@@ -981,7 +983,7 @@ function startHall() {
   HALL.job = WinterHall.job({
     path: trailFor('hall'), pathLook: { grey: V.trailGrey, shadow: V.trailShadow, bounce: V.trailBounce },
     W: W, H: H, PR: PR, cam: cam, place: { x0: pl.X(Hb.eave0), x1: pl.X(Hb.eave1), top: pl.Y(Hb.top), foot: pl.Y(Hb.base) },
-    yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
+    yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, riseFront: V.hallRiseFront, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
     haze: V.hallHaze, footMist: V.hallFootMist, shadow: V.hallShadow, lit: lampLevel() * V.hallLamps, spill: V.hallSpill,
     lampCol: hex(V.colours.flame), light: L,
     colours: { plaster: V.colours.hallPlaster, timber: V.colours.hallTimber, stone: V.colours.hallStone },
@@ -1005,7 +1007,7 @@ function trailHall() {                                   // where the hall's ste
   var hy = H * V.horizonLine, pl = blkPlace('hall'), Hb = BLK.hall;
   return WinterHall.job({ locateOnly: true, W: W, H: H, PR: PR, cam: WinterHill.camera(W, H, hy, MT.lens),
     place: { x0: pl.X(Hb.eave0), x1: pl.X(Hb.eave1), top: pl.Y(Hb.top), foot: pl.Y(Hb.base) },
-    yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
+    yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, riseFront: V.hallRiseFront, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
     light: { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) } });
 }
 // the panel's point n on the screen (CSS px), then on the snow (m: x right of the eye, z away)
@@ -1041,7 +1043,7 @@ function trailBuild() {
 // the path for one painter: the field's fades out where the hall's rise takes over (that one carries it up the rise)
 function trailFor(who) {
   if (!V.trailShow || typeof WinterPath === 'undefined') return null;
-  var key = [W, H, V.horizonLine, V.eyeHeight, MT.lens, V.pathX, V.pathY, V.pathSize, V.hallX, V.hallY, V.hallSize, V.hallTurn, V.hallSnow, V.hallEave,
+  var key = [W, H, V.horizonLine, V.eyeHeight, V.hallRiseFront, MT.lens, V.pathX, V.pathY, V.pathSize, V.hallX, V.hallY, V.hallSize, V.hallTurn, V.hallSnow, V.hallEave,
              V.hallRoof, V.hallSori, V.hallShow, V.trailToHall, V.trailBend, V.trailWidth, V.trailDepth, V.trailWall, V.trailBerm, V.trailWobble,
              V.trailTrod, V.seed, [1, 2, 3, 4, 5].map(function (n) { return V['trail' + n + 'X'] + ',' + V['trail' + n + 'Y']; }).join(';')].join('|');
   if (key !== TRAIL.key) { TRAIL.key = key; try { trailBuild(); } catch (e) { TRAIL.T = null; note('ERROR in the path: ' + e.message); } }
@@ -3361,6 +3363,7 @@ var G = [
     { o: 'V', k: 'hallShadow', label: 'Shadows on the snow', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'The hall\'s and the firs\' shadows, cast along the sun\'s direction (they follow the time of day).' },
     { o: 'V', k: 'hallLamps', label: 'Lamps after dusk', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'They come on with the pagoda\'s, as the autumn pagoda\'s do: fading in from about 38 minutes before sunset to full about 6 minutes after.' },
     { o: 'V', k: 'hallSpill', label: 'Lamplight on the snow', min: 0, max: 2, step: 0.01, re: 'hall' },
+    { o: 'V', k: 'hallRiseFront', label: 'The rise it stands on: length of its slope in front (m)', min: 14, max: 120, step: 1, re: 'hall trail', note: 'The hall stands 2.5 m above the snow field (where the reference has it). The path climbs this slope to its steps: longer is gentler.' },
     { chk: 'V', k: 'hfShow', label: 'Show the firs beside it', re: 'hall' },
     { o: 'V', k: 'hfSeed', label: 'Which firs (seed)', min: 1, max: 99, step: 1, re: 'hall', note: 'Every fir is its own tree from this.' },
     { o: 'V', k: 'hfSize', label: 'Firs: size (×)', min: 0.5, max: 1.6, step: 0.01, re: 'hall' },

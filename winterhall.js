@@ -37,6 +37,7 @@
       light { sun: [x, y, z] toward the sun (x right, y up, z toward you), sunCol, skyCol, amb, haze: [r, g, b] mist },
       field { snow, sun, shade, groundMist, haze, hazeM, glow, sunX, sunRGB, vis } (as the snow ground is baked),
       firs [{ x, foot, h, seed, haze }] (CSS px), firLook { … WinterHill.fir's look },
+      riseFront (m: how long the rise's slope is in front of the hall, toward you; 14 if not given; its sides and back 14),
       path (a WinterPath, winterpath.js: the trodden path, carved into this snow where it climbs the rise to the steps;
       along it this snow is drawn whole down to the rise's foot, where the snow field's path takes over), pathLook
       { grey, shadow, bounce } (as the snow field's)
@@ -195,7 +196,7 @@ function job(o) {
              steps: [Wp(0, 0, -bd - stepN * stepD - 0.05)[0], Wp(0, 0, -bd - stepN * stepD - 0.05)[2]],
              under: [Wp(0, 0, -bd + 0.6)[0], Wp(0, 0, -bd + 0.6)[2]],
              foot: function (m) { var p = Wp(0, 0, -bd - stepN * stepD - m); return [p[0], p[2]]; },
-             riseM: 1.5 + 14 - stepN * stepD };              // how far in front of the steps the rise's slope reaches the field
+             riseM: 1.5 + Math.max(14, o.riseFront || 14) - stepN * stepD };              // how far in front of the steps the rise's slope reaches the field
   }
   // the trodden path (winterpath.js) where it climbs the rise to the steps: its height is added to the snow's, in the
   // scene's own space (so it is the same path the snow field has), and it is lit as the rest of this snow
@@ -214,7 +215,8 @@ function job(o) {
 
   /* ---------- the snow round it: banked against the base, the level ground, the rise's slope down to the field ---------- */
   // the rise: a level top (a rounded oblong round the hall and the firs), then a slope of fixed length down to the field
-  var TER = { x0: 0, x1: 0, z0: 0, z1: 0, slope: 14 };
+  // (front: how long the slope is in front, toward you and the path; o.riseFront, m. The sides and back keep 14 m.)
+  var TER = { x0: 0, x1: 0, z0: 0, z1: 0, slope: 14, front: Math.max(14, o.riseFront || 14) };
   var firs = (o.firs || []).map(function (f) {
     var d = f.foot - hy, D = d > 0.3 ? -Y0 * F / d : 1e4;
     var wx = (f.x - cx) * D / F, wz = D, lx = (wx - X) * cs - (wz - Z) * sn, lz = (wx - X) * sn + (wz - Z) * cs;
@@ -228,7 +230,10 @@ function job(o) {
     firs.forEach(function (T) { if (T.D < 5e3) { TER.z1 = Math.max(TER.z1, T.z + T.r + 4); TER.x1 = Math.max(TER.x1, T.x + T.r + 3); TER.x0 = Math.min(TER.x0, T.x - T.r - 3); } });
   })();
   function terOut(x, z) {                                   // how far outside the rise's level top (m)
-    var dx = Math.max(TER.x0 - x, 0, x - TER.x1), dz = Math.max(TER.z0 - z, 0, z - TER.z1);
+    // the long front slope only in front of the hall itself (where the path climbs it), back to 14 m beside it, so the
+    // ground in front of the firs is as it was (a long slope there caught their long shadows as streaks)
+    var side = Math.max(-ex - 4 - x, x - ex - 4, 0), fl = lerp(TER.front, TER.slope, smooth(0, 60, side));
+    var dx = Math.max(TER.x0 - x, 0, x - TER.x1), dz = Math.max((TER.z0 - z) * TER.slope / fl, 0, z - TER.z1);
     return Math.hypot(dx, dz);
   }
   var maxG = 0.42 * Math.min(1.4, snowK) + 0.42;
@@ -313,8 +318,8 @@ function job(o) {
   grow(Pl(0, 0, -bd - stepN * stepD - 1));
   // the rise's slope down to the field, and its sides (where its edge is on the screen)
   for (var a2 = 0; a2 < 48; a2++) {
-    var u2 = a2 / 47, sl = TER.slope, gx = a2 < 24 ? lerp(TER.x0 - sl, TER.x1 + sl, u2 * 2) : (a2 < 36 ? TER.x0 - sl : TER.x1 + sl);
-    var gz = a2 < 24 ? TER.z0 - sl : lerp(TER.z0 - sl, TER.z1, (a2 % 12) / 11);
+    var u2 = a2 / 47, sl = TER.slope, sf = TER.front, gx = a2 < 24 ? lerp(TER.x0 - sl, TER.x1 + sl, u2 * 2) : (a2 < 36 ? TER.x0 - sl : TER.x1 + sl);
+    var gz = a2 < 24 ? TER.z0 - sf : lerp(TER.z0 - sf, TER.z1, (a2 % 12) / 11);
     var wpt = Wp(gx, -drop, gz);
     if (wpt[2] > 5) { var sp = P(wpt); if (sp[1] > hy) grow([clamp(sp[0], bx0 - 0.25 * W, bx1 + 0.25 * W), sp[1]]); }
   }
@@ -388,7 +393,7 @@ function job(o) {
     // it can reach the snow only below the highest snow, and it has reached it by the field's level
     var tLo = oo[1] > maxG ? (oo[1] - maxG) / -d[1] : 0, tHi = (oo[1] + drop + 0.2) / -d[1];
     // … and only inside the outer edge of the rise's slope (an ellipse on the ground)
-    var GB2 = [TER.x0 - TER.slope, -drop - 1, TER.z0 - TER.slope, TER.x1 + TER.slope, maxG + 1, TER.z1 + 2];
+    var GB2 = [TER.x0 - TER.slope, -drop - 1, TER.z0 - TER.front, TER.x1 + TER.slope, maxG + 1, TER.z1 + 2];
     var ta = slab(oo, d, GB2, 0);
     if (ta === Infinity) return 0;
     var tb = slabFar(oo, d, GB2);
