@@ -356,7 +356,7 @@ var V_DEFAULTS = {
   pagodaShow: true, pagodaTurn: 45, pagodaTimber: false, pagodaSnow: 1, pagodaHaze: 0.12, pagodaLamps: 1, pagodaRow: 0.32, pagodaClear: 1,
   // the pagoda's and the hall's depth of field (each its own lens, as the pines': on, the distance in focus in m, how
   // strongly what is nearer or farther blurs, the most it blurs in CSS px)
-  pagodaDof: false, pagodaFocus: 200, pagodaDofStrength: 1, pagodaDofMax: 3,
+  pagodaDof: false, pagodaFocus: 200, pagodaDofStrength: 3, pagodaDofMax: 8,
   hallDof: false, hallFocus: 200, hallDofStrength: 1, hallDofMax: 3,
   // step 5, the shrine hall (winterhall.js): shown, turned (degrees; + turns its right end toward you), the snow on its
   // roof (×), how far its eaves stand out (×), its roof's height (×), how much its corners turn up (×), mist on it, the
@@ -577,13 +577,16 @@ try {
     // the water's calm, wind and wave strength saved before ver 4 were the damped first settings (the waves barely
     // showed): not read, so the new defaults take effect
     if (saved.V && !(saved.ver >= 4)) { delete saved.V.lakeCalm; delete saved.V.lakeWind; delete saved.V.lakeWaves; }
+    // the pagoda's depth of field strength and most blur saved before ver 5 were the first, faint settings (1.7 px at the
+    // pagoda's distance): not read, so the stronger defaults take effect (its on / off and focus are kept)
+    if (saved.V && !(saved.ver >= 5)) { delete saved.V.pagodaDofStrength; delete saved.V.pagodaDofMax; }
     merge(V, saved.V || {}, V_DEFAULTS);
     // the sun and the clouds saved before step 1, and the mountains saved before step 2, were winter2.html's: not read
     if (saved.ver >= 2) { merge(CLOUD, saved.CLOUD || {}, CLOUD_DEFAULTS); merge(SUN, saved.SUN || {}, SDEF); }
     if (saved.ver >= 3) merge(MT, saved.MT || {}, MT_DEFAULTS);
   }
 } catch (e) { /* a private window: the defaults */ }
-function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 4, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
+function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 5, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
 
 /* Toolbar date and time (Nagoya). */
 function tickClock() {
@@ -3026,11 +3029,11 @@ if (!lab) return;
 var OBJ = { V: lab.V, MT: lab.MT, CLOUD: lab.CLOUD, SUN: lab.SUN };
 /* o: which values, k: the value, re: what it bakes again (see section 15) */
 // (the pagoda's and the hall's place and size are in their own groups)
-var MOVE = [['fuji', 'Mt Fuji'], ['hill', 'Hill of firs'], ['frost', 'Frosted trees'],
+var MOVE = [['hill', 'Hill of firs'], ['frost', 'Frosted trees'],
             ['lake', 'Lake and its banks'], ['pines', 'Roped pines and firs (right bank)'], ['path', 'Snow path'], ['gates', 'Torii'],
             ['lanterns', 'Stone lanterns'], ['plumL', 'Plum branch, left'], ['plumR', 'Plum branch, right']];
-function placeCtls(g, name, re) {
-  return [{ o: 'V', k: g + 'X', label: name + ': across', min: -0.3, max: 0.3, step: 0.005, re: re, note: 'Share of the screen\'s width; + to the right.' },
+function placeCtls(g, name, re, lo, hi) {
+  return [{ o: 'V', k: g + 'X', label: name + ': across (left − / right +)', min: lo === undefined ? -0.3 : lo, max: hi === undefined ? 0.3 : hi, step: 0.005, re: re, note: 'Share of the screen\'s width; + to the right.' },
           { o: 'V', k: g + 'Y', label: name + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: re },
           { o: 'V', k: g + 'Size', label: name + ': size', min: 0.4, max: 2, step: 0.01, re: re, note: 'About its foot.' }];
 }
@@ -3163,7 +3166,7 @@ var G = [
     { o: 'V', k: 'stars', label: 'Stars (night)', min: 0, max: 1, step: 0.01, re: 'live' },
     { chk: 'V', k: 'moon', label: 'Moon (night)', re: 'live' },
     { o: 'V', k: 'moonSize', label: 'Moon size', min: 0.5, max: 2.5, step: 0.05, re: 'live' } ] },
-  { name: 'Mountains and Fuji (step 2)', file: 'mountains.js', ctls: [
+  { name: 'Mountains and Fuji (step 2)', file: 'mountains.js', ctls: placeCtls('fuji', 'Mt Fuji', 'mtn', -0.85, 0.15).concat([
     { o: 'MT', k: 'rangeHeight', label: 'Height of the ranges', min: 0, max: 0.4, step: 0.005, re: 'mtn', note: 'The ranges either side of Fuji (the reference has none: keep it low).' },
     { o: 'MT', k: 'featureKm', label: 'Size of the mountains (km)', min: 3, max: 30, step: 0.5, re: 'mtn' },
     { o: 'MT', k: 'sharpness', label: 'Sharp crests', min: 0, max: 1, step: 0.01, re: 'mtn' },
@@ -3192,7 +3195,7 @@ var G = [
     { o: 'V', k: 'mistDrift', label: 'Drifting mist', min: 0, max: 1.5, step: 0.05, re: 'live' },
     { o: 'MT', k: 'softness', label: 'Softness (px)', min: 0, max: 4, step: 0.1, re: 'mtn' },
     { o: 'MT', k: 'resolution', label: 'Resolution', min: 0.4, max: 1.2, step: 0.05, re: 'mtn' },
-    { col: 'MT', keys: [['rock', 'Rock'], ['fujiRock', 'Fuji'], ['evergreen', 'Conifers'], ['snow', 'Snow'], ['haze', 'Haze']], re: 'mtn' } ] },
+    { col: 'MT', keys: [['rock', 'Rock'], ['fujiRock', 'Fuji'], ['evergreen', 'Conifers'], ['snow', 'Snow'], ['haze', 'Haze']], re: 'mtn' } ]) },
   { name: 'Hill of firs (step 3)', file: 'winterhill.js', note: 'The hill and its rows of firs, from the crest (far, small, misty) to the foot (near, larger, clearer). Every fir is its own tree from its seed. Its place and size: "Layout: where each element stands", Hill of firs. The needle colour: "Colours of the new scene", Pine needles.', ctls: [
     { chk: 'V', k: 'hillShow', label: 'Show the hill', re: 'hill' },
     { chk: 'V', k: 'hillFirs', label: 'Firs on the hill', re: 'hill' },
