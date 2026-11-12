@@ -1004,7 +1004,7 @@ function startHall() {
   var L = { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) };
   var firs = hallFirList(pl);
   HALL.job = WinterHall.job({
-    path: trailFor('hall'),
+    path: trailFor('hall'), stepBase: V.trailShow && V.trailToHall ? V.trailDepth : 0,
     pathLook: { grey: V.trailGrey, shadow: V.trailShadow, bounce: V.trailBounce },
     W: W, H: H, PR: PR, cam: cam, place: { x0: pl.X(Hb.eave0), x1: pl.X(Hb.eave1), top: pl.Y(Hb.top), foot: pl.Y(Hb.base) },
     yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, riseFront: V.hallRiseFront, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,

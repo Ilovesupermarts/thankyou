@@ -258,6 +258,10 @@ function job(o) {
     if (z < -bd + 0.01 && Math.abs(x) < stepW + 0.6) bank *= smooth(stepW + 0.1, stepW + 0.6, Math.abs(x));
     // the wind's soft waves in the snow
     var wav = 0.05 * Math.sin(0.21 * x + 0.13 * z + 0.7) + 0.035 * Math.sin(0.47 * x - 0.31 * z + 2.2);
+    // and the wind-carved ridges and hollows of the snow field (long, a few metres apart, each its own height), so this
+    // snow is shaded and textured as the field round it (smooth, it read as plain white)
+    wav += (0.075 * Math.sin(0.95 * x + 0.32 * z + 3 * vn1(z * 0.13 + x * 0.05, 21)) * (0.35 + 0.65 * vn1(x * 0.17 + z * 0.09, 23)) +
+            0.04 * Math.sin(2.1 * x - 0.55 * z + 2 * vn1(x * 0.3, 25)) * vn1(z * 0.4 + x * 0.2, 27));
     // and long low swells, so the rise's top meets the mist in a soft uneven line (not a ruler-straight one)
     var swell = (0.16 * Math.sin(0.093 * x + 0.04 * z + 0.5) + 0.1 * Math.sin(0.21 * x - 0.08 * z + 1.9) + 0.05 * Math.sin(0.43 * x + 0.17 * z + 4.1)) *
                 smooth(1, 6, Math.max(Math.abs(x) - bw, Math.abs(z) - bd));
@@ -287,7 +291,10 @@ function job(o) {
   // the solid parts of the hall (base, floor, walls, brackets, steps), in its own space, for what hides what and the shadows
   var BOX = [[-bw, -0.6, -bd, bw, fh - 0.18, bd], [-(ww + 0.9), fh - 0.18, -(wd + 0.9), ww + 0.9, fh, wd + 0.9], [-ww, fh, -wd, ww, wallTop, wd],
              [-(ww + brOut), wallTop, -(wd + brOut), ww + brOut, brTop, wd + brOut], [-(ww + brOut + 0.1), brTop, -(wd + brOut + 0.1), ww + brOut + 0.1, edgeY, wd + brOut + 0.1]];
-  for (var k0 = 1; k0 <= stepN; k0++) BOX.push([-stepW, -0.4, -bd - k0 * stepD, stepW, fh * (1 - k0 / (stepN + 1)), -bd + 0.01]);
+  // (the steps rise evenly from the trodden path's floor, o.stepBase m below this snow, so the bottom riser is as tall
+  // as the others: from the snow's level it showed twice as tall)
+  var stB = -(o.stepBase || 0);
+  for (var k0 = 1; k0 <= stepN; k0++) BOX.push([-stepW, stB - 0.4, -bd - k0 * stepD, stepW, stB + (fh - stB) * (1 - k0 / (stepN + 1)), -bd + 0.01]);
   function slab(oo, d, B, tmin) {
     var t0 = tmin, t1 = Infinity;
     for (var a = 0; a < 3; a++) {
