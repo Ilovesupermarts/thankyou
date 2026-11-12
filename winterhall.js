@@ -937,7 +937,7 @@ function job(o) {
       quad(c, Q, 0, 1, bm[0], bm[0] + (bm[1] - bm[0]) * 0.22, css(fin(mix(redC, [0, 0, 0], 0.25))));
       if (WE <= 0) return;
       // the paint worn and flaked through to the dark wood, and faded paler where the weather reaches it
-      var nf = Math.round(bays * 4 * WE);
+      var nf = Math.round(bays * 7 * WE);
       for (var k = 0; k < nf; k++) {
         var fs0 = hash(k, bi, sd + 11), fw = m2s(0.08 + 0.35 * hash(k, bi + 4, sd + 11)), ft0 = lerp(bm[0], bm[1], 0.15 + 0.6 * hash(k, bi + 8, sd + 11));
         var dark = hash(k, bi + 12, sd + 11) < 0.55;
@@ -966,7 +966,7 @@ function job(o) {
     if (WE <= 0) return;
     c.save(); quadPath(c, Q, 0, 1, 0, 1); c.clip();
     var A = P2(Q, 0.5, 0), B = P2(Q, 0.5, 0.26), g = c.createLinearGradient(A[0], A[1], B[0], B[1] + 0.01);
-    g.addColorStop(0, css([84, 70, 56], 0.5 * WE)); g.addColorStop(1, css([84, 70, 56], 0));
+    g.addColorStop(0, css([78, 64, 50], 0.7 * WE)); g.addColorStop(1, css([84, 70, 56], 0));
     quad(c, Q, 0, 1, 0, 0.3, g);
     var bayPx = w / bays;
     for (var j = 0; j < bays; j++) {
@@ -975,7 +975,7 @@ function job(o) {
         var C = P2(Q, lerp(a, b, 0.1 + 0.8 * hash(j, k, sd)), 0.08 + 0.84 * hash(j, k + 7, sd)), r = (0.1 + 0.22 * hash(j, k + 13, sd)) * bayPx;
         var dark = hash(j, k + 19, sd) < 0.7, col = dark ? [98, 86, 72] : [255, 250, 238];
         var gg = c.createRadialGradient(C[0], C[1], 0, C[0], C[1], r);
-        gg.addColorStop(0, css(col, (dark ? 0.26 : 0.16) * WE)); gg.addColorStop(1, css(col, 0));
+        gg.addColorStop(0, css(col, (dark ? 0.42 : 0.2) * WE)); gg.addColorStop(1, css(col, 0));
         c.fillStyle = gg; c.fillRect(C[0] - r, C[1] - r, 2 * r, 2 * r);
       }
       var ns = 3 + Math.floor(4 * hash(j, 31, sd));
@@ -984,14 +984,14 @@ function job(o) {
         var fromSill = Math.abs(s0 - (a + b) / 2) < (b - a) * 0.24 && hash(j, k + 60, sd) < 0.6;
         var tS = fromSill ? 0.4 : 0.85, tE = Math.max(0.02, tS - (0.12 + 0.4 * hash(j, k + 70, sd)));
         var P0 = P2(Q, s0, tS), P1 = P2(Q, s0, tE), gs = c.createLinearGradient(P0[0], P0[1], P1[0], P1[1] + 0.01);
-        gs.addColorStop(0, css([86, 76, 66], (0.22 + 0.22 * hash(j, k + 80, sd)) * WE)); gs.addColorStop(1, css([86, 76, 66], 0));
+        gs.addColorStop(0, css([86, 76, 66], (0.36 + 0.3 * hash(j, k + 80, sd)) * WE)); gs.addColorStop(1, css([86, 76, 66], 0));
         quad(c, Q, s0 - sw / 2, s0 + sw / 2, tE, tS, gs);
       }
       if (hash(j, 90, sd) < 0.55 * WE) {
         var cs0 = lerp(a, b, 0.15 + 0.7 * hash(j, 91, sd)), ct = 0.15 + 0.6 * hash(j, 92, sd), P3 = P2(Q, cs0, ct);
         c.beginPath(); c.moveTo(P3[0], P3[1]);
         for (var q = 0; q < 4; q++) { cs0 += (hash(j, 93 + q, sd) - 0.5) * 0.02; ct += (hash(j, 97 + q, sd) - 0.3) * 0.07; P3 = P2(Q, cs0, ct); c.lineTo(P3[0], P3[1]); }
-        c.strokeStyle = css([70, 60, 52], 0.3 * WE); c.lineWidth = 0.35; c.stroke();
+        c.strokeStyle = css([62, 52, 46], 0.5 * WE); c.lineWidth = 0.45; c.stroke();
       }
     }
     c.restore();
