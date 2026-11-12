@@ -69,15 +69,16 @@ function bake(p, L) {
   var hMax = Math.max(p.h0, p.h1);
   if (hMax < 0.25 || len < 1) return null;
   // how far the snow reaches past each end: on into the next piece, or out to its rounded cap
-  var ext0 = p.capStart ? 0 : Math.min(p.w0 * 1.3 + 1, len * 0.3);
+  // (a joined start begins exactly at the joint: the piece before reaches on under it, so nothing is laid over its snow)
+  var ext0 = 0;
   var ext1 = p.capEnd ? (p.fork ? p.w1 * 0.8 : 0) : Math.min(p.w1 * 1.3 + 1, len * 0.3);
   var xs = p.capStart ? len * (p.sa || 0) : -ext0, xe = p.capEnd ? len * (p.sb === undefined ? 1 : p.sb) + ext1 : len + ext1;
   if (xe - xs < 1) return null;
   var cover = L.cover === undefined ? 0.3 : L.cover;
   // the snow's line along the piece, every half device pixel: its crest (top, negative y) and its foot on the wood
   var step = 0.5 / RS, n = Math.ceil((xe - xs) / step) + 1, top = new Float32Array(n), foot = new Float32Array(n);
-  var cap0 = p.capStart ? Math.max(1.2, Math.min((p.h0 + p.w0) * 1.1, (xe - xs) * 0.45)) : Math.max(0.6, ext0);
-  var cap1 = p.capEnd ? Math.max(1.2, Math.min((p.h1 + p.w1) * 1.1, (xe - xs) * 0.45)) : Math.max(0.6, ext1);
+  var cap0 = Math.max(1.2, Math.min((p.h0 + p.w0) * 1.1, (xe - xs) * 0.45));
+  var cap1 = Math.max(1.2, Math.min((p.h1 + p.w1) * 1.1, (xe - xs) * 0.45));
   var lam1 = Math.max(10, (p.w0 + p.w1) * 3.5), lam2 = Math.max(4, lam1 * 0.33);
   var minY = 0, maxY = -1e9;
   for (var i = 0; i < n; i++) {
@@ -90,8 +91,9 @@ function bake(p, L) {
     if (p.fork) { var df = (x - len) / Math.max(2, p.w1 * 2.2); h += Math.max(p.w1 * 0.9, p.h1 * 0.5) * Math.exp(-df * df); }
     // rounded caps: where the snow ends (a capped end) or where it runs on past a joint (rounding off under the next piece)
     var e = 1;
-    if (x - xs < cap0) { var a0 = (x - xs) / cap0; e = Math.min(e, Math.sqrt(Math.max(0, 1 - (1 - a0) * (1 - a0)))); }
-    if (xe - x < cap1) { var a1 = (xe - x) / cap1; e = Math.min(e, Math.sqrt(Math.max(0, 1 - (1 - a1) * (1 - a1)))); }
+    if (p.capStart && x - xs < cap0) { var a0 = (x - xs) / cap0; e = Math.min(e, Math.sqrt(Math.max(0, 1 - (1 - a0) * (1 - a0)))); }
+    if (p.capEnd && xe - x < cap1) { var a1 = (xe - x) / cap1; e = Math.min(e, Math.sqrt(Math.max(0, 1 - (1 - a1) * (1 - a1)))); }
+    if (!p.capEnd && x > len) e = Math.min(e, 1 - 0.15 * (x - len) / Math.max(0.5, ext1));   // past the joint, a little under the next piece's snow
     // the foot: wrapping down over the upper part of the wood's front, a little further here and there (a soft drip)
     var drip = Math.max(0, noise1(s / lam2 * 0.9, p.chain + 11.3)) * lumpK;
     var fy = -w + w * 2 * clamp(cover * (0.75 + 0.5 * drip) * Math.sqrt(e), 0, 0.92);
@@ -121,7 +123,7 @@ function bake(p, L) {
     if (span <= 0.05) continue;
     var slope = (at(top, X + 0.6) - at(top, X - 0.6)) / 1.2;
     // how far into the snow this column is from its ends (thin ends let light through and look softer)
-    var endIn = Math.min(X - xs, xe - X);
+    var endIn = Math.min(p.capStart ? X - xs : 1e9, p.capEnd ? xe - X : 1e9);
     var yA = Math.floor((yT - y0) * RS - 1), yZ = Math.ceil((yB - y0) * RS + 1);
     for (var py = Math.max(0, yA); py < Math.min(ch, yZ); py++) {
       var Y = y0 + (py + 0.5) / RS;
@@ -133,7 +135,7 @@ function bake(p, L) {
       var th = Math.acos(clamp(1 - 1.62 * Math.pow(v, 1.35), -1, 1));
       var ct = Math.cos(th), st = Math.sin(th), tx = slope * 1.6 * Math.max(0, ct);
       // its ends round off sideways
-      var ex = endIn < span * 1.5 ? (X - xs < xe - X ? -1 : 1) * (1 - endIn / (span * 1.5)) * 0.8 : 0;
+      var ex = endIn < span * 1.5 ? ((p.capStart ? X - xs : 1e9) < (p.capEnd ? xe - X : 1e9) ? -1 : 1) * (1 - endIn / (span * 1.5)) * 0.8 : 0;
       tx += ex;
       var nx = tx * A[0] + ct * U[0], ny = tx * A[1] + ct * U[1], nz = st;
       // the fine lumpy surface tips the normal a little
