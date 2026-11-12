@@ -125,7 +125,7 @@ function build(o) {
   // the half width along it: wandering a little (each side its own), narrowing to endHalf at the end
   function halfW(s, side) {
     var w = W0 + wob * (0.13 * n1(s / 3.1, seed + side * 7) + 0.05 * n1(s / 0.9, seed + 3 + side * 7));
-    if (endHalf > 0) w = lerp(w, endHalf, smooth(L - 12, L - 1, s));
+    if (endHalf > 0) w = lerp(w, endHalf, smooth(L - 5, L - 1, s));          // (only where it goes in under the steps)
     return w;
   }
   function depthAt(s) { return D0 * (1 + 0.22 * wob * n1(s / 5.3, seed + 21)); }
@@ -262,7 +262,7 @@ function build(o) {
     }
     return clamp(1 - 0.5 * occ, 0, 1);
   }
-  return { delta: delta, near: near, sun: sun, sky: sky, Q: Q, maxRise: maxRise, maxDrop: maxDrop, length: L,
+  return { delta: delta, near: near, sun: sun, sky: sky, Q: Q, maxRise: maxRise, maxDrop: maxDrop, length: L, trod: trod,
            ends: [[X[0], Z[0]], [X[N - 1], Z[N - 1]]], at: function (s) { var i = clamp(Math.round(s / ds), 0, N - 1); return [X[i], Z[i]]; },
            sAt: function (x, z) { return locate(x, z) ? Q.s : -1; } };
 }

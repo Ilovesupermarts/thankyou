@@ -207,18 +207,8 @@ function job(o) {
   }
   var dofHall = 0;
   var eyeH = o.eye || 3, drop = Math.max(0, eyeH + Y0);     // how high its ground stands above the field (the rise)
-  // (o.locateOnly: only where it stands, for the path that leads to its steps; nothing is drawn)
-  if (o.locateOnly) {
-    var fwd = [-sn, -cs];                                    // the way its front faces, on the ground (x right, z away)
-    return { X: X, Y0: Y0, Z: Z, drop: drop, yaw: yaw, stepW: stepW, front: fwd,
-             steps: [Wp(0, 0, -bd - stepN * stepD - 0.05)[0], Wp(0, 0, -bd - stepN * stepD - 0.05)[2]],
-             under: [Wp(0, 0, -bd + 0.6)[0], Wp(0, 0, -bd + 0.6)[2]],
-             foot: function (m) { var p = Wp(0, 0, -bd - stepN * stepD - m); return [p[0], p[2]]; },
-             riseM: 1.5 + Math.max(14, o.riseFront || 14) - stepN * stepD };              // how far in front of the steps the rise's slope reaches the field
-  }
   // the trodden path (winterpath.js) where it climbs the rise to the steps: its height is added to the snow's, in the
   // scene's own space (so it is the same path the snow field has), and it is lit as the rest of this snow
-  var pCut = o.pathCut === undefined ? Infinity : o.pathCut, pBlend = o.pathBlend || 10;
   var gGrain = (o.field && o.field.grain) || 0, gRes = (o.PR || 1) * ((o.field && o.field.res) || 0.6), gY0 = Math.floor(o.cam.hy);
   var PATH = o.path || null, PFZ = 0, PQ = { floor: 0, far: true }, pGrey = (o.pathLook && o.pathLook.grey !== undefined) ? o.pathLook.grey : 0.5;
   var pShadow = (o.pathLook && o.pathLook.shadow !== undefined) ? o.pathLook.shadow : 1;
@@ -271,6 +261,25 @@ function job(o) {
     // (both die away toward the rise's foot, where this snow meets the field's level: the path is handed over there)
     var lev = 1 - smooth(0.45 * TER.slope, 0.95 * TER.slope, terOut(x, z));
     return g + bank + (wav * smooth(0, 3, dp) + swell) * lev + pathD(x, z);
+  }
+  // (o.locateOnly: only where it stands, for the path that leads to its steps; nothing is drawn)
+  if (o.locateOnly) {
+    var fwd = [-sn, -cs];                                    // the way its front faces, on the ground (x right, z away)
+    return { X: X, Y0: Y0, Z: Z, drop: drop, yaw: yaw, stepW: stepW, front: fwd,
+             steps: [Wp(0, 0, -bd - stepN * stepD - 0.05)[0], Wp(0, 0, -bd - stepN * stepD - 0.05)[2]],
+             under: [Wp(0, 0, -bd + 0.6)[0], Wp(0, 0, -bd + 0.6)[2]],
+             foot: function (m) { var p = Wp(0, 0, -bd - stepN * stepD - m); return [p[0], p[2]]; },
+             riseM: 1.5 + Math.max(14, o.riseFront || 14) - stepN * stepD,               // how far in front of the steps the rise's slope reaches the field
+             // the snow's height above the field at a point of the scene (x right, z away, m): the rise, its swells, the
+             // snow banked at the base (the path itself not included): the snow field draws the whole path on it
+             ground: function (xs, zs) { var dx = xs - X, dz = zs - Z; return groundAt(dx * cs - dz * sn, dx * sn + dz * cs) + drop; },
+             riseBox: (function () {                              // where it stands above the field (scene x, z)
+               var bx = [1e9, -1e9, 1e9, -1e9];
+               [[TER.x0 - TER.slope, TER.z0 - TER.front], [TER.x1 + TER.slope, TER.z0 - TER.front], [TER.x0 - TER.slope, TER.z1 + TER.slope], [TER.x1 + TER.slope, TER.z1 + TER.slope]].forEach(function (q) {
+                 var w = Wp(q[0], 0, q[1]); bx[0] = Math.min(bx[0], w[0]); bx[1] = Math.max(bx[1], w[0]); bx[2] = Math.min(bx[2], w[2]); bx[3] = Math.max(bx[3], w[2]);
+               });
+               return { x0: bx[0], x1: bx[1], z0: bx[2], z1: bx[3] };
+             })() };
   }
   // the solid parts of the hall (base, floor, walls, brackets, steps), in its own space, for what hides what and the shadows
   var BOX = [[-bw, -0.6, -bd, bw, fh - 0.18, bd], [-(ww + 0.9), fh - 0.18, -(wd + 0.9), ww + 0.9, fh, wd + 0.9], [-ww, fh, -wd, ww, wallTop, wd],
@@ -442,16 +451,27 @@ function job(o) {
     var al = drop > 0.05 ? 1 - smooth(0.45, 0.97, -hyy / drop) : 1;
     al *= 1 - smooth(0.4 * TER.slope, TER.slope, dOut);
     al *= 1 - smooth(TER.z1 - 8, TER.z1 + 1, hz2);
-    // on the path, up the rise's slope to its foot, this snow is drawn whole (the snow field's path stops at the foot,
-    // where the two meet at the same level); its colour still melts into the field's toward the foot
-    // (it comes in gradually over pathBlend m past the hand-over, cutS, where the field's path still lies under it)
-    var pZone = false, pA = 1;
-    if (PATH && dOut < TER.slope) {
+    // the path: the snow field draws all of it, up this rise to the steps (one painter, one look, one width); this snow
+    // leaves a gap where it runs, closing softly over the plain snow beyond the ridge pushed aside along its walls
+    // (just in front of the hall's stone base and steps this snow stays: it covers the base's foot, which the snow
+    // field, drawn under the hall, cannot)
+    var pHole = 1;
+    if (PATH) {
       PATH.delta(X + hx * cs + hz2 * sn, Z - hx * sn + hz2 * cs, Math.max(PFZ, 0.25), true);
-      if (!PATH.Q.far && PATH.Q.a < 1.4) { pZone = true; if (pCut < Infinity) pA = smooth(pCut, pCut + pBlend, PATH.Q.s); }
+      if (!PATH.Q.far) pHole = smooth(0.85, 1.35, PATH.Q.a);
+      // (kept where the line of sight, carried on, would meet the front of the base at its foot: seen from 0.5 m above
+      // this ground, that snow lies 30 m and more in front of the base. Faded by how low the line passes the base's
+      // front (a hard in-or-out test drew a dark seam along the line of the base's lowest edge))
+      if (d[2] > 1e-6) {
+        var tPl = (-bd - oo[2]) / d[2];
+        if (tPl > th) {
+          var yPl = oo[1] + d[1] * tPl, xPl = Math.abs(oo[0] + d[0] * tPl);
+          pHole = Math.max(pHole, smooth(-1.4, -0.55, yPl) * (1 - smooth(bw, bw + 1.5, xPl)));
+        }
+      }
     }
     var fadeCol = 1 - al;
-    if (pZone) al = Math.max(al, pA);
+    al *= pHole;
     if (al < 0.004) return 0;
     var fade = fadeCol;                                     // 1: it shows just what the field shows on this row
     var e = 0.12, nx = -(groundAt(hx + e, hz2) - hyy) / e, nz = -(groundAt(hx, hz2 + e) - hyy) / e;
@@ -509,8 +529,13 @@ function job(o) {
       var gk = 1 + (ihash(Math.floor(px * gRes), Math.floor((py - gY0) * gRes), 5) - 0.5) * 0.035 * gGrain * (1 + pfl);
       for (var gc = 0; gc < 3; gc++) { outA[gc] *= gk; outA[4 + gc] *= gk; }
     }
+    // the packed snow's grey-blue tint, as the snow field gives its path (after the roll-off toward white)
+    if (pfl > 0) {
+      var tk = pfl * pGrey * 2, tn = [1 - 0.065 * tk, 1 - 0.045 * tk, 1 - 0.015 * tk];
+      for (var tc2 = 0; tc2 < 3; tc2++) { outA[tc2] *= tn[tc2]; outA[4 + tc2] *= tn[tc2]; }
+    }
     outA[7] = sunFrac;
-    outA[3] = pZone ? Math.max(1 - smooth(0.8, 1, fade), pA) : 1 - smooth(0.8, 1, fade);
+    outA[3] = (1 - smooth(0.8, 1, fade)) * pHole;
     return th < tS ? 2 : 1;
   }
 
