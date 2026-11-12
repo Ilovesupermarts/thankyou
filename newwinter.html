@@ -136,6 +136,32 @@
   .sp.dragging { opacity: 0.92; }
   .sp.dragging .sp-head { cursor: grabbing; background: rgba(120, 120, 128, 0.1); }
   .sp-head b::before { content: '⠿ '; color: rgba(60, 60, 67, 0.4); font-weight: 400; }
+  /* shaping the path by touch: big numbered circles on the picture, a band where the path will lie, big buttons */
+  .sp-head .sp-headbtns { display: flex; gap: 6px; }
+  .sp button.pe-open { background: #C0392B; color: #FFFFFF; }
+  #pe { position: fixed; inset: 0; z-index: 2147483000; touch-action: none; -webkit-user-select: none; user-select: none; display: none; }
+  #pe.on { display: block; }
+  #pe canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #pe .pe-bar { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 12px 16px; border-radius: 22px; background: rgba(255, 255, 255, 0.92); box-shadow: 0 10px 30px rgba(40, 30, 30, 0.25);
+    font: 500 15px/1.35 -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif; color: #1D1D1F; max-width: calc(100vw - 24px); }
+  #pe .pe-hint { text-align: center; }
+  #pe .pe-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  #pe button { font: 600 18px/1 -apple-system, BlinkMacSystemFont, sans-serif; min-height: 56px; min-width: 96px; padding: 0 18px; border: 0; border-radius: 16px;
+    background: rgba(120, 120, 128, 0.16); color: #1D1D1F; cursor: pointer; }
+  #pe button:active { transform: scale(0.96); }
+  #pe button.pe-done { background: #1E8E3E; color: #FFFFFF; min-width: 140px; }
+  #pe button:disabled { opacity: 0.35; }
+  #pe .pe-status { font-size: 14px; color: #8A4B00; min-height: 1.3em; }
+  #pe .pe-h { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; touch-action: none; cursor: grab;
+    background: rgba(255, 255, 255, 0.55); border: 5px solid #C0392B; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    display: flex; align-items: center; justify-content: center; font: 800 26px/1 -apple-system, BlinkMacSystemFont, sans-serif; color: #C0392B; }
+  #pe .pe-h::after { content: ''; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #C0392B; }
+  #pe .pe-h span { position: relative; top: -17px; text-shadow: 0 0 4px #FFFFFF, 0 0 4px #FFFFFF; }
+  #pe .pe-h.drag { transform: scale(1.18); background: rgba(255, 236, 160, 0.6); cursor: grabbing; }
+  #pe .pe-h.off { border-style: dashed; }
+  #pe .pe-hall { position: absolute; transform: translate(-50%, -100%); padding: 6px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.85);
+    font: 600 13px/1.2 -apple-system, BlinkMacSystemFont, sans-serif; color: #1E5631; pointer-events: none; white-space: nowrap; }
   /* the groups, each folded away by tapping its title */
   .sp-group h4 { cursor: pointer; display: flex; justify-content: space-between; padding-top: 10px;
                  border-top: 0.5px solid rgba(60, 60, 67, 0.15); }
@@ -279,7 +305,7 @@
 
 <!-- The panel (test bed only): every value of the winter scene; drag it by its title bar -->
 <div class="sp" id="sp">
-  <div class="sp-head"><b>新しい冬 · New winter</b><button type="button" id="spToggle">Hide</button></div>
+  <div class="sp-head"><b>新しい冬 · New winter</b><span class="sp-headbtns"><button type="button" class="pe-open" id="spPath">✋ Shape the path</button><button type="button" id="spToggle">Hide</button></span></div>
   <div class="sp-body">
     <div id="spCtls"></div>
     <div class="sp-row">
@@ -1019,7 +1045,8 @@ function trailGround(p) {
   var hy = H * V.horizonLine, F = lakeLens(), d = Math.max(4, p[1] - hy), z = V.eyeHeight * F / d;
   return [(p[0] - W / 2) * z / F, z];
 }
-function trailBuild() {
+// the five points on the snow (m), with the bend applied, and where the path heads for the hall
+function trailPointsM(bend) {
   var pts = [];
   for (var n = 1; n <= 5; n++) pts.push(trailGround(trailScreen(n)));
   var hall = V.trailToHall && V.hallShow ? trailHall() : null;
@@ -1030,12 +1057,21 @@ function trailBuild() {
   for (var i = 1; i < pts.length; i++) {
     if (!hall && i === pts.length - 1) break;
     var t = ((pts[i][0] - ax) * bx + (pts[i][1] - az) * bz) / bl, qx = ax + bx * t, qz = az + bz * t;
-    pts[i] = [qx + (pts[i][0] - qx) * V.trailBend, qz + (pts[i][1] - qz) * V.trailBend];
+    pts[i] = [qx + (pts[i][0] - qx) * bend, qz + (pts[i][1] - qz) * bend];
   }
-  // it runs on past the bottom of the screen (toward you, as it came), and on into the hall's steps
+  return { pts: pts, hall: hall, A: A };
+}
+// the whole line the path follows (m): on past the bottom of the screen, the five points, on into the hall's steps
+function trailLineM(PM) {
+  var pts = PM.pts.slice(), hall = PM.hall;
   var dx = pts[0][0] - pts[1][0], dz = pts[0][1] - pts[1][1], dl = Math.hypot(dx, dz) || 1;
   pts.unshift([pts[0][0] + dx / dl * 14, Math.max(2, pts[0][1] + dz / dl * 14)]);
   if (hall) pts.push(hall.foot(7), hall.foot(2.5), hall.steps, hall.under);
+  return pts;
+}
+function trailBuild() {
+  var PM = trailPointsM(V.trailBend), hall = PM.hall;
+  var pts = trailLineM(PM);
   var T = WinterPath.build({ pts: pts, width: V.trailWidth, depth: V.trailDepth, wall: V.trailWall, berm: V.trailBerm,
                              wobble: V.trailWobble, trod: V.trailTrod, endHalf: hall ? hall.stepW + 0.2 : 0, seed: V.seed * 13 + 5 });
   var cutS = Infinity;
@@ -1062,6 +1098,84 @@ function trailFor(who) {
   return T;
 }
 function smoothstep(a, b, x) { var t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+/* ---------- shaping the path by touch (the panel's "Shape the path by touch"): the five points as circles on the
+   picture, dragged with a finger; a band shows where the path will lie, in the scene's own perspective ---------- */
+// a point on the screen (CSS px) to the panel's values for point n (the inverse of trailScreen)
+function trailSetScreen(n, x, y) {
+  var A = BLK_ANCHOR.path, dx = V.pathX || 0, dy = V.pathY || 0, sz = V.pathSize || 1, h = V.horizonLine;
+  var v = y / H, g = v <= h ? v * REF_HORIZON / h : REF_HORIZON + (v - h) * (1 - REF_HORIZON) / (1 - h);
+  V['trail' + n + 'X'] = Math.round(((x / W - dx - A[0]) / sz + A[0]) * 10000) / 10000;
+  V['trail' + n + 'Y'] = Math.round(((g + dy - A[1]) / sz + A[1]) * 10000) / 10000;
+}
+// a point on the snow (m) to the screen, at the ground's height there (the hall's rise near the hall)
+function trailToScreen(x, z, elev) {
+  var F = lakeLens(), hy = H * V.horizonLine;
+  return [W / 2 + F * x / z, hy - F * (-V.eyeHeight + (elev || 0)) / z];
+}
+var TRAIL_EDIT = {
+  // the curvature is laid into the points themselves (the path then runs exactly through the circles)
+  bakeBend: function () {
+    if (Math.abs(V.trailBend - 1) < 1e-6) return false;
+    var PM = trailPointsM(V.trailBend);
+    for (var n = 2; n <= 5; n++) { var p = trailToScreen(PM.pts[n - 1][0], PM.pts[n - 1][1]); trailSetScreen(n, p[0], p[1]); }
+    V.trailBend = 1;
+    return true;
+  },
+  // bend more (k > 1) or less (k < 1): every point's offset from the straight line, times k
+  scaleBend: function (k) {
+    var PM = trailPointsM(k);
+    for (var n = 2; n <= 5; n++) { if (!PM.hall && n === 5) break; var p = trailToScreen(PM.pts[n - 1][0], PM.pts[n - 1][1]); trailSetScreen(n, p[0], p[1]); }
+  },
+  // what to draw: the circles (CSS px), the hall's steps, the band the path covers
+  state: function () {
+    var PM = trailPointsM(V.trailBend), hall = PM.hall, line = trailLineM(PM), hw = V.trailWidth / 2;
+    var handles = [];
+    for (var n = 1; n <= 5; n++) handles.push(trailScreen(n));
+    var elevOf = function () { return 0; }, hallPt = null;
+    if (hall) {
+      var up = hall.drop || 0, st = hall.steps, rm = Math.max(6, hall.riseM || 14);
+      elevOf = function (x, z) { var m = Math.hypot(x - st[0], z - st[1]); return up * (1 - smoothstep(3, rm, m)); };
+      hallPt = trailToScreen(st[0], st[1], up);
+    }
+    // a centripetal Catmull-Rom curve through the line (as winterpath.js lays it)
+    var P = [line[0]].concat(line, [line[line.length - 1]]), L = [], R = [], C = [];
+    function tj(a, b, t) { return t + Math.pow(Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-3, 0.5); }
+    for (var i = 1; i < P.length - 2; i++) {
+      var p0 = P[i - 1], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2];
+      var t0 = 0, t1 = tj(p0, p1, t0), t2 = tj(p1, p2, t1), t3 = tj(p2, p3, t2);
+      for (var k = 0; k < 16; k++) {
+        var t = t1 + (t2 - t1) * k / 16, q = [0, 0];
+        for (var c = 0; c < 2; c++) {
+          var A1 = (t1 - t) / (t1 - t0) * p0[c] + (t - t0) / (t1 - t0) * p1[c], A2 = (t2 - t) / (t2 - t1) * p1[c] + (t - t1) / (t2 - t1) * p2[c];
+          var A3 = (t3 - t) / (t3 - t2) * p2[c] + (t - t2) / (t3 - t2) * p3[c];
+          var B1 = (t2 - t) / (t2 - t0) * A1 + (t - t0) / (t2 - t0) * A2, B2 = (t3 - t) / (t3 - t1) * A2 + (t - t1) / (t3 - t1) * A3;
+          q[c] = (t2 - t) / (t2 - t1) * B1 + (t - t1) / (t2 - t1) * B2;
+        }
+        C.push(q);
+      }
+    }
+    C.push(line[line.length - 1]);
+    for (var j = 0; j < C.length; j++) {
+      var a = C[Math.max(0, j - 1)], b = C[Math.min(C.length - 1, j + 1)], tx = b[0] - a[0], tz = b[1] - a[1], tl = Math.hypot(tx, tz) || 1;
+      var nx = -tz / tl, nz = tx / tl, x = C[j][0], z = C[j][1];
+      if (z < 1.5) continue;
+      var e = elevOf(x, z);
+      L.push(trailToScreen(x + nx * hw, z + nz * hw, e)); R.push(trailToScreen(x - nx * hw, z - nz * hw, e));
+    }
+    return { handles: handles, hall: hallPt, left: L, right: R, bend: V.trailBend, hy: H * V.horizonLine, W: W, H: H };
+  },
+  // move point n to (x, y) CSS px, kept on the snow, inside the screen and in order (each point farther than the one before)
+  setPoint: function (n, x, y) {
+    var hy = H * V.horizonLine, gap = 0.012 * H;
+    var lo = hy + 0.015 * H, hi = H - 2;
+    if (n > 1) hi = Math.min(hi, Math.min(H, trailScreen(n - 1)[1]) - gap);
+    if (n < 5) lo = Math.max(lo, trailScreen(n + 1)[1] + gap);
+    if (hi < lo) hi = lo;
+    trailSetScreen(n, Math.max(4, Math.min(W - 4, x)), Math.max(lo, Math.min(hi, y)));
+  },
+  get: function () { var o = {}; for (var n = 1; n <= 5; n++) { o['trail' + n + 'X'] = V['trail' + n + 'X']; o['trail' + n + 'Y'] = V['trail' + n + 'Y']; } o.trailBend = V.trailBend; return o; },
+  put: function (o) { for (var k in o) V[k] = o[k]; }
+};
 function stepHall() {
   if (HALL.job.step(8)) {
     HALL.cnv = HALL.job.canvas; HALL.x = HALL.job.x; HALL.y = HALL.job.y; HALL.info = HALL.job.info; HALL.times = HALL.job.times();
@@ -2759,7 +2873,8 @@ window.winterLab = {
   shake: function (k) { var E = PINES.list[k || 0]; if (E) for (var j = 0; j < E.A.rest.length; j++) Yukitsuri.shed(E.A, j, j * 0.15); },
   pines: function () { return PINES; },   // (for checking each picture on its own)
   hall: function () { return HALL; },
-  trail: function () { return TRAIL; },   // (the path, for checking)     // (the hall's picture, for checking it on its own)
+  trail: function () { return TRAIL; },
+  trailEdit: TRAIL_EDIT,   // (the path, for checking)     // (the hall's picture, for checking it on its own)
   lamps: function () { return { level: lampLevel(), dark: CLK.Lt.dark, set: CLK.sun.set, tod: V.timeOfDay }; },   // (the lamps' timing, for checking)
   busy: function () { return !!mtnJob || !!hillJob || !!HALL.job || !!FIELDJ || !!PINES.job || stages.length > 0 || Object.keys(dirty).length > 0; },
   info: function () {
@@ -3159,7 +3274,8 @@ function moveCtls() {
   return out;
 }
 function trailCtls() {
-  var out = [{ chk: 'V', k: 'trailShow', label: 'Show the path', re: 'trail block' },
+  var out = [{ btn: 'trailTouch', label: '✋ Shape the path by touch (drag circles on the picture)' },
+             { chk: 'V', k: 'trailShow', label: 'Show the path', re: 'trail block' },
              { chk: 'V', k: 'trailToHall', label: 'On up to the hall\'s steps', re: 'trail', note: 'It meets the steps square on, climbing the rise the hall stands on. Off: it ends at point 5.' },
              { o: 'V', k: 'trailBend', label: 'Curvature: how much it bends (×)', min: 0, max: 3, step: 0.05, re: 'trail', note: '0 a straight line from point 1 to the hall; 1 through the points as placed; more bends it further the same way.' }];
   var names = ['the nearest, at the bottom', 'second', 'middle', 'fourth', 'the farthest'];
@@ -3526,6 +3642,117 @@ document.getElementById('spCopy').addEventListener('click', function () {
   out.textContent = text; out.classList.add('shown');
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).catch(function () {});
 });
+
+/* ---------- shaping the path by touch ----------
+   The panel steps aside; the path's five points show as big numbered circles on the picture. Drag one with a finger:
+   a pale band shows at once where the path will lie (in the scene's own perspective, up the hall's rise to its steps);
+   the snow is drawn again when the finger lifts. A point cannot leave the snow, the screen, or its place in the row
+   (each one farther away than the one before). Bend more / less, Undo, Start again, Done. */
+var TE = lab.trailEdit, pe = null, peCv, peHall, peStatus, peBend, peUndo, handles = [], undo = [], peDrag = null, peBusyT = 0;
+function peMake() {
+  pe = document.createElement('div'); pe.id = 'pe';
+  peCv = document.createElement('canvas'); pe.appendChild(peCv);
+  for (var n = 1; n <= 5; n++) {
+    var h = document.createElement('div'); h.className = 'pe-h'; h.innerHTML = '<span>' + n + '</span>'; h.dataset.n = n;
+    h.addEventListener('pointerdown', peDown); h.addEventListener('pointermove', peMove);
+    h.addEventListener('pointerup', peUp); h.addEventListener('pointercancel', peUp);
+    pe.appendChild(h); handles.push(h);
+  }
+  peHall = document.createElement('div'); peHall.className = 'pe-hall'; peHall.textContent = 'Hall steps (the path ends here)'; pe.appendChild(peHall);
+  var bar = document.createElement('div'); bar.className = 'pe-bar';
+  bar.innerHTML = '<div class="pe-hint">Drag the numbered circles with your finger. <b>1</b> is nearest you, <b>5</b> farthest.<br>The orange band shows where the path will go.</div>' +
+    '<div class="pe-btns"><button type="button" data-a="less">Bend less</button><button type="button" data-a="more">Bend more</button>' +
+    '<button type="button" data-a="undo">Undo</button><button type="button" data-a="reset">Start again</button>' +
+    '<button type="button" class="pe-done" data-a="done">✓ Done</button></div><div class="pe-status"></div>';
+  pe.appendChild(bar);
+  peStatus = bar.querySelector('.pe-status'); peUndo = bar.querySelector('[data-a=undo]');
+  bar.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var a = b.dataset.a;
+    if (a === 'done') return peClose();
+    if (a === 'undo') { if (undo.length) { TE.put(undo.pop()); peChanged(); } return; }
+    if (a === 'reset') {
+      if (!window.confirm('Put the path back where it was at the start?')) return;
+      undo.push(TE.get());
+      var D = lab.defaults.V, o = {};
+      for (var k in TE.get()) o[k] = D[k];
+      TE.put(o); TE.bakeBend(); peChanged(); return;
+    }
+    if (a === 'more' || a === 'less') { undo.push(TE.get()); TE.scaleBend(a === 'more' ? 1.2 : 1 / 1.2); peChanged(); }
+  });
+  // touches on the picture itself do nothing here (no swipes or gusts while shaping)
+  ['pointerdown', 'pointerup', 'click'].forEach(function (ev) { pe.addEventListener(ev, function (e) { e.stopPropagation(); }); });
+  document.body.appendChild(pe);
+  window.addEventListener('resize', function () { if (pe.classList.contains('on')) peDraw(); });
+}
+function peOpen() {
+  if (!pe) peMake();
+  undo = [];
+  if (!lab.V.trailShow) { lab.V.trailShow = true; lab.changed('trail block'); }
+  var before = TE.get();
+  if (TE.bakeBend()) { undo.push(before); lab.changed('trail'); }
+  sp.style.display = 'none';
+  pe.classList.add('on');
+  peDraw();
+}
+function peClose() {
+  pe.classList.remove('on');
+  sp.style.display = '';
+  build();                                            // (the sliders show the new places)
+}
+lab.trailTouch = peOpen;
+document.getElementById('spPath').addEventListener('click', peOpen);
+function peChanged() { lab.changed('trail'); peBusyT = performance.now(); peDraw(); }
+function peDraw() {
+  var st = TE.state(), dpr = window.devicePixelRatio || 1, w = window.innerWidth, h = window.innerHeight;
+  if (peCv.width !== Math.round(w * dpr) || peCv.height !== Math.round(h * dpr)) { peCv.width = Math.round(w * dpr); peCv.height = Math.round(h * dpr); }
+  var c = peCv.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+  // the screen and the scene may differ in size (the scene is the stage): scale its CSS px to the window's
+  var kx = w / (st.W || w), ky = h / (st.H || h);
+  if (st.left.length > 1) {
+    c.beginPath();
+    st.left.forEach(function (p, i) { if (i) c.lineTo(p[0] * kx, p[1] * ky); else c.moveTo(p[0] * kx, p[1] * ky); });
+    for (var i = st.right.length - 1; i >= 0; i--) c.lineTo(st.right[i][0] * kx, st.right[i][1] * ky);
+    c.closePath(); c.fillStyle = 'rgba(255, 140, 30, 0.32)'; c.fill();
+    c.lineWidth = 2.5; c.strokeStyle = 'rgba(200, 80, 10, 0.95)'; c.setLineDash([10, 6]); c.stroke(); c.setLineDash([]);
+  }
+  // where the land begins (a point cannot go above it)
+  c.strokeStyle = 'rgba(255, 255, 255, 0.6)'; c.lineWidth = 1.5; c.setLineDash([4, 8]);
+  c.beginPath(); c.moveTo(0, st.hy * ky); c.lineTo(w, st.hy * ky); c.stroke(); c.setLineDash([]);
+  st.handles.forEach(function (p, i) {
+    var hEl = handles[i];
+    hEl.style.left = (p[0] * kx) + 'px'; hEl.style.top = (Math.min(p[1], st.H - 8) * ky) + 'px';
+    hEl.classList.toggle('off', p[1] > st.H - 8);   // (dashed: the point itself lies just below the screen's bottom edge)
+  });
+  if (st.hall) { peHall.style.display = ''; peHall.style.left = (st.hall[0] * kx) + 'px'; peHall.style.top = (st.hall[1] * ky - 10) + 'px'; }
+  else peHall.style.display = 'none';
+  peUndo.disabled = !undo.length;
+  peStatus.textContent = 'Curvature ' + st.bend.toFixed(2) + (lab.busy() ? ' · drawing the snow again…' : '');
+}
+setInterval(function () { if (pe && pe.classList.contains('on')) peStatus.textContent = 'Curvature ' + lab.V.trailBend.toFixed(2) + (lab.busy() ? ' · drawing the snow again…' : ' · drawn'); }, 500);
+function peDown(e) {
+  var h = e.currentTarget, r = h.getBoundingClientRect();
+  undo.push(TE.get());
+  // grab offset: the point moves with the finger without jumping under it
+  peDrag = { n: +h.dataset.n, id: e.pointerId, ox: e.clientX - (r.left + r.width / 2), oy: e.clientY - (r.top + r.height / 2), el: h, moved: false };
+  h.setPointerCapture(e.pointerId); h.classList.add('drag');
+  e.preventDefault(); e.stopPropagation();
+}
+function peMove(e) {
+  if (!peDrag || e.pointerId !== peDrag.id) return;
+  var st = TE.state(), kx = window.innerWidth / (st.W || 1), ky = window.innerHeight / (st.H || 1);
+  TE.setPoint(peDrag.n, (e.clientX - peDrag.ox) / kx, (e.clientY - peDrag.oy) / ky);
+  peDrag.moved = true;
+  peDraw();
+}
+function peUp(e) {
+  if (!peDrag || e.pointerId !== peDrag.id) return;
+  peDrag.el.classList.remove('drag');
+  if (peDrag.moved) peChanged(); else undo.pop();
+  peDrag = null;
+  e.stopPropagation();
+}
 
 /* ---------- moving the panel: drag it by its title bar ---------- */
 var POS_KEY = 'newWinter-panel', head = sp.querySelector('.sp-head'), drag = null;
