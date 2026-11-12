@@ -1985,9 +1985,9 @@ function umeBakeSnowNew(T) {
   var C = cols(), back = T.idx > 0 ? V.branchDepth : 0, RS = PR * 1.25, ns = T.nodes, i, j;
   var kids = ns.map(function () { return []; });
   ns.forEach(function (n, k) { if (n.p >= 0) kids[n.p].push(k); });
-  // the child that carries on each piece's line (the straightest, if it bends less than about 35°)
+  // the child that carries on each piece's line (the straightest of its own limb, if it bends less than about 55°)
   var next = ns.map(function (n, k) {
-    var best = -1, bd = 0.6;
+    var best = -1, bd = 1.0;
     // (only a piece of its own limb: a side shoot can leave closer to the line than the limb's next piece)
     kids[k].forEach(function (q) { var d = Math.abs(ns[q].rel); if (ns[q].g === n.g && d < bd) { bd = d; best = q; } });
     return best;
