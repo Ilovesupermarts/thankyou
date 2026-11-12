@@ -31,7 +31,8 @@
                                        the earth face's height at each point (px), the top
        o: W, H, hy (px), F (lens, px), eye (m), drop (m: the bank's height above the water),
           wobble (0 … 2), seed
-     WinterLake.bakeGround(c, o)     the snow ground into the 2D context c (device px), the lake cut out
+     WinterLake.bakeGround(c, o)     the snow ground into the 2D context c (device px), the lake cut out; with o.path (a
+                                     WinterPath, winterpath.js) and o.pathLook { grey, shadow } the trodden path in it
      WinterLake.bakeMirror(c, o)     the water's mirror (rows from the water's top down; pad each side)
      WinterLake.bakeStill(c, o)      the thin ice and the mist on the far water (the screen's size)
      WinterLake.steam(S, c, o, t, dt) the steam, each frame (S: its state, {} at first)
@@ -147,31 +148,110 @@ function shore(pts, o) {
 /* ---------- the snow ground ---------- */
 /* The ground's height (m) at x (across) and z (away from you), m. Soft swells, and long low drifts the wind has
    carved (fainter far away, where they are smaller than a pixel). fz: how much ground one pixel covers in depth (m). */
-function heightAt(x, z, o, fz) {
+function heightAt(x, z, o, fz, dk) {
   var s = o.seed || 7;
   var h = (fbm(x / 22, z / 22, s, 2) * 0.8 + fbm(x / 7.5, z / 7.5, s + 11, 3) * 0.55) * o.swell;
-  if (o.drifts > 0) {
+  // (dk: how much of the wind's drifts are left; the trodden path's floor has none)
+  if (o.drifts > 0 && (dk === undefined || dk > 0)) {
     var fade = 1 - smooth(0.3, 0.9, fz / 2.4);
     if (fade > 0) {
       var w = fbm(x / 9 + 5.2, z / 9, s + 3, 2);
       var u = (z * 0.92 + x * 0.38) / 2.6 + w * 2.2;
       var rr = 1 - Math.abs(Math.sin(u * PI));
-      h += rr * rr * (0.55 + 0.45 * fbm(x / 6, z / 6, s + 7, 2)) * 0.11 * o.drifts * fade;
+      h += rr * rr * (0.55 + 0.45 * fbm(x / 6, z / 6, s + 7, 2)) * 0.11 * o.drifts * fade * (dk === undefined ? 1 : dk);
     }
   }
   return h;
 }
 /* o: W, H, PR (device px per CSS px), hy, F, eye (m), res (share of PR the light is worked out at), shore,
    light { dir [x, y up, z toward you], sun [r, g, b] (0 … ~1.5), vis (0 … 1: how much the sun shows) },
-   snow, shade, mist, earth (rgb), sunX (CSS px), sunRGB, swell, drifts, grain, sparkle, haze, hazeM (m), glow, seed */
-function bakeGround(c, o) {
+   snow, shade, mist, earth (rgb), sunX (CSS px), sunRGB, swell, drifts, grain, sparkle, haze, hazeM (m), glow, seed;
+   path (a WinterPath, or null), pathLook { grey, shadow, bounce } */
+function bakeGround(c, o) { groundJob(c, o).step(); }
+/* The same, a few rows at a time: job.step(ms) → true when finished; only then is c drawn on (so a page can bake into
+   a second picture and show the old one meanwhile). */
+function groundJob(c, o) {
   var W = o.W, H = o.H, PR = o.PR, hy = o.hy, F = o.F, eye = o.eye || 3, Sh = o.shore;
   var res = PR * (o.res || 0.6), gw = Math.max(2, Math.round(W * res)), y0 = Math.floor(hy), gh = Math.max(2, Math.round((H - y0) * res));
   var tmp = document.createElement('canvas'); tmp.width = gw; tmp.height = gh;
   var tc = tmp.getContext('2d'), im = tc.createImageData(gw, gh), D = im.data;
   var L = o.light.dir, sun = o.light.sun, snow = o.snow, shade = mix(o.shade, snow, 0.12), mist = o.groundMist || o.mist, glowCol = o.sunRGB || [255, 220, 170];
   var vis = o.light.vis === undefined ? 1 : o.light.vis, hazeM = o.hazeM || 150, eps = 0.18, gs = o.grain || 0;
-  for (var j = 0; j < gh; j++) {
+  /* ---- the trodden path (o.path: a WinterPath). The snow ground is drawn as if flat (its swells only shade it); the
+     path's own height is followed along the line of sight: from the eye the ray reaches the flat snow at (x, z) and
+     goes on down; it meets the path's surface where its height above the flat snow equals the path's (so the wall
+     facing you shows, the one facing away hides behind its own lip, the floor sinks a little up the screen). ---- */
+  var PT = o.path || null, PO = o.pathLook || {}, Ls = [L[0], L[1], -L[2]];          // toward the sun, z away
+  var pGrey = PO.grey === undefined ? 0.5 : PO.grey, pShade = PO.shadow === undefined ? 1 : PO.shadow, pBounce = PO.bounce === undefined ? 0.5 : PO.bounce;
+  var kA = PT ? 1 - PT.maxRise / eye : 1, kB = PT ? 1 + PT.maxDrop / eye : 1, HK = 0, nPath = 0;
+  var dlFlat = Math.max(0, L[1]);                                                     // the sun on level snow
+  function pathHit(x, z, fz) {
+    var r0 = Math.hypot(x, z);
+    if (!PT.near(x, z, r0 * (kB - kA) + 0.5)) return 0;
+    // steps of about a pixel over the stretch of screen the path's depth covers here, then halving to the surface
+    var parPx = (PT.maxDrop + PT.maxRise) * F / z * res, n = clamp(Math.ceil(parPx / 2) + 2, 3, 24);
+    var prevK = kA;
+    if (eye * (1 - kA) - PT.delta(x * kA, z * kA, fz, true) <= 0) { HK = kA; return 1; }
+    for (var q = 1; q <= n; q++) {
+      var kk = kA + (kB - kA) * q / n;
+      if (eye * (1 - kk) - PT.delta(x * kk, z * kk, fz, true) <= 0) {
+        var lo = prevK, hi = kk;
+        for (var b = 0; b < 6; b++) { var m = (lo + hi) / 2; if (eye * (1 - m) - PT.delta(x * m, z * m, fz, true) > 0) lo = m; else hi = m; }
+        HK = hi; return 1;
+      }
+      prevK = kk;
+    }
+    HK = kB; return 1;
+  }
+  function pathPixel(i, j, x, z, fz) {
+    var hx = x * HK, hz = z * HK, fzz = fz * HK * HK;
+    var dz0 = PT.delta(hx, hz, fzz), Q = PT.Q, fl = Q.floor, far = Q.far, aa = Q.a;
+    var dk = 1 - fl;
+    var h0 = heightAt(hx, hz, o, fzz, dk), gx = (heightAt(hx + eps, hz, o, fzz, dk) - h0) / eps, gz = (heightAt(hx, hz + eps, o, fzz, dk) - h0) / eps;
+    if (!far) {
+      // the path's own slopes, found over about a pixel (finer than that they would only flicker)
+      var e2 = clamp(Math.min(z / F / res, fzz) * 0.6, 0.012, 0.25);
+      gx += (PT.delta(hx + e2, hz, fzz) - PT.delta(hx - e2, hz, fzz)) / (2 * e2);
+      gz += (PT.delta(hx, hz + e2, fzz) - PT.delta(hx, hz - e2, fzz)) / (2 * e2);
+    }
+    var nx = -gx, nz = gz, nl = Math.sqrt(nx * nx + 1 + nz * nz), ny = 1 / nl;
+    nx /= nl; nz /= nl;
+    // the sun, unless the path's wall stands between (a soft shadow; the footprints are too shallow to cast one that
+    // shows: they are shaded by their slopes alone); averaged along the stretch of ground one pixel covers when that is
+    // long (seen nearly edge-on far away)
+    var sv = 1, skv = 1;
+    if (!far && aa < 1.6) {
+      if (pShade > 0) {
+        var span = Math.min(fzz, 2), ns = span > 0.15 ? 2 : 1, acc = 0, fzS = Math.max(fzz, 0.25);
+        for (var q = 0; q < ns; q++) {
+          var off = ns > 1 ? ((q + 0.5) / ns - 0.5) * span : 0, qz = hz + off, qx = hx * qz / hz;
+          acc += PT.sun(qx, qz, PT.delta(qx, qz, fzS, true), Ls, fzS);
+        }
+        sv = 1 - pShade * (1 - acc / ns);
+      }
+      skv = PT.sky(hx, hz, PT.delta(hx, hz, fzz, true), fzz);
+    }
+    var dl0 = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]), dl = dl0 * clamp(sv, 0, 1);
+    // light thrown back into the shade by the sunlit snow all round (and through the snow's own thin edges): a shadow
+    // on snow is lighter than the sky's light alone would make it
+    if (pBounce > 0) dl += pBounce * Math.max(0, dlFlat - dl);
+    var sk = (0.5 + 0.5 * ny) * skv;
+    var hzv = clamp((1 - Math.exp(-Math.pow(hz / hazeM, 1.6))) * o.haze + smooth(8, 0, F * eye / hz) * 0.7, 0, 1);
+    var gfar = 1 - Math.exp(-hz / 70), sx = (i + 0.5) / res;
+    var kk2 = (i + j * gw) * 4, g = gs ? 1 + (hash(i, j, 5) - 0.5) * 0.035 * gs * (1 + fl) : 1;
+    // trodden snow: packed and a little greyer and cooler than the fresh snow round it
+    var alb = 1 - 0.07 * pGrey * fl, cool = 0.1 * pGrey * fl;
+    for (var ch = 0; ch < 3; ch++) {
+      var sc = lerp(snow[ch], shade[ch] * 1.15, cool) * alb;
+      var v = sc * sun[ch] * dl * 1.25 + shade[ch] * sk * (1 - 0.04 * pGrey * fl);
+      if (v > 226) v = 226 + (v - 226) * 26 / (v - 226 + 26);
+      v = lerp(v, mist[ch], hzv);
+      v += glowCol[ch] * o.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((sx - o.sunX) / (W * 0.42), 2));
+      D[kk2 + ch] = clamp(v * g, 0, 255);
+    }
+    D[kk2 + 3] = 255;
+  }
+  function row(j) {
     var sy = y0 + (j + 0.5) / res, d = sy - hy;
     if (d <= 0.3) d = 0.3;
     var z = eye * F / d, fz = eye * F / (d * d) / Math.max(0.3, res / PR);
@@ -179,6 +259,8 @@ function bakeGround(c, o) {
     var gfar = 1 - Math.exp(-z / 70);
     for (var i = 0; i < gw; i++) {
       var sx = (i + 0.5) / res, x = (sx - W / 2) * z / F;
+      // the trodden path (winterpath.js): where it may be seen here, the line of sight is followed down into it
+      if (PT && pathHit(x, z, fz)) { pathPixel(i, j, x, z, fz); nPath++; continue; }
       var h0 = heightAt(x, z, o, fz), hx = (heightAt(x + eps, z, o, fz) - h0) / eps, hzz = (heightAt(x, z + eps, o, fz) - h0) / eps;
       // the slope's normal, x right, y up, z toward you
       var nx = -hx, ny = 1, nz = hzz, nl = Math.sqrt(nx * nx + 1 + nz * nz);
@@ -197,28 +279,46 @@ function bakeGround(c, o) {
       D[k + 3] = 255;
     }
   }
-  tc.putImageData(im, 0, 0);
-  // onto the ground's picture, soft
-  c.save();
-  c.setTransform(1, 0, 0, 1, 0, 0);
-  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
-  c.drawImage(tmp, 0, 0, gw, gh, 0, y0 * PR, W * PR, (H - y0) * PR);
-  tmp.width = tmp.height = 1;
-  c.setTransform(PR, 0, 0, PR, 0, 0);
-  // the sparkle of snow crystals in the sun: a few bright points, more and larger near you
-  var r = rng((o.seed || 7) * 131 + 3), nsp = Math.round(1800 * (o.sparkle || 0) * vis);
-  for (var q = 0; q < nsp; q++) {
-    var v2 = Math.pow(r(), 0.6), yy = hy + 4 + (H - hy - 4) * v2, xx = r() * W;
-    var sz = lerp(0.35, 1.1, v2) * lerp(0.6, 1.2, r());
-    c.fillStyle = rgb(mix([255, 255, 255], glowCol, 0.25), lerp(0.25, 0.85, r()) * lerp(0.5, 1, v2));
-    c.fillRect(xx, yy, sz, sz);
+  function finish() {
+    tc.putImageData(im, 0, 0);
+    // onto the ground's picture, soft
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+    c.drawImage(tmp, 0, 0, gw, gh, 0, y0 * PR, W * PR, (H - y0) * PR);
+    tmp.width = tmp.height = 1;
+    c.setTransform(PR, 0, 0, PR, 0, 0);
+    // the sparkle of snow crystals in the sun: a few bright points, more and larger near you
+    var r = rng((o.seed || 7) * 131 + 3), nsp = Math.round(1800 * (o.sparkle || 0) * vis);
+    for (var q = 0; q < nsp; q++) {
+      var v2 = Math.pow(r(), 0.6), yy = hy + 4 + (H - hy - 4) * v2, xx = r() * W;
+      var sz = lerp(0.35, 1.1, v2) * lerp(0.6, 1.2, r());
+      var spA = lerp(0.25, 0.85, r()) * lerp(0.5, 1, v2);
+      if (PT) {                                            // packed snow on the path's floor hardly sparkles
+        var zq = eye * F / Math.max(0.3, yy - hy), xq = (xx - W / 2) * zq / F;
+        if (PT.near(xq, zq, 0)) { PT.delta(xq, zq, 1); spA *= 1 - 0.85 * PT.Q.floor; }
+      }
+      c.fillStyle = rgb(mix([255, 255, 255], glowCol, 0.25), spA);
+      c.fillRect(xx, yy, sz, sz);
+    }
+    // the lake cut out of the snow
+    c.globalCompositeOperation = 'destination-out';
+    polyPath(c, Sh.pts); c.fillStyle = '#000'; c.fill();
+    c.globalCompositeOperation = 'source-over';
+    drawBanks(c, o);
+    c.restore();
   }
-  // the lake cut out of the snow
-  c.globalCompositeOperation = 'destination-out';
-  polyPath(c, Sh.pts); c.fillStyle = '#000'; c.fill();
-  c.globalCompositeOperation = 'source-over';
-  drawBanks(c, o);
-  c.restore();
+  var j = 0, done = false, cpu = 0;
+  return {
+    step: function (ms) {
+      if (done) return true;
+      var t0 = performance.now(), lim = ms === undefined ? Infinity : t0 + ms;
+      while (j < gh) { row(j++); if (performance.now() > lim) { cpu += performance.now() - t0; return false; } }
+      finish(); done = true; cpu += performance.now() - t0; return true;
+    },
+    cancel: function () { done = true; },
+    info: function () { return { rows: gh, pathPixels: nPath, cpu: cpu }; }
+  };
 }
 /* How much a thing at screen height y is hazed into the mist (as the ground is). */
 function hazeAt(o, y) {
@@ -484,5 +584,5 @@ function steam(S, c, o, t, dt) {
   c.restore();
 }
 
-return { shore: shore, bakeGround: bakeGround, bakeMirror: bakeMirror, bakeStill: bakeStill, steam: steam };
+return { shore: shore, bakeGround: bakeGround, groundJob: groundJob, bakeMirror: bakeMirror, bakeStill: bakeStill, steam: steam };
 })();
