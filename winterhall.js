@@ -36,7 +36,12 @@
       lit (0 … 1.5: its lamps), spill (0 … 2: their light on the snow), lampCol [r, g, b],
       light { sun: [x, y, z] toward the sun (x right, y up, z toward you), sunCol, skyCol, amb, haze: [r, g, b] mist },
       field { snow, sun, shade, groundMist, haze, hazeM, glow, sunX, sunRGB, vis } (as the snow ground is baked),
-      firs [{ x, foot, h, seed, haze }] (CSS px), firLook { … WinterHill.fir's look }
+      firs [{ x, foot, h, seed, haze }] (CSS px), firLook { … WinterHill.fir's look },
+      path (a WinterPath, winterpath.js: the trodden path, carved into this snow where it climbs the rise to the steps;
+      along it this snow is drawn whole down to the rise's foot, where the snow field's path takes over), pathLook
+      { grey, shadow, bounce } (as the snow field's)
+     WinterHall.job({ …, locateOnly: true }) → only where it stands: { X, Y0, Z, yaw, stepW, front, steps, under,
+      foot(m) (the point m metres in front of the steps, on the ground), riseM } (scene space: x right, z away, m)
    ============================================================ */
 var WinterHall = (function () {
 'use strict';
@@ -183,6 +188,21 @@ function job(o) {
   }
   var dofHall = 0;
   var eyeH = o.eye || 3, drop = Math.max(0, eyeH + Y0);     // how high its ground stands above the field (the rise)
+  // (o.locateOnly: only where it stands, for the path that leads to its steps; nothing is drawn)
+  if (o.locateOnly) {
+    var fwd = [-sn, -cs];                                    // the way its front faces, on the ground (x right, z away)
+    return { X: X, Y0: Y0, Z: Z, drop: drop, yaw: yaw, stepW: stepW, front: fwd,
+             steps: [Wp(0, 0, -bd - stepN * stepD - 0.05)[0], Wp(0, 0, -bd - stepN * stepD - 0.05)[2]],
+             under: [Wp(0, 0, -bd + 0.6)[0], Wp(0, 0, -bd + 0.6)[2]],
+             foot: function (m) { var p = Wp(0, 0, -bd - stepN * stepD - m); return [p[0], p[2]]; },
+             riseM: 1.5 + 14 - stepN * stepD };              // how far in front of the steps the rise's slope reaches the field
+  }
+  // the trodden path (winterpath.js) where it climbs the rise to the steps: its height is added to the snow's, in the
+  // scene's own space (so it is the same path the snow field has), and it is lit as the rest of this snow
+  var PATH = o.path || null, PFZ = 0, PQ = { floor: 0, far: true }, pGrey = (o.pathLook && o.pathLook.grey !== undefined) ? o.pathLook.grey : 0.5;
+  var pShadow = (o.pathLook && o.pathLook.shadow !== undefined) ? o.pathLook.shadow : 1;
+  var pBounce = (o.pathLook && o.pathLook.bounce !== undefined) ? o.pathLook.bounce : 0.5;
+  function pathD(x, z) { return PATH ? PATH.delta(X + x * cs + z * sn, Z - x * sn + z * cs, PFZ) : 0; }
   var Lw = norm([o.light.sun[0], o.light.sun[1], -o.light.sun[2]]);          // toward the sun, in the camera's space (z away)
   var Ll = norm([Lw[0] * cs - Lw[2] * sn, Lw[1], Lw[0] * sn + Lw[2] * cs]);   // … and in the hall's own
   var Lsh = o.light.sun;                                    // (x right, y up, z toward you: the snow ground's way)
@@ -223,7 +243,7 @@ function job(o) {
     // and long low swells, so the rise's top meets the mist in a soft uneven line (not a ruler-straight one)
     var swell = (0.16 * Math.sin(0.093 * x + 0.04 * z + 0.5) + 0.1 * Math.sin(0.21 * x - 0.08 * z + 1.9) + 0.05 * Math.sin(0.43 * x + 0.17 * z + 4.1)) *
                 smooth(1, 6, Math.max(Math.abs(x) - bw, Math.abs(z) - bd));
-    return g + bank + wav * smooth(0, 3, dp) + swell;
+    return g + bank + wav * smooth(0, 3, dp) + swell + pathD(x, z);
   }
   // the solid parts of the hall (base, floor, walls, brackets, steps), in its own space, for what hides what and the shadows
   var BOX = [[-bw, -0.6, -bd, bw, fh - 0.18, bd], [-(ww + 0.9), fh - 0.18, -(wd + 0.9), ww + 0.9, fh, wd + 0.9], [-ww, fh, -wd, ww, wallTop, wd],
@@ -310,11 +330,16 @@ function job(o) {
 
   /* ---------- the snow's light: as the snow ground is lit (winterlake.js), so the two meet without a seam ---------- */
   var FS = o.field, shadeS = mix(FS.shade, FS.snow, 0.12), vis = FS.vis === undefined ? 1 : FS.vis;
-  function snowLight(nS, occ, sky, out) {
+  function snowLight(nS, occ, sky, out, fl, bnc) {
     var dl = Math.max(0, nS[0] * Lsh[0] + nS[1] * Lsh[1] + nS[2] * Lsh[2]) * occ;
+    // (bnc, on the path: light thrown into its shade by the sunlit snow all round, as the snow field's path has it)
+    if (bnc) dl += bnc * Math.max(0, Math.max(0, Lsh[1]) - dl);
     var sk = (0.5 + 0.5 * nS[1]) * sky + 0.22 * (0.5 - 0.5 * nS[1]);       // (+ the light thrown up off the snow below)
+    // (fl: how trodden it is, on the path: packed snow a little greyer and cooler, as on the snow field)
+    var alb = fl ? 1 - 0.07 * pGrey * fl : 1, cool = fl ? 0.1 * pGrey * fl : 0, skK = fl ? 1 - 0.04 * pGrey * fl : 1;
     for (var ch = 0; ch < 3; ch++) {
-      var v = FS.snow[ch] * FS.sun[ch] * dl * 1.25 + shadeS[ch] * sk;
+      var sc = cool ? lerp(FS.snow[ch], shadeS[ch] * 1.15, cool) * alb : FS.snow[ch];
+      var v = sc * FS.sun[ch] * dl * 1.25 + shadeS[ch] * sk * skK;
       if (v > 226) v = 226 + (v - 226) * 26 / (v - 226 + 26);
       out[ch] = v;
     }
@@ -354,7 +379,7 @@ function job(o) {
   }
 
   /* ---------- following the line of sight to the snow on the ground ---------- */
-  var COL = [0, 0, 0];
+  var COL = [0, 0, 0], COLF = [0, 0, 0];
   function groundSample(px, py, outA) {
     var d = dirL(px, py), oo = oL;
     // only where the ground lies: from the near edge of the field round it to its far side
@@ -367,6 +392,8 @@ function job(o) {
     var ta = slab(oo, d, GB2, 0);
     if (ta === Infinity) return 0;
     var tb = slabFar(oo, d, GB2);
+    // (how much ground one pixel covers here, for the path's fine detail)
+    PFZ = Z / (F * PR) / Math.max(0.006, -d[1] / Math.hypot(d[0], d[1], d[2]));
     var tS = solidsT(oo, d), t = Math.max(20, tLo, ta), tEnd = Math.min(tHi, tb), prev = t, hitT = -1;
     if (t >= tEnd) return 0;
     var y;
@@ -387,8 +414,17 @@ function job(o) {
     var al = drop > 0.05 ? 1 - smooth(0.45, 0.97, -hyy / drop) : 1;
     al *= 1 - smooth(0.4 * TER.slope, TER.slope, dOut);
     al *= 1 - smooth(TER.z1 - 8, TER.z1 + 1, hz2);
+    // on the path, up the rise's slope to its foot, this snow is drawn whole (the snow field's path stops at the foot,
+    // where the two meet at the same level); its colour still melts into the field's toward the foot
+    var pZone = false;
+    if (PATH && dOut < TER.slope) {
+      PATH.delta(X + hx * cs + hz2 * sn, Z - hx * sn + hz2 * cs, Math.max(PFZ, 0.25), true);
+      if (!PATH.Q.far && PATH.Q.a < 1.4) pZone = true;
+    }
+    var fadeCol = 1 - al;
+    if (pZone) al = 1;
     if (al < 0.004) return 0;
-    var fade = 1 - al;                                      // 1: it shows just what the field shows on this row
+    var fade = fadeCol;                                     // 1: it shows just what the field shows on this row
     var e = 0.12, nx = -(groundAt(hx + e, hz2) - hyy) / e, nz = -(groundAt(hx, hz2 + e) - hyy) / e;
     var nL = norm([nx, 1, nz]), nS = toShadeN(nL);
     var p = [hx, hyy + 0.02, hz2];
@@ -400,26 +436,47 @@ function job(o) {
       var tq = th + span * (nSh > 1 ? (si + 0.5) / nSh - 0.5 : 0), qx = oo[0] + d[0] * tq, qz = oo[2] + d[2] * tq;
       if (!sunHidden([qx, groundAt(qx, qz) + 0.02, qz])) sunSeen++;
     }
-    var sunFrac = sunSeen / nSh, occ = Math.max(0, 1 - clamp(shadowK, 0, 1.5) * (1 - sunFrac));
+    // on the path: the shadows its own walls cast, the sky they hide, and (for melting into the field) the same snow
+    // as if the path were not there
+    var pfl = 0, pNear = false, nSF = null, skyF = 1, pSunK = 1;
+    if (PATH) {
+      var pwx = X + hx * cs + hz2 * sn, pwz = Z - hx * sn + hz2 * cs, pfz = Math.max(PFZ, 0.25), pdh = PATH.delta(pwx, pwz, pfz, true);
+      if (!PATH.Q.far) {
+        pNear = true; pfl = PATH.Q.floor;
+        var Lsa = [Lsh[0], Lsh[1], -Lsh[2]];
+        pSunK = clamp(1 - clamp(pShadow, 0, 1.5) * (1 - PATH.sun(pwx, pwz, pdh, Lsa, pfz)), 0, 1);
+        var psk = PATH.sky(pwx, pwz, PATH.delta(pwx, pwz, pfz, true), pfz);
+        var PS = PATH; PATH = null;
+        var hF = groundAt(hx, hz2), nF = norm([-(groundAt(hx + e, hz2) - hF) / e, 1, -(groundAt(hx, hz2 + e) - hF) / e]);
+        PATH = PS; nSF = toShadeN(nF);
+      }
+    }
+    var sunFrac = clamp(sunSeen / nSh, 0, 1), occ = Math.max(0, 1 - clamp(shadowK, 0, 1.5) * (1 - sunFrac));
     // the sky's light is cut off under the deep eaves and close round the firs' feet
     var sky = 1;
     var mOut = Math.max(Math.abs(hx) - ww, Math.abs(hz2) - wd);
     if (mOut > -0.5) sky *= lerp(0.55, 1, smooth(0, ov + 1.5, mOut));
     for (var fi = 0; fi < firs.length; fi++) { var T = firs[fi], dd = Math.hypot(hx - T.x, hz2 - T.z); if (dd < T.r * 1.6) sky *= lerp(0.6, 1, smooth(0, T.r * 1.6, dd)); }
+    skyF = sky;
+    if (pNear) sky *= psk;
     // two colours: in the sun and in the shadow; which of them shows (the sun seen, outA[7]) is softened across a few
     // pixels afterwards, so a shadow's edge is soft as the sun's disc and the air make it
     var lamp = lampAt(p), wpt = Wp(hx, hyy, hz2), sY = P(wpt)[1], hzF = fieldHaze(wpt[2], sY);
     var gfar = 1 - Math.exp(-wpt[2] / 70), FC = fieldRow(px, py), fk = smooth(0, 0.85, fade);
     for (var pass = 0; pass < 2; pass++) {
-      snowLight(nS, pass ? Math.max(0, 1 - clamp(shadowK, 0, 1.5)) : 1, sky, COL);
+      var occP = pass ? Math.max(0, 1 - clamp(shadowK, 0, 1.5)) : 1;
+      snowLight(nS, occP * pSunK, sky, COL, pfl, pNear ? pBounce : 0);
+      // where it melts into the field (which shows the path too), the field's colour carries the path's light and shade
+      if (pNear && fk > 0) snowLight(nSF, occP, skyF, COLF, 0, 0);
       for (var ch = 0; ch < 3; ch++) {
         var v = lerp(COL[ch] + lampCol[ch] * lamp * 0.85, FS.groundMist[ch], hzF);
         v += FS.sunRGB[ch] * FS.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((px - FS.sunX) / (W * 0.42), 2));
-        outA[pass * 4 + ch] = lerp(v, FC[ch], fk);
+        var fc = pNear && fk > 0 ? FC[ch] * (COL[0] + COL[1] + COL[2]) / Math.max(3, COLF[0] + COLF[1] + COLF[2]) : FC[ch];
+        outA[pass * 4 + ch] = lerp(v, fc, fk);
       }
     }
     outA[7] = sunFrac;
-    outA[3] = 1 - smooth(0.8, 1, fade);
+    outA[3] = pZone ? 1 : 1 - smooth(0.8, 1, fade);
     return th < tS ? 2 : 1;
   }
 
