@@ -2823,12 +2823,15 @@ function ytFirPaint(c, x, y, h, seed, look) {
     haze: hz, hazeCol: look.light && look.light.haze ? look.light.haze : light(hex(V.colours.mist)),
     // the hill softens each whole row once (look.direct); the shrine's firs are laid down soft one by one, as before
     soft: look.direct ? 0 : (0.3 + hz * 0.3) * sc * (look.soft === undefined ? 1 : look.soft),
-    loose: 0, dof: 0, trunks: false
+    loose: 0, dof: 0, trunks: false, lod: true,      // (less detail where a pixel cannot show it: these are small and far)
+    into: look.direct ? c : null                     // (the hill: straight onto its row's layer)
   };
+  var M = c.getTransform();
   var job = Yukitsuri.bakeJob(T, o);
   job.step(Infinity);
   var R = job.result, b = R.box;
-  c.drawImage(R.body, b.bx, b.by, b.w, b.h);
+  c.setTransform(M);                                 // (as the caller had it)
+  if (!o.into) c.drawImage(R.body, b.bx, b.by, b.w, b.h);
 }
 function startPines() {
   PINES.job = null; PINES.next = [];
@@ -2952,6 +2955,7 @@ var dirty = {}, dirtyAt = 0;
 window.winterLab = {
   V: V, MT: MT, CLOUD: CLOUD, SUN: SUN, defaults: { V: V_DEFAULTS, MT: MT_DEFAULTS, CLOUD: CLOUD_DEFAULTS, SUN: SDEF },
   plums: function () { return WS.branches; },                 // the plum branches (step 10), for check scripts
+  ytFirPaint: function () { return ytFirPaint.apply(null, arguments); },   // the right bank's fir as the hill and shrine draw it (checks)
   changed: function (what) {
     saveAll();
     if (!what || what === 'live') return;

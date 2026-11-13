@@ -550,7 +550,9 @@ function boughPt(E, t) {
 function boughModel(E) {
   if (E._m) return E._m;
   var rr = rng(E.seed + 11), L = E.L, tw = [], step = Math.max(0.045, 2 / (E._s || 40)) * lerp(0.9, 1.15, rr());
-  var n = Math.max(3, Math.round(L / step));
+  // (E._lod: a small, far tree drawn with less detail: branchlets no closer than about 3 px apart on the screen)
+  if (E._lod) step = Math.max(step, 3 / (E._s || 40));
+  var n = Math.max(E._lod ? 1 : 3, Math.round(L / step));
   for (var i = 0; i < n; i++) {
     var t = (i + 0.35 + rr() * 0.3) / n;
     if (t > 0.98) continue;
@@ -605,8 +607,9 @@ function Brush(c, lw) {
 }
 /* a branchlet's needles: several fine strokes along it, spread across its width and tapering to its tip, then a fringe
    of single needles along its edges */
-function needleRun(Bru, pts, wid, s, cols, alphaK, rr) {
+function needleRun(Bru, pts, wid, s, cols, alphaK, rr, lod) {
   var A = pts[0], M = pts[1], Z = pts[2], ns = wid > 3 ? 6 : wid > 2 ? 5 : wid > 1.2 ? 4 : 3;
+  if (lod) ns = Math.max(2, Math.min(ns, Math.round(wid * 1.5)));     // (no more strokes across it than its pixels can show)
   var mx = 2 * M[0] - (A[0] + Z[0]) / 2, my = 2 * M[1] - (A[1] + Z[1]) / 2;
   function at(u) { var a = (1 - u) * (1 - u), b = 2 * u * (1 - u), cc = u * u; return [a * A[0] + b * mx + cc * Z[0], a * A[1] + b * my + cc * Z[1]]; }
   var seg = 4, P0 = [];
@@ -622,6 +625,7 @@ function needleRun(Bru, pts, wid, s, cols, alphaK, rr) {
   }
   // single needles standing out along its edges (its edges are never a clean line)
   var nf = Math.round(lerp(1, 3, rr())), nl = Math.max(0.9, 0.04 * s);
+  if (lod && s < 30) nf = rr() < 0.3 ? 1 : 0;                        // (single needles: finer than a pixel on a small tree)
   for (i = 0; i < nf; i++) {
     var u2 = rr() * 0.95, p2 = at(u2), q2 = at(Math.min(1, u2 + 0.05)), dx2 = q2[0] - p2[0], dy2 = q2[1] - p2[1], l2 = Math.hypot(dx2, dy2) || 1;
     var sd = rr() < 0.5 ? -1 : 1, w2 = wid * 0.5 * (1 - 0.7 * u2), bx = p2[0] - dy2 / l2 * w2 * sd, by = p2[1] + dx2 / l2 * w2 * sd;
@@ -647,7 +651,7 @@ function paintCore(c, T, P, K) {
   Bru.flush();
 }
 function paintBough(c, E, P, K) {
-  var M = boughModel(E), s = P.s(E.p1[2]), rr = rng(E.seed + 1), lx = K.lx;
+  var M = boughModel(E), s = P.s(E.p1[2]), rr = rng(E.seed + 1), lx = K.lx, lod = !!E._lod;
   var axisZ = boughPt(E, 0.5)[2], wid0 = Math.max(1, 0.12 * s), Bru = Brush(c, Math.max(0.45, 0.012 * s));
   function twig(T) {
     // its light: deep in the crown (near the trunk) and under the branch, darker; out at the tips and on the sun's
@@ -655,10 +659,11 @@ function paintBough(c, E, P, K) {
     var depth = clamp(1 - T.t * 1.3, 0, 1), back = T.z < axisZ ? 0.25 : 0, litSide = (P(T.tip)[0] - P(T.base)[0]) * lx > 0;
     var cols = depth + back > 0.7 ? [K.under, K.dark, K.dark, K.mid] : depth + back > 0.35 ? [K.dark, K.mid, K.mid] : litSide ? [K.mid, K.lit, K.lit, K.hi] : [K.dark, K.mid, K.mid, K.lit];
     var A = P(T.base), Mi = P(T.mid), Z = P(T.tip);
-    needleRun(Bru, [A, Mi, Z], wid0 * T.full * (0.6 + 0.4 * (1 - T.t)), s, cols, 1, rr);
-    T.hang.forEach(function (H) {
+    needleRun(Bru, [A, Mi, Z], wid0 * T.full * (0.6 + 0.4 * (1 - T.t)), s, cols, 1, rr, lod);
+    T.hang.forEach(function (H, hi) {
+      if (lod && s < 30 && hi > 0) return;                              // (a small tree: one hanging twig is all a pixel can show)
       var hb = P(H[0]), he = P(H[1]);
-      needleRun(Bru, [hb, [lerp(hb[0], he[0], 0.5) + (rr() - 0.5) * 2, lerp(hb[1], he[1], 0.5)], he], wid0 * 0.6, s, [K.under, K.dark, K.mid, K.mid], 0.95, rr);
+      needleRun(Bru, [hb, [lerp(hb[0], he[0], 0.5) + (rr() - 0.5) * 2, lerp(hb[1], he[1], 0.5)], he], wid0 * 0.6, s, [K.under, K.dark, K.mid, K.mid], 0.95, rr, lod);
     });
   }
   var backT = M.tw.filter(function (T) { return T.z < axisZ; }), foreT = M.tw.filter(function (T) { return T.z >= axisZ; });
@@ -672,9 +677,9 @@ function paintBough(c, E, P, K) {
   foreT.forEach(twig);
   // the tip: the branch's own end, a spray of new growth
   var tp = P(E.p2), tq = P(boughPt(E, 0.9));
-  for (var tf = 0; tf < 5; tf++) {                                        // a soft rounded tuft at the end (no point)
-    var ta = (tf / 4 - 0.5) * 1.6 + Math.atan2(tp[1] - tq[1], tp[0] - tq[0]) + 0.3, tl2 = wid0 * lerp(1.2, 1.8, rr());
-    needleRun(Bru, [tq, [lerp(tq[0], tp[0], 0.7), lerp(tq[1], tp[1], 0.7)], [tp[0] + Math.cos(ta) * tl2, tp[1] + Math.sin(ta) * tl2 + tl2 * 0.4]], wid0 * 0.7, s, [K.mid, K.lit, K.dark], 0.9, rr);
+  for (var tf = 0, ntf = lod && s < 30 ? 2 : 5; tf < ntf; tf++) {          // a soft rounded tuft at the end (no point)
+    var ta = (tf / Math.max(1, ntf - 1) - 0.5) * 1.6 + Math.atan2(tp[1] - tq[1], tp[0] - tq[0]) + 0.3, tl2 = wid0 * lerp(1.2, 1.8, rr());
+    needleRun(Bru, [tq, [lerp(tq[0], tp[0], 0.7), lerp(tq[1], tp[1], 0.7)], [tp[0] + Math.cos(ta) * tl2, tp[1] + Math.sin(ta) * tl2 + tl2 * 0.4]], wid0 * 0.7, s, [K.mid, K.lit, K.dark], 0.9, rr, lod);
   }
   Bru.flush(0.18);
   E.pieces.forEach(function (Pc) { if (!Pc.loose) paintBoughSnow(c, E, Pc, P, K); });
@@ -1006,7 +1011,11 @@ function bakeJob(T, o) {
   var P = project(o), K = palette(o), box = bounds(T, P), PR = o.PR;
   T.fol.forEach(function (E) { E._sh = null; });
   function layer() { var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(box.w * PR)); cv.height = Math.max(1, Math.ceil(box.h * PR)); var c = cv.getContext('2d'); c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); return { cnv: cv, c: c }; }
-  var work = layer(), body = layer(), front = layer(), c = work.c;
+  // o.into: draw straight onto that context (its own transform: CSS px), with no pictures of its own and no softening
+  // (the hill's firs: the hill softens each row at once; copying hundreds of small pictures cost far more than the drawing)
+  var M0 = o.into ? o.into.getTransform() : null;
+  var work = o.into ? { cnv: null, c: o.into } : layer(), body = o.into ? null : layer(), front = o.into ? null : layer(), c = work.c;
+  function setT() { if (M0) c.setTransform(M0); else c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); }
   // Everything in depth order (the farthest first), so whatever is nearer covers it: the foliage, the wood (trunk and
   // limbs, about the trunk's depth), and the ropes, the pole and the props piece by piece (each piece at its own depth).
   // A rope's last stretch, inside the foliage of the branch it is tied to, goes just behind that branch's needles.
@@ -1014,7 +1023,7 @@ function bakeJob(T, o) {
   function segRect(A, B, w) { return [Math.min(A[0], B[0]) - w, Math.min(A[1], B[1]) - w, Math.max(A[0], B[0]) + w, Math.max(A[1], B[1]) + w]; }
   if (T.core) items.push({ z: -1e6, rects: [], draw: function () { paintCore(c, T, P, K); } });
   T.fol.forEach(function (E) {
-    E._s = P.s(E.kind === 'pad' ? E.c[2] : E.p1[2]); E._m = null;
+    E._s = P.s(E.kind === 'pad' ? E.c[2] : E.p1[2]); E._m = null; E._lod = !!o.lod;
     var Sh = E.kind === 'pad' ? padShape(E, P) : boughShape(E, P), r0;
     if (E.kind === 'pad') r0 = [Sh.C[0] - Sh.hw - 2, Sh.C[1] - Sh.th * 0.7, Sh.C[0] + Sh.hw + 2, Sh.C[1] + Sh.th * 0.5];
     else r0 = [Math.min(Sh.A[0], Sh.B[0]) - 2, Math.min(Sh.A[1], Sh.B[1]) - Sh.up - 2, Math.max(Sh.A[0], Sh.B[0]) + 2, Math.max(Sh.A[1], Sh.B[1]) + Sh.hang];
@@ -1046,7 +1055,7 @@ function bakeJob(T, o) {
   var woodRects = T.segs.map(function (S) { return segRect(P(S.a), P(S.b), (S.ra + S.rb) * P.s(S.a[2]) + 2); });
   items.push({ z: 0, wood: true, rects: woodRects, draw: function () {
     R.wood = paintWood(c, T, P, o, K, box);
-    c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR);
+    setT();
     paintLimbSnow(c, T, P, K);
     if (T._join) paintJoin(c, T._join, T._join.half * 2.0, K);
   } });
@@ -1057,11 +1066,13 @@ function bakeJob(T, o) {
   var tasks = items.map(function (it) { return it.draw; });
   tasks.push(function () {
     // laid down a little soft, so no edge is ruler-sharp
-    var bc = body.c; bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0);
-    var bl = Math.hypot(o.soft || 0, o.dof || 0);
-    if (bl > 0.05) bc.filter = 'blur(' + bl.toFixed(2) + 'px)';
-    bc.drawImage(work.cnv, 0, 0); bc.restore();
-    work.cnv.width = 1;
+    if (body) {
+      var bc = body.c; bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0);
+      var bl = Math.hypot(o.soft || 0, o.dof || 0);
+      if (bl > 0.05) bc.filter = 'blur(' + bl.toFixed(2) + 'px)';
+      bc.drawImage(work.cnv, 0, 0); bc.restore();
+      work.cnv.width = 1;
+    }
     // the loose clumps, each on its own little picture
     R.loose.forEach(function (Lc) { bakeClump(Lc); });
     R.pads = T.fol.map(function (E) {
@@ -1071,14 +1082,14 @@ function bakeJob(T, o) {
       return { id: E.id, c: E.kind === 'pad' ? E.c : E.p1, rx: E.rx, rz: E.rz, top: top, z: zOf(E), scr: sc };
     });
   });
-  R.body = body.cnv; R.front = front.cnv;
+  R.body = body ? body.cnv : null; R.front = front ? front.cnv : null;
   var ti = 0;
   return {
     result: R,
     step: function (ms) {
       var t0 = performance.now();
       while (ti < tasks.length) {
-        c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR);
+        setT();
         tasks[ti++]();
         if (performance.now() - t0 > ms) break;
       }
@@ -1089,6 +1100,7 @@ function bakeJob(T, o) {
   function pickLoose() {
     function hit(a, b) { return a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]; }
     var pr = rng(T.seed * 31 + 7), share = o.loose === undefined ? 0.5 : o.loose;
+    if (share <= 0) return;                         // (none can fall: nothing to find)
     items.forEach(function (it, i) {
       var E = it.E;
       if (!E) return;
