@@ -657,9 +657,13 @@ function paintCore(c, T, P, K) {
   }
   Bru.flush();
 }
-function paintBough(c, E, P, K) {
+/* S (o.batch, small far firs only): a group of neighbouring boughs drawn together: their back needles, then their main
+   branches, then their front needles and tips, then their snow, each needle where it always was; one stroke per colour for
+   the whole group instead of one per bough (a fir 23 px tall has ~130 boughs: ~28 strokes each made the graphics chip
+   wait). Without S: each bough on its own, as before. */
+function paintBough(c, E, P, K, S) {
   var M = boughModel(E), s = P.s(E.p1[2]), rr = rng(E.seed + 1), lx = K.lx, lod = !!E._lod;
-  var axisZ = boughPt(E, 0.5)[2], wid0 = Math.max(1, 0.12 * s), Bru = Brush(c, Math.max(0.45, 0.012 * s));
+  var axisZ = boughPt(E, 0.5)[2], wid0 = Math.max(1, 0.12 * s), Bru = S ? S.back : Brush(c, Math.max(0.45, 0.012 * s));
   function twig(T) {
     // its light: deep in the crown (near the trunk) and under the branch, darker; out at the tips and on the sun's
     // side, lighter; the far side of the bough, a little darker (in the bough's own shade)
@@ -675,12 +679,17 @@ function paintBough(c, E, P, K) {
   }
   var backT = M.tw.filter(function (T) { return T.z < axisZ; }), foreT = M.tw.filter(function (T) { return T.z >= axisZ; });
   backT.forEach(twig);
-  Bru.flush(0.18);
+  if (!S) Bru.flush(0.18);
   // the main branch itself, a thin dark twig, seen in the gaps near the trunk
-  c.strokeStyle = css(K.barkDk, 0.85); c.lineWidth = Math.max(0.6, 0.035 * s); c.lineCap = 'round';
-  c.beginPath();
-  for (var i = 0; i <= 10; i++) { var q = P(boughPt(E, i / 10 * 0.9)); if (i) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]); }
-  c.stroke();
+  var bpts = [];
+  for (var i = 0; i <= 10; i++) bpts.push(P(boughPt(E, i / 10 * 0.9)));
+  function branch() {
+    c.strokeStyle = css(K.barkDk, 0.85); c.lineWidth = Math.max(0.6, 0.035 * s); c.lineCap = 'round';
+    c.beginPath();
+    for (var i = 0; i <= 10; i++) { if (i) c.lineTo(bpts[i][0], bpts[i][1]); else c.moveTo(bpts[i][0], bpts[i][1]); }
+    c.stroke();
+  }
+  if (S) { S.lines.push(branch); Bru = S.fore; } else branch();
   foreT.forEach(twig);
   // the tip: the branch's own end, a spray of new growth
   var tp = P(E.p2), tq = P(boughPt(E, 0.9));
@@ -688,8 +697,16 @@ function paintBough(c, E, P, K) {
     var ta = (tf / Math.max(1, ntf - 1) - 0.5) * 1.6 + Math.atan2(tp[1] - tq[1], tp[0] - tq[0]) + 0.3, tl2 = wid0 * lerp(1.2, 1.8, rr());
     needleRun(Bru, [tq, [lerp(tq[0], tp[0], 0.7), lerp(tq[1], tp[1], 0.7)], [tp[0] + Math.cos(ta) * tl2, tp[1] + Math.sin(ta) * tl2 + tl2 * 0.4]], wid0 * 0.7, s, [K.mid, K.lit, K.dark], 0.9, rr, lod);
   }
+  if (S) { S.snow.push(function () { E.pieces.forEach(function (Pc) { if (!Pc.loose) paintBoughSnow(c, E, Pc, P, K); }); }); return; }
   Bru.flush(0.18);
   E.pieces.forEach(function (Pc) { if (!Pc.loose) paintBoughSnow(c, E, Pc, P, K); });
+}
+function boughGroup(c, s) { var lw = Math.max(0.45, 0.012 * s); return { back: Brush(c, lw), fore: Brush(c, lw), lines: [], snow: [], lw: lw }; }
+function flushGroup(S) {
+  S.back.flush(0.18);
+  S.lines.forEach(function (f) { f(); });
+  S.fore.flush(0.18);
+  S.snow.forEach(function (f) { f(); });
 }
 /* The snow on a bough, piece by piece: it lies only on the branch itself and the inner part of its branchlets, as soft
    rounded cushions along their tops (never wider than the needles under it: snow cannot bridge the air between them),
@@ -1075,7 +1092,16 @@ function bakeJob(T, o) {
   items.sort(function (a, b) { return a.z - b.z || a.n - b.n; });
   // which snow can fall: pieces nothing drawn after them covers on the screen (so the clump can be drawn on its own)
   pickLoose();
-  var tasks = items.map(function (it) { return it.draw; });
+  var tasks = [];
+  // (o.batch: groups of up to that many neighbouring small boughs, in their depth order, drawn together: paintBough's S)
+  var NB = o.batch > 1 && o.lod ? Math.round(o.batch) : 0, grp = null;
+  function endGrp() { if (grp) { var g = grp; tasks.push(function () { var S = boughGroup(c, g[0]._s); g.forEach(function (E) { paintBough(c, E, P, K, S); }); flushGroup(S); }); grp = null; } }
+  items.forEach(function (it) {
+    var E = it.E;
+    if (NB && E && E.kind === 'bough' && E._s < 37.5) { if (!grp) grp = []; grp.push(E); if (grp.length >= NB) endGrp(); return; }
+    endGrp(); tasks.push(it.draw);
+  });
+  endGrp();
   tasks.push(function () {
     // laid down a little soft, so no edge is ruler-sharp
     if (body) {
