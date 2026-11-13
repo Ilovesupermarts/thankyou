@@ -3410,6 +3410,7 @@ window.winterLab = {
   shake: function (k) { var E = PINES.list[k || 0]; if (E) for (var j = 0; j < E.A.rest.length; j++) Yukitsuri.shed(E.A, j, j * 0.15); },
   pines: function () { return PINES; },   // (for checking each picture on its own)
   hall: function () { return HALL; },
+  lake: function () { return { span: LAKEW.shore ? lakeSpan() : null, top: LAKEW.top, info: lakeInfo }; },   // (checks: the strip of water drawn)
   trail: function () { return TRAIL; },
   fieldProbe: function (x, y) { return FIELDLAST ? FIELDLAST.probe(x, y) : null; },
   trailEdit: TRAIL_EDIT,   // (the path, for checking)     // (the hall's picture, for checking it on its own)
