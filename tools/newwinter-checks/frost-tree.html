@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- One or more frosted trees (frosttree.js) large on a plain snow-and-mist background, lit as the new winter scene at
+     15:30. ?seed=N&h=11&D=180&trunks=3&bark3d=0 . Used by frost-tree.js (screenshots); not used by the app. -->
+<html><head><meta charset="utf-8"><title>Frosted tree check</title>
+<style>html,body{margin:0;background:#e9e3df}canvas{display:block}</style>
+<script src="../../trunks.js"></script>
+<script src="../../yukitsuri.js"></script>
+<script src="../../frosttree.js"></script>
+</head><body><canvas id="c"></canvas>
+<script>
+var q = new URLSearchParams(location.search), W = 900, H = 700, PR = window.devicePixelRatio || 1;
+var cv = document.getElementById('c'); cv.width = W * PR; cv.height = H * PR; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+var c = cv.getContext('2d');
+// the background: warm misty sky, the snow below the horizon
+var hy = H * 0.62, g = c.createLinearGradient(0, 0, 0, hy);
+g.addColorStop(0, '#e8c9a8'); g.addColorStop(1, '#f6e6cf');
+c.fillStyle = g; c.fillRect(0, 0, cv.width, hy * PR);
+var g2 = c.createLinearGradient(0, hy * PR, 0, cv.height); g2.addColorStop(0, '#ece8ec'); g2.addColorStop(1, '#f4f5fa');
+c.fillStyle = g2; c.fillRect(0, hy * PR, cv.width, cv.height);
+// the scene's light (newwinter.html sceneLight at 15:30, day, partly cloudy)
+var a = -60 * Math.PI / 180, e = 22 * Math.PI / 180, sS = 1.1 * 0.85;
+var LT = { dir: [Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e)], sun: [255 * sS / 255, 247 * sS / 255, 236 * sS / 255],
+           sky: [0.72, 0.79, 0.9], amb: 1.0, vis: 0.85 };
+var SHADE = [196, 204, 228], D = +(q.get('D') || 60), Hm = +(q.get('h') || 11), F = H / (2 * Math.tan(11 * Math.PI / 180)), eye = 3;
+var footY = hy + eye * F / D, list = [];
+var o = { cam: { F: F, cx: W / 2, hy: hy }, eye: eye, footX: W / 2, footY: footY, PR: PR, W: W, H: H,
+          light: { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, vis: LT.vis }, shade: SHADE, snow: [250, 250, 252], rime: [244, 247, 252],
+          bark: { bark: [122, 116, 114], dark: [51, 49, 48], light: [161, 156, 154], lichen: [168, 172, 160], moss: [78, 90, 48] },
+          rimeK: +(q.get('rime') || 1), snowK: +(q.get('snow') || 1), feather: +(q.get('feather') || 1), trunks: q.get('bark3d') !== '0',
+          haze: +(q.get('haze') || 0), hazeCol: [252, 232, 196], soft: 0.35 * PR };
+var T = FrostTree.build({ seed: +(q.get('seed') || 5) * 101, height: Hm, trunks: +(q.get('trunks') || 3), spread: +(q.get('spread') || 1), twigs: +(q.get('twigs') || 0.6) });
+var t0 = performance.now(), job = FrostTree.bakeJob(T, o);
+while (!job.step(1e9)) {}
+var R = job.result, ms = performance.now() - t0;
+var sc = document.createElement('canvas'); sc.width = cv.width; sc.height = cv.height;
+var sx = sc.getContext('2d'); sx.setTransform(PR, 0, 0, PR, 0, 0);
+Yukitsuri.shadow(sx, FrostTree.shadowTree(T), o, 'cast');
+sx.setTransform(1, 0, 0, 1, 0, 0); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = 'rgb(150,158,196)'; sx.fillRect(0, 0, sc.width, sc.height);
+c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 0.45; c.filter = 'blur(' + PR + 'px)'; c.drawImage(sc, 0, 0); c.globalAlpha = 1; c.filter = 'none';
+c.drawImage(R.body, Math.round(R.box.bx * PR), Math.round(R.box.by * PR));
+window.done = { ms: Math.round(ms), wood: R.wood, segs: R.segs, box: R.box, top: T.top, crown: T.crown.R };
+</script></body></html>
