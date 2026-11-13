@@ -232,17 +232,20 @@ function job(o) {
   // the rise: a level top (a rounded oblong round the hall and the firs), then a slope of fixed length down to the field
   // (front: how long the slope is in front, toward you and the path; o.riseFront, m. The sides and back keep 14 m.)
   var TER = { x0: 0, x1: 0, z0: 0, z1: 0, slope: 14, front: Math.max(14, o.riseFront || 14) };
-  var firs = (o.firs || []).map(function (f) {
+  var firsAll = (o.firs || []).map(function (f) {
     var d = f.foot - hy, D = d > 0.3 ? -Y0 * F / d : 1e4;
     var wx = (f.x - cx) * D / F, wz = D, lx = (wx - X) * cs - (wz - Z) * sn, lz = (wx - X) * sn + (wz - Z) * cs;
     var hm = f.h * D / F;
     return { f: f, x: lx, z: lz, h: hm, r: hm * 0.3 * ((o.firLook && o.firLook.width) || 1), D: D };
   });
+  // (o.firsHidden: other trees stand where the firs were (the page's frosted trees): the rise they stood on is kept (its
+  // extent follows the firs' places) but the firs themselves are not drawn and cast no shadow)
+  var firs = o.firsHidden ? [] : firsAll;
   (function () {
     // the rise's slope starts just in front of the stone base (the hall stands at its top), so the shadows and the
     // lamplight that fall in front of it lie on the slope you can see
     TER.z0 = -bd - 1.5; TER.z1 = ez + 6; TER.x0 = -ex - 4; TER.x1 = ex + 4;
-    firs.forEach(function (T) { if (T.D < 5e3) { TER.z1 = Math.max(TER.z1, T.z + T.r + 4); TER.x1 = Math.max(TER.x1, T.x + T.r + 3); TER.x0 = Math.min(TER.x0, T.x - T.r - 3); } });
+    firsAll.forEach(function (T) { if (T.D < 5e3) { TER.z1 = Math.max(TER.z1, T.z + T.r + 4); TER.x1 = Math.max(TER.x1, T.x + T.r + 3); TER.x0 = Math.min(TER.x0, T.x - T.r - 3); } });
   })();
   function terOut(x, z) {                                   // how far outside the rise's level top (m)
     // the long front slope only in front of the hall itself (where the path climbs it), back to 14 m beside it, so the
