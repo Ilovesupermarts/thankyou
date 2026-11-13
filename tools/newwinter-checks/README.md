@@ -36,3 +36,6 @@ Added in the kept-pictures / loading session (`NODE_PATH=$(npm root -g) node <sc
 - `old-yukitsuri.js` — the page with an old `yukitsuri.js` (no `pack`): no error, the pines not kept.
 Added in the frosted-trees session:
 - `frost-tree.html` + `frost-tree.js` — one frosted tree (frosttree.js) large on a plain background, lit as the scene at 15:30, with its shadow: `node frost-tree.js OUT.png 2 'seed=5&D=145&h=9&twigs=0.35&feather=0.6'` (D: metres away; `bark3d=0` painted wood). Under a second per tree: the quick place to tune the tree's look.
+Added in the valley-mist / far-snow session:
+- `band.js` — the test bed with the user's values and the pines off; saves the snow ground layer (`PREFIX-field.png`) and 1x screenshots with the valley mist on (`PREFIX-on.png`) and off (`PREFIX-off.png`): `node band.js b0` (optional second argument `'{"V":{...}}'`). About 4-10 minutes here: run with `run_in_background`, then measure rows with PIL (row-to-row difference shows hard edges; colours show tints). Used to find the far-snow speckle, the yellow band and the ridges' foot edge.
+- `scene.js` — the whole test bed at any scale with the user's values + overrides, full picture and a clip: `node scene.js PREFIX 2 '{"V":{"gatesX":3,"lanternsX":3,"blockLabels":false}}' 'x,y,w,h'` (the flat torii and lanterns moved off screen for the check only). 2x takes 20+ minutes here.
