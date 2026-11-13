@@ -494,20 +494,20 @@ var V_DEFAULTS = {
     pineBark: '#3E3634',
     bamboo: '#A88E55',
     // (the hall's and the pagoda's colours follow the user's two photos of a shrine hall and a five-storey pagoda: vermilion
-    // posts, beams and brackets, white walls, a grey-green roof on the hall, cypress-bark roofs and a dark bronze spire on
-    // the pagoda; measured on the photos, the lit middle of each part)
-    pagodaWall: '#EEEBD9',
-    pagodaRed: '#B1341E',
-    pagodaBracket: '#A83220',
-    pagodaSoffit: '#9C3020',
-    pagodaRoof: '#826350',
-    pagodaSpire: '#3A4650',
-    hallPlaster: '#EEEBD9',
-    hallTimber: '#B6441C',
-    hallRed: '#B6441C',
-    hallGreen: '#738387',
-    hallStone: '#92928A',
-    hallSoffit: '#A03A1E',
+    // posts, beams and brackets, white walls, verdigris green, cypress-bark roofs and a gilt spire; made bright and saturated
+    // at the user's request, as the winter light dims what the photos show)
+    pagodaWall: '#FFF8E8',
+    pagodaRed: '#F23A12',
+    pagodaBracket: '#F23A12',
+    pagodaSoffit: '#E0360F',
+    pagodaRoof: '#B0683A',
+    pagodaSpire: '#E8A81E',
+    hallPlaster: '#FFF8E8',
+    hallTimber: '#F23A12',
+    hallRed: '#F23A12',
+    hallGreen: '#1FA67A',
+    hallStone: '#A8A8A0',
+    hallSoffit: '#E0360F',
     frostBark: '#625C5B'
   }
 };
@@ -662,7 +662,7 @@ try {
     // (ver 6: the path's walls doubled to 0.24 m: a height saved before is not read)
     if (saved.V && !(saved.ver >= 6)) delete saved.V.trailDepth;
     // (ver 7: the ridges from winter2.html: the ranges' height, crests, tree line and the mountains' light saved before are not read)
-    if (saved.V && saved.V.colours && !(saved.ver >= 8)) ['pagodaWall', 'pagodaRed', 'hallPlaster', 'hallTimber', 'hallRed', 'hallGreen', 'hallStone'].forEach(function (k) { delete saved.V.colours[k]; });   // (the photos' colours, ver 8)
+    if (saved.V && saved.V.colours && !(saved.ver >= 9)) ['pagodaWall', 'pagodaRed', 'pagodaBracket', 'pagodaSoffit', 'pagodaRoof', 'pagodaSpire', 'hallPlaster', 'hallTimber', 'hallRed', 'hallGreen', 'hallStone', 'hallSoffit'].forEach(function (k) { delete saved.V.colours[k]; });   // (the photos' colours, made bright: ver 9)
     if (saved.MT && !(saved.ver >= 7)) ['rangeHeight', 'sharpness', 'treeLine', 'sunStrength', 'ambient', 'shadows', 'haze', 'softness'].forEach(function (k) { delete saved.MT[k]; });
     merge(V, saved.V || {}, V_DEFAULTS);
     // the sun and the clouds saved before step 1, and the mountains saved before step 2, were winter2.html's: not read
@@ -670,7 +670,7 @@ try {
     if (saved.ver >= 3) merge(MT, saved.MT || {}, MT_DEFAULTS);
   }
 } catch (e) { /* a private window: the defaults */ }
-function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 8, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
+function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 9, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
 
 /* Toolbar date and time (Nagoya). */
 function tickClock() {
