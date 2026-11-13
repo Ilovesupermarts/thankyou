@@ -378,7 +378,7 @@ var V_DEFAULTS = {
   // at the foot (shares of the height), their look, snow, mist with distance and softness (the preview's option B, the user's choice)
   // the hill's and the shrine's firs drawn as the right bank's (yukitsuri.js, variant 1: no ropes, pole or props, painted wood);
   // off: their own older firs (winterhill.js)
-  hillNewFirs: true, hfNewFirs: true,
+  hillNewFirs: true, hfNewFirs: true, firCpu: false,
   hillShow: true, hillFirs: true, hillSeed: 11, hillRows: 9, hillDensity: 0.55, hillFill: 0.92, hillFirFar: 0.03, hillFirNear: 0.08,
   hillFirWidth: 0.78, hillTiers: 1, hillSparse: 0.35, hillDroop: 1, hillLean: 1, hillFirSnow: 0.7, hillBrush: 1, hillSoft: 1,
   hillHazeFar: 0.68, hillHazeNear: 0.18, hillNeedleTint: 0,
@@ -951,7 +951,7 @@ function startHill() {
     treeFar: V.hillFirFar * H * ph.sz, treeNear: V.hillFirNear * H * ph.sz, density: V.hillDensity, fill: V.hillFill, snow: V.hillFirSnow,
     hazeFar: V.hillHazeFar, hazeNear: V.hillHazeNear, treeWidth: V.hillFirWidth, light: L, soft: V.hillSoft, noTrees: !V.hillFirs,
     look: { tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean, brush: V.hillBrush,
-            needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle), painter: V.hillNewFirs ? ytFirPaint : null },
+            needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle), painter: V.hillNewFirs ? ytFirPaint : null, cpu: V.firCpu },
     // no tree right behind the pagoda's lowest storey in the rows in front of it, none on or just in front of its steps
     clearing: function (x, y, u) {
       if (!V.pagodaShow) return false;
@@ -1028,7 +1028,7 @@ function startHall() {
     firs: firs,
     firLook: { snow: V.hfSnow, width: V.hfWidth, tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean,
                brush: V.hillBrush, soft: V.hillSoft, needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle),
-               painter: V.hfNewFirs ? ytFirPaint : null }
+               painter: V.hfNewFirs ? ytFirPaint : null, cpu: V.firCpu }
   });
 }
 /* ============================================================
@@ -2826,7 +2826,8 @@ function ytFirPaint(c, x, y, h, seed, look) {
     soft: look.direct ? 0 : (0.3 + hz * 0.3) * sc * (look.soft === undefined ? 1 : look.soft),
     loose: 0, dof: 0, trunks: false, lod: true,      // (less detail where a pixel cannot show it: these are small and far)
     into: look.direct ? c : null,                    // (the hill: straight onto its row's layer)
-    cpuBody: true                                    // (the shrine's firs: laid onto the hall's picture being built)
+    cpu: !!look.cpu,                                 // (V.firCpu: drawn on the main processor at twice the size; off = the graphics chip)
+    cpuBody: !!look.cpu                              // (the shrine's firs: laid onto the hall's picture being built)
   };
   var M = c.getTransform(), job = Yukitsuri.bakeJob(T, o);
   function fin() {
@@ -3583,6 +3584,7 @@ var G = [
     { chk: 'V', k: 'hillShow', label: 'Show the hill', re: 'hill' },
     { chk: 'V', k: 'hillFirs', label: 'Firs on the hill', re: 'hill' },
     { chk: 'V', k: 'hillNewFirs', label: 'Firs as the right bank\'s (no ropes)', re: 'hill', note: 'On: the right bank\'s firs (yukitsuri.js; their snow and width follow "Roped pines and firs"). Off: the older hill firs, with the values below.' },
+    { chk: 'V', k: 'firCpu', label: 'Draw these firs on the main processor (2× size)', re: 'hill hall', note: 'Off (default): on the graphics chip, as before the last speed round. On: on the main processor at twice the size, shrunk (faster in a browser without a graphics chip). For timing both ways: see the Report lines "hill and pagoda" and "hall and the firs beside it". Applies to the hill\'s and the shrine\'s firs.' },
     { o: 'V', k: 'hillSeed', label: 'Which forest (seed)', min: 1, max: 99, step: 1, re: 'hill', note: 'Each number lays out a different forest, with different trees.' },
     { o: 'V', k: 'hillRows', label: 'Rows of firs', min: 2, max: 16, step: 1, re: 'hill', note: 'From the crest down to the foot.' },
     { o: 'V', k: 'hillDensity', label: 'Density (how close together)', min: 0, max: 1, step: 0.01, re: 'hill', note: 'Higher = the firs in a row stand closer.' },
