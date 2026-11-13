@@ -3321,6 +3321,20 @@ function scDeps(st, roots) {
   if (roots) return { seen: Object.keys(seen).filter(function (k) { try { return typeof eval(k) === 'function'; } catch (e) { return false; } }).map(function (k) { return k + '<' + from[k]; }) };
   return (SC.deps[st] = { keys: all ? null : Object.keys(keys).sort(), mt: Object.keys(mt).sort(), sun: Object.keys(sun).sort(), code: h, n: Object.keys(seen).length });
 }
+/* The kept pictures are used once both the store is read and the drawing files are measured. */
+var SC_WAIT = { db: false, files: false };
+function scReady(w) { SC_WAIT[w] = true; if (SC_WAIT.db && SC_WAIT.files) SC.ready = true; }
+/* Each drawing file's own length, read once when the page opens (from the browser's cache: the copy the page runs). The
+   browser's own report of a file's size (below) is 0 when it served the file from its cache, which made every label
+   change and every picture bake again on such a reload. */
+function scMeasureFiles() {
+  var names = [];
+  Array.prototype.forEach.call(document.scripts, function (sc) { var n = (sc.getAttribute('src') || '').split('?')[0]; if (/\.js$/.test(n)) names.push(n); });
+  if (!names.length || typeof fetch !== 'function') { scReady('files'); return; }
+  Promise.all(names.map(function (n) {
+    return fetch(n, { cache: 'force-cache' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) { return n.split('/').pop() + ':' + t.length; }, function () { return n.split('/').pop() + ':?'; });
+  })).then(function (list) { SC.files = list.sort().join(','); scReady('files'); }, function () { scReady('files'); });
+}
 function scFiles() {                                 // the drawing files' sizes as loaded (a change to one changes its size)
   if (SC.files) return SC.files;
   var f = {};
@@ -3345,12 +3359,12 @@ function scOpen() {
     var rq = indexedDB.open('newWinter-pictures', 1);
     rq.onupgradeneeded = function () { rq.result.createObjectStore('p'); };
     rq.onsuccess = function () { SC.db = rq.result; scLoadAll(); };
-    rq.onerror = rq.onblocked = function () { SC.ready = true; };
-  } catch (e) { SC.ready = true; }
+    rq.onerror = rq.onblocked = function () { scReady('db'); };
+  } catch (e) { scReady('db'); }
 }
 function scLoadAll() {
   var left = SC_STAGES.length;
-  function one() { if (--left <= 0) SC.ready = true; }
+  function one() { if (--left <= 0) scReady('db'); }
   try {
     var os = SC.db.transaction('p', 'readonly').objectStore('p');
     SC_STAGES.forEach(function (st) {
@@ -3363,7 +3377,7 @@ function scLoadAll() {
       };
       g.onerror = one;
     });
-  } catch (e) { SC.ready = true; }
+  } catch (e) { scReady('db'); }
 }
 /* The kept picture for stage st, when its label matches what would make it now. */
 function scTake(st) {
@@ -3425,6 +3439,7 @@ function scRestore(st) {
   return true;
 }
 scOpen();
+scMeasureFiles();
 
 /* Everything is baked again in steps, one heavy step a frame (the
    mountains, the snowdrift, the snowfield, the sprites), so the graphics
