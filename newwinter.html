@@ -2907,7 +2907,6 @@ function pinesMirror(c) {
     c.setTransform(res, 0, 0, -res, pad * res, (2 * yw - top) * res);
     c.drawImage(R.body, b.bx, b.by, b.w, b.h);
     Yukitsuri.drawRest(c, E.A);
-    c.drawImage(R.front, b.bx, b.by, b.w, b.h);
   });
 }
 function ytWind(x) { return (fieldAt(x) - V.wind * 0.12) * 6 + V.wind * 0.6; }   // m/s across the screen (the breeze, its ripples and gusts)
@@ -2939,8 +2938,6 @@ function drawPines(t, dt) {
     ctx.setTransform(PR, 0, 0, PR, 0, 0);
     Yukitsuri.drawRest(ctx, E.A);
     Yukitsuri.drawFalling(ctx, E.A, E.K, PINES.powder);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(R.front, Math.round(b.bx * PR), Math.round(b.by * PR));
   }
   ctx.globalAlpha = 1;
 }

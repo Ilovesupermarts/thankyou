@@ -29,6 +29,11 @@
 var WinterHill = (function () {
 'use strict';
 
+// Pictures built from many strokes or pixels are drawn on canvases the main processor draws (willReadFrequently):
+// on a canvas the graphics chip draws, every stroke waits for the chip while it draws the scene (measured: 50–85× slower
+// for the firs). The finished picture is handed to the graphics chip once, when it is laid down.
+var CPU = { willReadFrequently: true };
+
 var PI = Math.PI, TAU = PI * 2;
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -115,7 +120,7 @@ function pagoda(c, cam, o) {
   bx0 -= 8; by0 -= 8; bx1 += 8; by1 += 8;
   var layer = document.createElement('canvas');
   layer.width = Math.max(1, Math.ceil((bx1 - bx0) * T0.a)); layer.height = Math.max(1, Math.ceil((by1 - by0) * T0.d));
-  c = layer.getContext('2d'); c.setTransform(T0.a, 0, 0, T0.d, -bx0 * T0.a, -by0 * T0.d);
+  c = layer.getContext('2d', CPU); c.setTransform(T0.a, 0, 0, T0.d, -bx0 * T0.a, -by0 * T0.d);
 
   /* ---------- what is drawn, in order: groups of faces, each followed by what is painted over them ---------- */
   var items = [], cur = null;
@@ -369,7 +374,7 @@ function pagoda(c, cam, o) {
     // a layer just the size of the bank (in device pixels), with the same drawing transform, moved to its corner
     var lay = document.createElement('canvas');
     lay.width = Math.max(1, Math.ceil((bx1 - bx0) * T0.a)); lay.height = Math.max(1, Math.ceil((by1 - by0) * T0.d));
-    c = lay.getContext('2d'); c.setTransform(T0.a, 0, 0, T0.d, -bx0 * T0.a, -by0 * T0.d);
+    c = lay.getContext('2d', CPU); c.setTransform(T0.a, 0, 0, T0.d, -bx0 * T0.a, -by0 * T0.d);
     softBands(In, Out, cIn, cOut, 8);
     // the shade where the snow meets the walls
     c.save(); c.filter = 'blur(1.2px)';
@@ -419,7 +424,7 @@ function pagoda(c, cam, o) {
     bx0 -= 6; by0 -= 6; bx1 += 6; by1 += 6;
     var lay = document.createElement('canvas');
     lay.width = Math.max(1, Math.ceil((bx1 - bx0) * T0.a)); lay.height = Math.max(1, Math.ceil((by1 - by0) * T0.d));
-    c = lay.getContext('2d'); c.setTransform(T0.a, 0, 0, T0.d, -bx0 * T0.a, -by0 * T0.d);
+    c = lay.getContext('2d', CPU); c.setTransform(T0.a, 0, 0, T0.d, -bx0 * T0.a, -by0 * T0.d);
     softBands(Crest, Foot, cc, cf, 10);
     var cm = Crest[Math.round(N / 2)], fm = Foot[Math.round(N / 2)];
     c.save(); c.globalCompositeOperation = 'destination-out';
@@ -681,7 +686,7 @@ function fir(c, x, y, h, seed, look) {
   if (!look.direct) {
     lay = document.createElement('canvas');
     lay.width = Math.max(1, Math.ceil((bx1 - bx0) * sc)); lay.height = Math.max(1, Math.ceil((by1 - by0) * sc));
-    c = lay.getContext('2d'); c.setTransform(sc, 0, 0, sc, -bx0 * sc, -by0 * sc);
+    c = lay.getContext('2d', CPU); c.setTransform(sc, 0, 0, sc, -bx0 * sc, -by0 * sc);
   }
   c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
 
@@ -899,7 +904,7 @@ function hillJob(c, o) {
     ry0 -= hgt * 2.2; var ry1 = foot + 4;
     var lay = document.createElement('canvas');
     lay.width = Math.max(1, Math.ceil((rx1 - rx0) * sc)); lay.height = Math.max(1, Math.ceil((ry1 - ry0) * sc));
-    var lc = lay.getContext('2d'); lc.setTransform(sc, 0, 0, sc, -rx0 * sc, -ry0 * sc);
+    var lc = lay.getContext('2d', CPU); lc.setTransform(sc, 0, 0, sc, -rx0 * sc, -ry0 * sc);
     var look = { light: L, haze: haze, snow: o.snow, width: o.treeWidth, direct: true };
     for (var lk in look0) look[lk] = look0[lk];
     return { trees: trees, i: 0, lay: lay, lc: lc, look: look, haze: haze, T0: T0, sc: sc, rx0: rx0, ry0: ry0 };

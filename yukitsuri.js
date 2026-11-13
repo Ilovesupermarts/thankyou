@@ -65,6 +65,11 @@
 var Yukitsuri = (function () {
 'use strict';
 
+// Pictures built from many strokes or pixels are drawn on canvases the main processor draws (willReadFrequently):
+// on a canvas the graphics chip draws, every stroke waits for the chip while it draws the scene (measured: 50–85× slower
+// for the firs). The finished picture is handed to the graphics chip once, when it is laid down.
+var CPU = { willReadFrequently: true };
+
 var PI = Math.PI, TAU = PI * 2;
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -942,7 +947,7 @@ function paintWood(c, T, P, o, K, box) {
         // (copied once into a picture of its own, so where the bark meets the snow can be found from it: the dark gap
         // between them is drawn only where there is bark, never across bare snow)
         var tmp = document.createElement('canvas'); tmp.width = g.w; tmp.height = g.h;
-        var tc = tmp.getContext('2d'); tc.drawImage(g.cnv, 0, 0, g.w, g.h, 0, 0, g.w, g.h);
+        var tc = tmp.getContext('2d', CPU); tc.drawImage(g.cnv, 0, 0, g.w, g.h, 0, 0, g.w, g.h);
         J.bark = barkAlong(tc, g, J, o.PR);
         c.save(); clipAbove(c, J, J.x - J.half * 3, J.x + J.half * 3, box.by - 10);
         c.setTransform(1, 0, 0, 1, 0, 0);
@@ -1010,11 +1015,13 @@ function zOf(E) { return E.kind === 'pad' ? E.c[2] : (E.p0[2] + E.p2[2] * 2) / 3
 function bakeJob(T, o) {
   var P = project(o), K = palette(o), box = bounds(T, P), PR = o.PR;
   T.fol.forEach(function (E) { E._sh = null; });
-  function layer() { var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(box.w * PR)); cv.height = Math.max(1, Math.ceil(box.h * PR)); var c = cv.getContext('2d'); c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); return { cnv: cv, c: c }; }
+  function layer(cpu) { var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(box.w * PR)); cv.height = Math.max(1, Math.ceil(box.h * PR)); var c = cv.getContext('2d', cpu ? CPU : undefined); c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); return { cnv: cv, c: c }; }
   // o.into: draw straight onto that context (its own transform: CSS px), with no pictures of its own and no softening
   // (the hill's firs: the hill softens each row at once; copying hundreds of small pictures cost far more than the drawing)
   var M0 = o.into ? o.into.getTransform() : null;
-  var work = o.into ? { cnv: null, c: o.into } : layer(), body = o.into ? null : layer(), front = o.into ? null : layer(), c = work.c;
+  // (work: drawn here, stroke by stroke; body: the finished tree the scene lays down every frame. There is no 'front'
+  // picture any more: nothing was ever drawn on it, yet it was laid down for every tree every frame)
+  var work = o.into ? { cnv: null, c: o.into } : layer(true), body = o.into ? null : layer(false), c = work.c;
   function setT() { if (M0) c.setTransform(M0); else c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); }
   // Everything in depth order (the farthest first), so whatever is nearer covers it: the foliage, the wood (trunk and
   // limbs, about the trunk's depth), and the ropes, the pole and the props piece by piece (each piece at its own depth).
@@ -1082,7 +1089,7 @@ function bakeJob(T, o) {
       return { id: E.id, c: E.kind === 'pad' ? E.c : E.p1, rx: E.rx, rz: E.rz, top: top, z: zOf(E), scr: sc };
     });
   });
-  R.body = body ? body.cnv : null; R.front = front ? front.cnv : null;
+  R.body = body ? body.cnv : null;
   var ti = 0;
   return {
     result: R,

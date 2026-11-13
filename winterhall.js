@@ -47,6 +47,11 @@
 var WinterHall = (function () {
 'use strict';
 
+// Pictures built from many strokes or pixels are drawn on canvases the main processor draws (willReadFrequently):
+// on a canvas the graphics chip draws, every stroke waits for the chip while it draws the scene (measured: 50–85× slower
+// for the firs). The finished picture is handed to the graphics chip once, when it is laid down.
+var CPU = { willReadFrequently: true };
+
 var PI = Math.PI, TAU = PI * 2;
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -369,8 +374,9 @@ function job(o) {
   firs.forEach(function (T) { grow([T.f.x - T.f.h * 0.6, T.f.foot - T.f.h * 1.12]); grow([T.f.x + T.f.h * 0.6, T.f.foot + 4]); });
   bx0 = Math.max(-2, Math.floor(bx0 - 6)); by0 = Math.max(-2, Math.floor(by0 - 6)); bx1 = Math.min(W + 2, Math.ceil(bx1 + 6)); by1 = Math.min(H + 2, Math.ceil(by1 + 6));
   var LW = Math.max(1, Math.round((bx1 - bx0) * PR)), LH = Math.max(1, Math.round((by1 - by0) * PR));
-  function mkLayer() { var cv = document.createElement('canvas'); cv.width = LW; cv.height = LH; return cv; }
-  var OUT = mkLayer(), BODY = mkLayer(), GB = mkLayer(), GF = mkLayer();
+  // (OUT is the finished picture the scene lays down every frame: the graphics chip's; the rest are built here, then laid onto it once)
+  function mkLayer(cpu) { var cv = document.createElement('canvas'); cv.width = LW; cv.height = LH; cv.getContext('2d', cpu ? CPU : undefined); return cv; }
+  var OUT = mkLayer(false), BODY = mkLayer(true), GB = mkLayer(true), GF = mkLayer(true);
   var gBack = new Float32Array(LW * LH * 8), gFront = new Float32Array(LW * LH * 8), roofI = new Float32Array(LW * LH * 4);
   var gHit = new Uint8Array(LW * LH), rHit = new Uint8Array(LW * LH);   // 0 nothing, 1 back, 2 in front of the hall / 1 snow
   function sx(i) { return bx0 + (i + 0.5) / PR; }
@@ -1361,7 +1367,7 @@ function job(o) {
   tasks.push(function (lim) { while (row < LH) { rasterRows('r', row, Math.min(LH, row + ROWS)); row += ROWS; if (performance.now() > lim) return false; } row = 0; return true; });
   tasks.push(function (lim) { if (!edges) { edges = findEdges('r'); ei = 0; } while (ei < edges.length) { edgeOne('r', edges[ei++]); if ((ei & 63) === 0 && performance.now() > lim) return false; } edges = null; return true; });
   tasks.push(function () {
-    var RC = mkLayer(); toCanvas(roofI, RC); roofI = null;
+    var RC = mkLayer(true); toCanvas(roofI, RC); roofI = null;
     bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0); bc.filter = 'blur(' + (0.35 * PR).toFixed(2) + 'px)'; bc.drawImage(RC, 0, 0); bc.restore();
     bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0); bc.drawImage(RC, 0, 0); bc.restore();   // (sharp over its own soft copy: a soft edge, no see-through)
     ridgeOrnaments(bc);
