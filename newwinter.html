@@ -2885,6 +2885,10 @@ function finishPines() {
   PINES.drawn = true;
   PINES.info = PINES.list.length + ' trees, ' + PINES.list.reduce(function (n, E) { return n + E.R.loose.length; }, 0) + ' clumps of snow that can fall, wood: ' +
                (PINES.list.length ? PINES.list[0].R.wood : '-');
+  if (PINES.fresh && typeof Yukitsuri.pack !== 'function') {
+    PINES.fresh = false;                               // (an older yukitsuri.js was loaded: the trees are not kept this time)
+    note('roped pines and firs: ' + Math.round(performance.now() - PINES.t0) + ' ms · not kept (yukitsuri.js is an older copy; reload)');
+  }
   if (PINES.fresh) {
     PINES.fresh = false;
     var cnvs = [], trees = PINES.list.map(function (E) { var pk = Yukitsuri.pack(E.R); cnvs = cnvs.concat(pk.pics); return pk.data; });
@@ -3086,6 +3090,7 @@ var BAKE_VER = 1;                                   // (raise it to throw every 
 var SC_STAGES = ['hill', 'field', 'hall', 'pines'];
 var SC = { db: null, ready: false, giveUp: performance.now() + 4000, rec: {}, pic: { hill: 0, field: 0, hall: 0, pines: 0 }, want: {}, deps: {}, files: null };
 var SC_ROOTS = { hill: ['startHill', 'ytFirPaint'], field: ['bakeField'], hall: ['startHall'], pines: ['startPines', 'stepPines'] };
+var SC_SKIP = ['note', 'stepMs', 'scSave', 'scSaveAll', 'scKey', 'scDeps', 'scFiles', 'scRestore', 'scTake'];
 var SC_COMMON = ['sceneLight', 'shadeColour', 'lampLevel', 'sunPlace', 'light', 'isNight', 'nightLights', 'blkPlace', 'blkY'];
 /* What a stage's code reads: its functions and every function of this page they call (read from their own text), and in
    them every value of V (and MT, SUN) they read by name. blkPlace('g') brings g's across / up / size; V['trail' + …]
@@ -3097,6 +3102,7 @@ function scDeps(st, roots) {
     var n = todo.pop();
     if (seen[n]) continue;
     seen[n] = true;
+    if (SC_SKIP.indexOf(n) >= 0) continue;              // (the Report and the keeping itself: they change no pixel)
     var fn = null;
     try { fn = eval(n); } catch (e) { fn = null; }      // (only names of this page's own functions)
     if (typeof fn !== 'function' || /\[native code\]/.test(String(fn))) continue;
