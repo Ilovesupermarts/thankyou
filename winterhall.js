@@ -36,7 +36,7 @@
       lit (0 … 1.5: its lamps), spill (0 … 2: their light on the snow), lampCol [r, g, b],
       light { sun: [x, y, z] toward the sun (x right, y up, z toward you), sunCol, skyCol, amb, haze: [r, g, b] mist },
       field { snow, sun, shade, groundMist, haze, hazeM, glow, sunX, sunRGB, vis } (as the snow ground is baked),
-      firs [{ x, foot, h, seed, haze }] (CSS px), firLook { … WinterHill.fir's look },
+      firs [{ x, foot, h, seed, haze, hm? }] (CSS px; hm: its height in metres, else worked out from h), firLook { … WinterHill.fir's look },
       riseFront (m: how long the rise's slope is in front of the hall, toward you; 14 if not given; its sides and back 14),
       path (a WinterPath, winterpath.js: the trodden path, carved into this snow where it climbs the rise to the steps;
       along it this snow is drawn whole down to the rise's foot, where the snow field's path takes over), pathLook
@@ -235,7 +235,7 @@ function job(o) {
   var firsAll = (o.firs || []).map(function (f) {
     var d = f.foot - hy, D = d > 0.3 ? -Y0 * F / d : 1e4;
     var wx = (f.x - cx) * D / F, wz = D, lx = (wx - X) * cs - (wz - Z) * sn, lz = (wx - X) * sn + (wz - Z) * cs;
-    var hm = f.h * D / F;
+    var hm = f.hm !== undefined ? f.hm : f.h * D / F;     // (f.hm: its height in metres, when the page gives it)
     return { f: f, x: lx, z: lz, h: hm, r: hm * 0.3 * ((o.firLook && o.firLook.width) || 1), D: D };
   });
   // (o.firsHidden: other trees stand where the firs were (the page's frosted trees): the rise they stood on is kept (its

@@ -380,7 +380,7 @@ var V_DEFAULTS = {
   // at the foot (shares of the height), their look, snow, mist with distance and softness (the preview's option B, the user's choice)
   // the hill's and the shrine's firs drawn as the right bank's (yukitsuri.js, variant 1: no ropes, pole or props, painted wood);
   // off: their own older firs (winterhill.js)
-  hillNewFirs: true, hfNewFirs: true, firCpu: false, firBatch: 4, keepPictures: true, loadBudget: 24,
+  hillNewFirs: true, firCpu: false, firBatch: 4, keepPictures: true, loadBudget: 24,
   hillShow: true, hillFirs: true, hillSeed: 11, hillRows: 9, hillDensity: 0.55, hillFill: 0.92, hillFirFar: 0.03, hillFirNear: 0.08,
   hillFirWidth: 0.78, hillTiers: 1, hillSparse: 0.35, hillDroop: 1, hillLean: 1, hillFirSnow: 0.7, hillBrush: 1, hillSoft: 1,
   hillHazeFar: 0.68, hillHazeNear: 0.18, hillNeedleTint: 0,
@@ -401,7 +401,14 @@ var V_DEFAULTS = {
   hallShadow: 1, hallLamps: 1, hallSpill: 1, hallWeather: 1, hallRidge: true, hallRailing: true, hallRope: true,
   // the firs beside the hall (right of it, in the mist): shown, which trees (seed), their size and width (×), snow on
   // them, the mist on them
-  hfShow: true, hfSeed: 5, hfSize: 1, hfWidth: 1.3, hfSnow: 0.8, hfHaze: 0.5,
+ ftSSeed: 5, ftSTrunks: 1, ftSSpread: 1, ftSSize: 1,
+  ftS1Show: true, ftS1X: 0.386, ftS1Foot: 0.665, ftS1H: 4.1,,
+  ftS2Show: true, ftS2X: 0.398, ftS2Foot: 0.666, ftS2H: 4.27,,
+  ftS3Show: true, ftS3X: 0.409, ftS3Foot: 0.664, ftS3H: 4.87,,
+  ftS4Show: true, ftS4X: 0.418, ftS4Foot: 0.665, ftS4H: 4.0,,
+  ftS5Show: true, ftS5X: 0.428, ftS5Foot: 0.664, ftS5H: 4.24,,
+  ftS6Show: true, ftS6X: 0.437, ftS6Foot: 0.665, ftS6H: 3.53,,
+  ftS7Show: true, ftS7X: 0.446, ftS7Foot: 0.663, ftS7H: 3.95,
   // the length (m) of the slope of the rise the hall stands on, in front of it (where the path climbs it)
   hallRiseFront: 60,
   // step 8, the trodden path (winterpath.js): five points it curves through (across, how far down: fractions of the
@@ -1058,7 +1065,7 @@ function hallOpts() {
   var hy = H * V.horizonLine, pl = blkPlace('hall'), Hb = BLK.hall;
   var cam = WinterHill.camera(W, H, hy, MT.lens);
   var L = { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) };
-  var firs = hallFirList(pl);
+  var firs = shrineHallFirs(pl);
   return {
     path: trailFor('hall'), stepBase: V.trailShow && V.trailToHall ? V.trailDepth : 0,
     pathLook: { grey: V.trailGrey, shadow: V.trailShadow, bounce: V.trailBounce },
@@ -1072,10 +1079,9 @@ function hallOpts() {
     field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: groundHaze(),
              haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis,
              grain: V.fieldGrain, res: 0.6, swell: V.fieldSwell, drifts: V.fieldDrifts, seed: V.seed },
-    firs: firs, firsHidden: !!(V.ftShrine && V.ftShow && typeof FrostTree !== 'undefined'),
-    firLook: { snow: V.hfSnow, width: V.hfWidth, tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean,
-               brush: V.hillBrush, soft: V.hillSoft, needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle),
-               painter: V.hfNewFirs ? ytFirPaint : null, cpu: V.firCpu }
+    // (the trees beside it are the frosted trees' own pictures: the hall only keeps the rise of snow they stand on, as far
+    // as they reach; its firs list is those trees' places and heights, and none is drawn here)
+    firs: firs, firsHidden: true, firLook: { width: 1.3 }
   };
 }
 /* ============================================================
@@ -1085,15 +1091,19 @@ function hallOpts() {
    (winterlake.js) and the hall's rise (winterhall.js) each carve it into their own snow and light it as the rest.
    ============================================================ */
 var TRAIL = { key: '', T: null, hall: null, cutS: Infinity, info: '' };
-function hallFirList(pl) {                               // the firs beside the hall (CSS px), for the hall and its rise
-  var firs = [];
-  if (V.hfShow) BLK.hallFirs.forEach(function (f, i) {
-    var top = pl.Y(f.top), foot = pl.Y(f.foot), x = pl.X(f.x), n = BLK.hallFirs.length;
-    firs.push({ x: x, foot: foot, h: (foot - top) * V.hfSize, seed: Math.round(V.hfSeed) * 100 + i * 7 + 3,
-                haze: clamp(V.hfHaze * lerp(0.75, 1.25, n > 1 ? i / (n - 1) : 0.5), 0, 0.95) });
-  });
-  return firs;
+/* The seven frosted trees beside the hall (their own values: ftS<n>X across and ftS<n>Foot, as fractions of the reference
+   picture, moved by the hall's layout; ftS<n>H their height in metres). For the hall and its rise (CSS px): only where each
+   stands and how tall it is matters there (the rise of snow they stand on reaches as far as they do). */
+function shrineHallFirs(pl) {
+  var out = [];
+  if (!V.ftShrine || !V.hallShow) return out;
+  for (var n = 1; n <= 7; n++) {
+    if (!V['ftS' + n + 'Show']) continue;
+    out.push({ n: n, x: pl.X(V['ftS' + n + 'X']), foot: pl.Y(V['ftS' + n + 'Foot']), h: 0, hm: Math.max(0.5, V['ftS' + n + 'H'] * V.ftSSize), seed: 0, haze: 0 });
+  }
+  return out;
 }
+function shrineKey() { return shrineHallFirs(blkPlace('hall')).map(function (f) { return f.x.toFixed(2) + ',' + f.foot.toFixed(2) + ',' + f.hm.toFixed(2); }).join(';'); }
 function trailHall() {                                   // where the hall's steps are (only the hall's place is worked out)
   if (typeof WinterHall === 'undefined') return null;
   return WinterHall.job(trailHallOpts());
@@ -1103,7 +1113,7 @@ function trailHallOpts() {
   return { locateOnly: true, W: W, H: H, PR: PR, cam: WinterHill.camera(W, H, hy, MT.lens),
     place: { x0: pl.X(Hb.eave0), x1: pl.X(Hb.eave1), top: pl.Y(Hb.top), foot: pl.Y(Hb.base) },
     yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, riseFront: V.hallRiseFront, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
-    firs: hallFirList(pl), firLook: { width: V.hfWidth },
+    firs: shrineHallFirs(pl), firLook: { width: 1.3 },
     light: { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) } };
 }
 // the panel's point n on the screen (CSS px), then on the snow (m: x right of the eye, z away)
@@ -1151,7 +1161,7 @@ function trailBuild() {
 // the path for one painter: the field's fades out where the hall's rise takes over (that one carries it up the rise)
 function trailFor(who) {
   if (!V.trailShow || typeof WinterPath === 'undefined') return null;
-  var key = [W, H, V.horizonLine, V.eyeHeight, V.hallRiseFront, MT.lens, V.pathX, V.pathY, V.pathSize, V.hallX, V.hallY, V.hallSize, V.hallTurn, V.hallSnow, V.hallEave, V.hfShow, V.hfSize, V.hfWidth, V.hfSeed,
+  var key = [W, H, V.horizonLine, V.eyeHeight, V.hallRiseFront, MT.lens, V.pathX, V.pathY, V.pathSize, V.hallX, V.hallY, V.hallSize, V.hallTurn, V.hallSnow, V.hallEave, shrineKey(),
              V.hallRoof, V.hallSori, V.hallShow, V.trailToHall, V.trailBend, V.trailWidth, V.trailDepth, V.trailWall, V.trailBerm, V.trailWobble,
              V.trailTrod, V.seed, [1, 2, 3, 4, 5].map(function (n) { return V['trail' + n + 'X'] + ',' + V['trail' + n + 'Y']; }).join(';')].join('|');
   if (key !== TRAIL.key) { TRAIL.key = key; try { trailBuild(); } catch (e) { TRAIL.T = null; note('ERROR in the path: ' + e.message); } }
@@ -3089,12 +3099,11 @@ function frostPlaces() {
   // (after the others are placed, so none of them moves: they were placed without these trees)
   // V.ftShrine: seven frosted trees where the shrine's seven firs stood (they stand on the rise the hall stands on: the eye is
   // only a little above that snow, so their size and distance follow from where their feet are on it, as the hall's)
-  if (V.ftShrine && V.hallShow && V.hfShow && typeof WinterHall !== 'undefined') {
+  if (V.ftShrine && V.hallShow && typeof WinterHall !== 'undefined') {
     var hall = trailHall(), eyeR = hall ? -hall.Y0 : 0;
-    if (eyeR > 0.2) hallFirList(blkPlace('hall')).forEach(function (f, k) {
+    if (eyeR > 0.2) shrineHallFirs(blkPlace('hall')).forEach(function (f) {
       var d = f.foot - hy; if (d < 1) return;
-      var D = eyeR * F / d;
-      out.push({ i: 50 + k, x: f.x, foot: f.foot, D: D, h: f.h * D / F, trunks: 1, eye: eyeR, shrine: true });
+      out.push({ i: 49 + f.n, x: f.x, foot: f.foot, D: eyeR * F / d, h: f.hm, trunks: Math.max(1, Math.round(V.ftSTrunks)), eye: eyeR, shrine: true });
     });
   }
   return out.sort(function (a, b) { return a.foot - b.foot; });
@@ -3112,7 +3121,7 @@ function ftOptions(P) {
   };
 }
 function ftBuild(P) {
-  return FrostTree.build({ seed: Math.round(V.ftSeed) * 101 + P.i * 17, height: P.h, trunks: P.trunks, spread: V.ftSpread, twigs: V.ftTwigs });
+  return FrostTree.build({ seed: Math.round(P.shrine ? V.ftSSeed : V.ftSeed) * 101 + P.i * 17, height: P.h, trunks: P.trunks, spread: V.ftSpread * (P.shrine ? V.ftSSpread : 1), twigs: V.ftTwigs });
 }
 /* kept: the kept pictures (scRestore): each tree built again (cheap) and its picture laid in, with no bake; false when they
    do not fit (then they are baked as usual) */
@@ -3423,6 +3432,7 @@ window.winterLab = {
   shake: function (k) { var E = PINES.list[k || 0]; if (E) for (var j = 0; j < E.A.rest.length; j++) Yukitsuri.shed(E.A, j, j * 0.15); },
   pines: function () { return PINES; },   // (for checking each picture on its own)
   hall: function () { return HALL; },
+  places: function () { return frostPlaces(); },   // (checks: where each frosted tree stands now)
   lake: function () { return { span: LAKEW.shore ? lakeSpan() : null, top: LAKEW.top, info: lakeInfo }; },   // (checks: the strip of water drawn)
   trail: function () { return TRAIL; },
   fieldProbe: function (x, y) { return FIELDLAST ? FIELDLAST.probe(x, y) : null; },
@@ -4160,6 +4170,17 @@ function ytCtls() {
   }
   return out;
 }
+function shrineTreeCtls() {
+  var out = [];
+  for (var n = 1; n <= 7; n++) {
+    var t = 'Tree ' + n + ' beside the hall: ';
+    out.push({ chk: 'V', k: 'ftS' + n + 'Show', label: t + 'shown', re: 'hall trail frost' },
+             { o: 'V', k: 'ftS' + n + 'X', label: t + 'across', min: 0.3, max: 0.6, step: 0.0005, re: 'hall trail frost', note: 'Across the picture (a share of the reference\'s width, moved with the hall). + = right.' },
+             { o: 'V', k: 'ftS' + n + 'Foot', label: t + 'its foot, how far down', min: 0.64, max: 0.70, step: 0.0002, re: 'hall trail frost', note: 'Its foot on the snow the hall stands on: lower = nearer you (so larger on the screen), higher = farther back (smaller).' },
+             { o: 'V', k: 'ftS' + n + 'H', label: t + 'height (m)', min: 1, max: 14, step: 0.05, re: 'hall trail frost' });
+  }
+  return out;
+}
 var G = [
   { name: 'Report', note: 'What happened on this tablet. After a change, wait 10 s, then tap Copy report and paste it to Claude.', ctls: [
     { report: true },
@@ -4340,7 +4361,7 @@ var G = [
     { o: 'V', k: 'pagodaClear', label: 'Open snow round it', min: 0, max: 2, step: 0.05, re: 'hill', note: 'How far the firs keep back from it and its steps.' },
     { col: 'V', keys: [['pagodaWall', 'Pagoda walls (vermilion style)'], ['pagodaRed', 'Pagoda posts, beams, rails (vermilion style)']], re: 'hill' }
   ]).concat(dofCtls('pagoda', 'hill', 'The pagoda stands about 470 m away at its default place and size (the Report gives the exact distance each time it is drawn).')) },
-  { name: 'Shrine hall and the firs beside it (step 5)', file: 'winterhall.js', note: 'Where it stands (the firs move with it), how big, its look and its depth of field.', ctls: placeCtls('hall', 'Hall', 'hall').concat([
+  { name: 'Shrine hall and the frosted trees beside it (step 5)', file: 'winterhall.js, frosttree.js', note: 'Where it stands (the trees beside it move with it), how big, its look and its depth of field; then the seven frosted trees beside it, each with its own across, foot and height.', ctls: placeCtls('hall', 'Hall', 'hall').concat([
     { chk: 'V', k: 'hallShow', label: 'Show the hall', re: 'hall block', note: 'Off: the flat block-in shape comes back.' },
     { o: 'V', k: 'hallTurn', label: 'Turned (°)', min: -40, max: 40, step: 1, re: 'hall', note: '+ turns its right end toward you (more of its right side shows); 0 = its front square to the view.' },
     { o: 'V', k: 'hallSnow', label: 'Snow on the roof (×)', min: 0, max: 2, step: 0.01, re: 'hall', note: '1 = about 38 cm.' },
@@ -4357,16 +4378,14 @@ var G = [
     { chk: 'V', k: 'hallRailing', label: 'Vermilion veranda railing (with copper knobs)', re: 'hall' },
     { chk: 'V', k: 'hallRope', label: 'Sacred rope with paper streamers, and the name plaque, over the doors', re: 'hall' },
     { o: 'V', k: 'hallRiseFront', label: 'The rise it stands on: length of its slope in front (m)', min: 14, max: 120, step: 1, re: 'hall trail', note: 'The hall stands 2.5 m above the snow field (where the reference has it). The path climbs this slope to its steps: longer is gentler.' },
-    { chk: 'V', k: 'ftShrine', label: 'Frosted trees beside it instead of the firs', re: 'hall frost', note: 'On: seven frosted trees (the frosted trees\' painter) stand where the seven firs stood, and the firs are not drawn (the rise of snow they stood on stays). Off: the firs, as before.' },
-    { chk: 'V', k: 'hfShow', label: 'Show the firs beside it', re: 'hall' },
-    { chk: 'V', k: 'hfNewFirs', label: 'Firs as the right bank\'s (no ropes)', re: 'hall', note: 'On: the right bank\'s firs (yukitsuri.js). Off: the older firs.' },
-    { o: 'V', k: 'hfSeed', label: 'Which firs (seed)', min: 1, max: 99, step: 1, re: 'hall', note: 'Every fir is its own tree from this.' },
-    { o: 'V', k: 'hfSize', label: 'Firs: size (×)', min: 0.5, max: 1.6, step: 0.01, re: 'hall' },
-    { o: 'V', k: 'hfWidth', label: 'Firs: width (×)', min: 0.5, max: 1.8, step: 0.01, re: 'hall' },
-    { o: 'V', k: 'hfSnow', label: 'Firs: snow on them', min: 0, max: 1.6, step: 0.01, re: 'hall' },
-    { o: 'V', k: 'hfHaze', label: 'Firs: mist on them', min: 0, max: 1, step: 0.01, re: 'hall', note: 'More on the right-hand ones, farther into the mist.' } ,
+    { chk: 'V', k: 'ftShrine', label: 'Frosted trees beside it: shown', re: 'hall frost', note: 'Seven frosted trees (the frosted trees\' painter, frosttree.js) stand right of the hall, where the firs stood. The rise of snow they stand on reaches as far as they do. Their look (rime, twigs, mist, shadow, sway) is set in "Frosted trees"; the settings here are only for these seven.' },
+    { o: 'V', k: 'ftSSeed', label: 'Frosted trees beside it: which trees (seed)', min: 1, max: 99, step: 1, re: 'frost', note: 'Every tree is its own from this.' },
+    { o: 'V', k: 'ftSTrunks', label: 'Frosted trees beside it: trunks from one foot', min: 1, max: 3, step: 1, re: 'frost' },
+    { o: 'V', k: 'ftSSpread', label: 'Frosted trees beside it: crown width (×)', min: 0.5, max: 1.8, step: 0.01, re: 'frost' },
+    { o: 'V', k: 'ftSSize', label: 'Frosted trees beside it: all heights (×)', min: 0.4, max: 2.5, step: 0.01, re: 'hall frost', note: 'Multiplies every tree\'s own height below.' }
+  ]).concat(shrineTreeCtls()).concat([
     { col: 'V', keys: [['hallPlaster', 'Hall plaster walls'], ['hallTimber', 'Hall posts (bare timber)'], ['hallStone', 'Hall stone base'], ['hallRed', 'Hall vermilion (beams, brackets, door frames, railing)'], ['hallGreen', 'Hall green (window lattices, copper)']], re: 'hall' }
-  ]).concat(dofCtls('hall', 'hall', 'The hall stands about 200 m away, the firs beside it a little farther (each blurs by its own distance; the Report gives the hall\'s).')) },
+  ]).concat(dofCtls('hall', 'hall', 'The hall stands about 157 m away (the Report gives it).')) },
   { name: 'Plum branches (step 10)', note: 'From winter2.html, now in the scene (with the block-in too). Where they stand: "Layout: where each element stands", Plum branch left / right.', ctls: [
     { chk: 'V', k: 'plumShow', label: 'Show the plum branches in the scene', re: 'block', note: 'Off: the flat block-in shapes again.' },
     { o: 'V', k: 'branchCount', label: 'Branches each side', min: 0, max: 3, step: 1, re: 'branches' },
