@@ -120,7 +120,7 @@ function build(spec) {
     }
     // laterals along the limb (fewer high in the tree), then the fork at its end
     for (var k = 0; k < L.pieces.length - 1; k++) {
-      if (r() > (dep <= 1 ? 0.42 : 0.26)) continue;
+      if (r() > (dep <= 1 ? 0.3 : 0.22)) continue;
       var pi = L.pieces[k], S = segs[pi], f = lerp(0.3, 0.9, r());
       var at = [lerp(S.a[0], S.b[0], f), lerp(S.a[1], S.b[1], f), lerp(S.a[2], S.b[2], f)];
       var ang = lerp(0.45, 0.85, r()), dd = turn(S.dir, ang, r() * TAU);
@@ -156,10 +156,10 @@ function build(spec) {
   for (var t = 0; t < nT; t++) {
     var lean = t === 0 ? lerp(0.02, 0.07, r()) : lerp(0.07, 0.17, r()), taz = t === 0 ? r() * TAU : az + t * TAU / nT + (r() - 0.5) * 0.9;
     var tk = t === 0 ? 1 : lerp(0.68, 0.86, r()), Ht = Hm * tk;
-    // (the others from the same root, a little apart: up to half a metre or so)
-    var foot = t === 0 ? [0, 0, 0] : [Math.cos(taz) * Hm * lerp(0.025, 0.05, r()), 0, Math.sin(taz) * Hm * lerp(0.025, 0.05, r())];
+    // (the others a little apart, as the reference's: about one metre)
+    var fd = Hm * lerp(0.06, 0.13, r()), foot = t === 0 ? [0, 0, 0] : [Math.cos(taz) * fd, 0, Math.sin(taz) * fd];
     var d0 = norm([Math.cos(taz) * Math.sin(lean), Math.cos(lean), Math.sin(taz) * Math.sin(lean)]);
-    var rT = Hm * (t === 0 ? 0.026 : 0.017) * lerp(0.9, 1.1, r()), fh = Ht * lerp(0.36, 0.48, r());
+    var rT = Hm * (t === 0 ? 0.026 : 0.017) * lerp(0.9, 1.1, r()), fh = Ht * lerp(0.4, 0.52, r());
     var T0 = run(foot, d0, fh, rT, rT * 0.78, -1, 0, 4, 0.0, 0.05);
     trunks.push({ first: T0.pieces[0], foot: foot, r: rT });
     // the scaffold limbs: steep, fanned round the trunk (the vase)
@@ -315,7 +315,7 @@ function bakeJob(T, o) {
       Bt.add(shadeC(K.barkRaw, nC, L, 1 - inside), Math.min(1, w / 0.6) * hazeA, Math.max(0.3, w), A[0], A[1], B[0], B[1]);
     }
     var cMid = rimeCol(K, nC, inside), cEa = rimeCol(K, nE, inside), cEb = rimeCol(K, [-nE[0], -nE[1], -nE[2]], inside);
-    var big = !!wood[i] && w > 2.5;
+    var big = !!wood[i];                                             // (wood drawn in 3D: the bark shows on its lee side)
     if (big) {
       // a thick limb: the rime only on its windward side, a band along that edge (the bark shows on the lee side)
       var sgn = ww >= 0 ? 1 : -1, bw = Math.min(w * 0.42, tpx * 1.6 + w * 0.12) * (0.7 + 0.6 * rr());
@@ -388,11 +388,21 @@ function bakeJob(T, o) {
       var roots = [[fx - half * lerp(1.5, 1.9, q()), half * 0.6, half * lerp(0.4, 0.6, q())], [fx + half * lerp(1.5, 1.9, q()), half * 0.6, half * lerp(0.4, 0.6, q())]];
       if (Y && Y.snowJoin) joins.push(Y.snowJoin(Tr.foot, Math.max(0.6, half), roots, P, T.seed * 7 + 3 + k));
     });
-    function clipAll() {
-      // keeps what is above the snow's line at every trunk's foot (one clip: below the lowest line nothing is drawn)
-      if (!joins.length || !Y || !Y.clipAbove) return;
-      var J = joins[0];
-      Y.clipAbove(c, J, J.x - J.half * 4, J.x + J.half * 4, box.by - 10);
+    // the wood is drawn on a layer of its own, cut off below the snow's line at each trunk's foot (each its own line:
+    // the trunks stand apart, at their own depths), then laid on the tree
+    var wl = layer(), wc = wl.c;
+    function cutAndLay() {
+      wc.save();
+      wc.globalCompositeOperation = 'destination-out'; wc.fillStyle = '#000';
+      joins.forEach(function (J) {
+        var x0 = J.x - J.half * 3.5, x1 = J.x + J.half * 3.5, bot = box.by + box.h + 10;
+        wc.beginPath(); wc.moveTo(x0, bot);
+        for (var x = x0; x <= x1; x += 0.5) wc.lineTo(x, J.y - J.h(x));
+        wc.lineTo(x1, bot); wc.closePath(); wc.fill();
+      });
+      wc.restore();
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(wl.cnv, 0, 0); c.restore();
+      wl.cnv.width = 1;
     }
     if (o.trunks !== false && typeof Trunks !== 'undefined' && Trunks.state() !== 'none' && nodes.length) {
       try {
@@ -411,17 +421,15 @@ function bakeJob(T, o) {
           // (a graphics-chip canvas on purpose, as yukitsuri.js: only this small copy is read)
           var tmp = document.createElement('canvas'); tmp.width = g.w; tmp.height = g.h;
           tmp.getContext('2d').drawImage(g.cnv, 0, 0, g.w, g.h, 0, 0, g.w, g.h);
-          c.save(); clipAll();
-          c.setTransform(1, 0, 0, 1, 0, 0);
-          c.drawImage(tmp, g.x - box.bx * PR, g.y - box.by * PR);
-          c.restore(); done = true;
+          wc.save(); wc.setTransform(1, 0, 0, 1, 0, 0);
+          wc.drawImage(tmp, g.x - box.bx * PR, g.y - box.by * PR);
+          wc.restore(); cutAndLay(); done = true;
         }
       } catch (e) { done = false; }
     }
     if (done) return 'trunks.js';
     // painted: each piece a stroke, lit on the sun's side
-    c.save(); clipAll();
-    var Bt = Batch(c);
+    var Bt = Batch(wc);
     T.segs.forEach(function (S, i) {
       if (!wood[i]) return;
       var A = P(S.a), B = P(S.b), w = (S.ra + S.rb) * P.s(S.a[2]);
@@ -434,7 +442,7 @@ function bakeJob(T, o) {
       Bt.add(K.bark, 0.8, w * 0.45, A[0] + K.lx * w * 0.2, A[1], B[0] + K.lx * w * 0.2, B[1]);
     });
     Bt.flush();
-    c.restore();
+    cutAndLay();
     return 'painted';
   }
   var noWood = !(o.trunks !== false && typeof Trunks !== 'undefined' && Trunks.state() !== 'none');
