@@ -68,7 +68,7 @@ var FS = '#version 300 es\n' +
 // one layer of fog: its density at screen point (x, h above the horizon), the layer's own depth k (0 far … 2 near)
 'float fog(vec2 q, float k, out float lightSide){\n' +
 '  float f = mix(2.2, 1.0, k / 2.0);\n' +                                   // far layers: finer on the screen
-'  vec2 p = vec2((q.x + uDrift * mix(0.35, 1.0, k / 2.0)) * 0.35, q.y * 2.4) * f * uScale * 3.2 + vec2(k * 31.7, k * 7.3);\n' +
+'  vec2 p = vec2((q.x + uDrift * mix(0.35, 1.0, k / 2.0)) * 0.55, q.y * 7.5) * f * uScale * 3.2 + vec2(k * 31.7, k * 7.3);\n' +
 '  float t = uTime * 0.035;\n' +
 '  vec2 w1 = vec2(fbm(p + vec2(0.0, t)), fbm(p + vec2(5.2, 1.3 - t)));\n' +
 '  vec2 w2 = vec2(fbm(p + 3.0 * uWarp * w1 + vec2(1.7, 9.2) + t * 0.7), fbm(p + 3.0 * uWarp * w1 + vec2(8.3, 2.8) - t * 0.5));\n' +
