@@ -3046,7 +3046,9 @@ function startFrost(kept) {
   if (kept && (!trees || !list.length || trees.length !== list.length)) return false;
   FT.job = null; FT.next = [];
   FT.t0 = performance.now();
+  var lay = { x: V.frostX, y: V.frostY, s: V.frostSize };      // (the layout this bake was made for: see drawFrost)
   list.forEach(function (P, i) {
+    P.lay = lay;
     var T = ftBuild(P), o = ftOptions(P);
     if (kept) FT.next.push({ P: P, T: T, o: o, job: null, R: { body: kept.bmps[i], box: trees[i].box, wood: trees[i].wood, D: trees[i].D }, sw: { a: 0, v: 0 } });
     else FT.next.push({ P: P, T: T, o: o, job: FrostTree.bakeJob(T, o), R: null, sw: { a: 0, v: 0 } });
@@ -3125,12 +3127,20 @@ function drawFrost(t, dt) {
   }
   for (i = 0; i < L.length; i++) {
     var E = L[i], b = E.R.box, sw = E.sw;
+    // the position sliders act at once: until the trees are baked again for the new place (a few seconds), each baked tree
+    // is moved and scaled about its foot to where the layout now puts it (the same move and size the block-in shapes had)
+    var mx = E.P.x, my = E.P.foot, mk = 1, lay = E.P.lay;
+    if (lay && E.P.i < BLK.frost.length && (lay.x !== V.frostX || lay.y !== V.frostY || lay.s !== V.frostSize)) {
+      var pl = blkPlace('frost'), B0 = BLK.frost[E.P.i];
+      mx = pl.X(B0.x); my = pl.Y(B0.foot); mk = (V.frostSize || 1) / (lay.s || 1);
+    }
     // a spring: the breeze leans it a little (its ripples pass), it swings back slowly and settles
     var want = (fieldAt(E.P.x) - V.wind * 0.12) * 0.012 * V.ftSway;
     sw.v += (-14 * (sw.a - want) - 1.6 * sw.v) * dt;
     sw.a += sw.v * dt;
     var sh = clamp(sw.a, -0.04, 0.04);
     ctx.setTransform(PR, 0, 0, PR, 0, 0);
+    ctx.translate(mx, my); ctx.scale(mk, mk); ctx.translate(-E.P.x, -E.P.foot);   // (to its place now)
     ctx.transform(1, 0, -sh, 1, sh * E.P.foot, 0);                 // (a shear about the foot: x moves by sh × the height above it)
     ctx.drawImage(E.R.body, b.bx, b.by, b.w, b.h);
   }
