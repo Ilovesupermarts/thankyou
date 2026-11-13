@@ -171,7 +171,10 @@ function shore(pts, o) {
    carved (fainter far away, where they are smaller than a pixel). fz: how much ground one pixel covers in depth (m). */
 function heightAt(x, z, o, fz, dk) {
   var s = o.seed || 7;
-  var h = (fbm(x / 22, z / 22, s, 2) * 0.8 + fbm(x / 7.5, z / 7.5, s + 11, 3) * 0.55) * o.swell;
+  // (each swell fades out where one pixel covers more ground in depth than it can show: sampled once a pixel far away,
+  // the 7.5 m and 22 m swells broke up into speckle, and the far snow read as a different ground from the near)
+  var q = fz || 0, kC = 1 - smooth(9, 22, q), kN = 1 - smooth(3, 7, q);
+  var h = ((kC > 0 ? fbm(x / 22, z / 22, s, 2) * 0.8 * kC : 0) + (kN > 0 ? fbm(x / 7.5, z / 7.5, s + 11, 3) * 0.55 * kN : 0)) * o.swell;
   // (dk: how much of the wind's drifts are left; the trodden path's floor has none)
   if (o.drifts > 0 && (dk === undefined || dk > 0)) {
     var fade = 1 - smooth(0.3, 0.9, fz / 2.4);
