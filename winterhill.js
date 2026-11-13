@@ -83,10 +83,10 @@ var GLOW = hex('#FFB65C'), PANE_DAY = hex('#2C2422');
 
 /* (o.vivid) the paint keeps its own hue and saturation through the light: the cool sky and the low sun dim and grey a
    vermilion into a muddy brown; the shaded colour is put back to the paint's own at its brightness, the shade lifted a
-   little. 0 = as the light makes it. */
+   bit, so it reads bright. 0 = as the light makes it. */
 function vividPaint(out, base, k) {
   var lo = 0.3 * out[0] + 0.59 * out[1] + 0.11 * out[2], lb = 0.3 * base[0] + 0.59 * base[1] + 0.11 * base[2] || 1;
-  var f = lo / lb; f = lerp(f, 0.5 + 0.6 * f, k);
+  var f = lo / lb; f = lerp(f, 0.78 + 0.3 * f, k);              // (the shade is lifted to about nine tenths of the paint's own brightness)
   return [lerp(out[0], Math.min(255, base[0] * f), k), lerp(out[1], Math.min(255, base[1] * f), k), lerp(out[2], Math.min(255, base[2] * f), k)];
 }
 function pagoda(c, cam, o) {

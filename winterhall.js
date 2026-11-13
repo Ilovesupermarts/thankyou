@@ -90,10 +90,10 @@ function shadeC(base, n, L, sunK) {
 }
 /* (o.vivid, 0 … 1) The paint keeps its own hue and saturation through the light: the cool sky and the low sun dim and grey
    a vermilion into a muddy brown, so the shaded colour is put back to the paint's own at its brightness, and the shade
-   is lifted a little so the paint reads bright in the shade too. 0 = as the light makes it. */
+   is lifted so the paint reads bright in the shade too. 0 = as the light makes it. */
 function vividPaint(out, base, k) {
   var lo = 0.3 * out[0] + 0.59 * out[1] + 0.11 * out[2], lb = 0.3 * base[0] + 0.59 * base[1] + 0.11 * base[2] || 1;
-  var f = lo / lb; f = lerp(f, 0.5 + 0.6 * f, k);
+  var f = lo / lb; f = lerp(f, 0.78 + 0.3 * f, k);              // (the shade is lifted to about nine tenths of the paint's own brightness)
   return [lerp(out[0], Math.min(255, base[0] * f), k), lerp(out[1], Math.min(255, base[1] * f), k), lerp(out[2], Math.min(255, base[2] * f), k)];
 }
 
