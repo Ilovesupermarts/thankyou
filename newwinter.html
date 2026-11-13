@@ -3193,23 +3193,23 @@ function ftDust(E, G) {
    nearer. Without WebGL 2 (or after repeated losses of its context) the
    flat block-in band is drawn instead.
    ============================================================ */
-var MIST = { drift: 0, info: '' };
+var VMIST = { drift: 0, info: '' };          // (not MIST: that is the shed-snow puffs' picture)
 function mistLive() { return V.vmShow && typeof WinterMist !== 'undefined' && WinterMist.state() === 'ok'; }
 function drawMist(t, dt) {
   if (!mistLive()) return;
   var hy = H * V.horizonLine, top = Math.max(0, hy - V.vmRise * H * 2.2), bot = Math.min(H, hy + V.vmBelow * H * 1.2), hh = bot - top;
   if (hh < 2) return;
   // the wind carries it (the breeze, its ripples and the gusts passing), slowly: fog in still cold air hardly moves
-  MIST.drift += dt * V.vmSpeed * (6 + 40 * Math.max(0, fieldAt(W * 0.35)));
+  VMIST.drift += dt * V.vmSpeed * (6 + 40 * Math.max(0, fieldAt(W * 0.35)));
   var mc = hex(V.colours.mist), P = sunPlace(), night = isNight();
   var lit = light(mix(mc, [255, 252, 248], 0.5));
   var shade = mix(SHADE || [196, 204, 228], light(mc), 0.3);
   var glow = scale(light(mix(LT ? LT.sunRGB : [255, 247, 236], mc, 0.35)), (LT ? LT.vis : 1) * (night ? 0.25 : 1));
   var pic = WinterMist.render({ w: W * PR * V.vmRes, h: hh * PR * V.vmRes, W: W, H: H, top: top, height: hh, horizon: hy,
-                                time: t * V.vmMorph, drift: MIST.drift, rise: V.vmRise, below: V.vmBelow, density: V.vmDensity,
+                                time: t * V.vmMorph, drift: VMIST.drift, rise: V.vmRise, below: V.vmBelow, density: V.vmDensity,
                                 scale: V.vmScale, warp: V.vmWarp, strength: V.vmStrength, lit: lit, shade: shade, glow: glow,
                                 sunX: P.x, sunY: P.y, warm: V.vmWarm * (night ? 0.3 : 1), sparkle: V.vmSparkle * (night ? 0.2 : 1) });
-  MIST.info = pic ? 'wintermist.js (WebGL 2' + (WinterMist.renewals() ? ', context made again ' + WinterMist.renewals() + '×' : '') + ')' : 'not drawn';
+  VMIST.info = pic ? 'wintermist.js (WebGL 2' + (WinterMist.renewals() ? ', context made again ' + WinterMist.renewals() + '×' : '') + ')' : 'not drawn';
   if (!pic) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
   ctx.drawImage(pic, 0, Math.round(top * PR), Math.round(W * PR), Math.round(hh * PR));
@@ -3227,7 +3227,7 @@ window.winterLab = {
   V: V, MT: MT, CLOUD: CLOUD, SUN: SUN, defaults: { V: V_DEFAULTS, MT: MT_DEFAULTS, CLOUD: CLOUD_DEFAULTS, SUN: SDEF },
   plums: function () { return WS.branches; },
   frost: function () { return FT; },
-  mist: function () { return { drift: MIST.drift, info: MIST.info, state: typeof WinterMist !== 'undefined' ? WinterMist.state() : 'missing' }; },   // the valley mist (14f), for check scripts                      // the frosted trees (14e), for check scripts
+  mist: function () { return { drift: VMIST.drift, info: VMIST.info, state: typeof WinterMist !== 'undefined' ? WinterMist.state() : 'missing' }; },   // the valley mist (14f), for check scripts                      // the frosted trees (14e), for check scripts
   gustAt: function (x, str) { WS.gusts.push({ dir: 1, x: x, v: 300, str: str || 0.6, hit: {} }); },   // (checks: a gust front starting at x, CSS px)
   stepBudget: function (ms) { STEP_MS = ms; },             // (check scripts only: the headless browser draws a frame in about 1.5 s)                 // the plum branches (step 10), for check scripts
   ytFirPaint: function () { return ytFirPaint.apply(null, arguments); },   // the right bank's fir as the hill and shrine draw it (checks)
