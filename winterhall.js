@@ -47,9 +47,7 @@
 var WinterHall = (function () {
 'use strict';
 
-// Pictures built from many strokes or pixels are drawn on canvases the main processor draws (willReadFrequently):
-// on a canvas the graphics chip draws, every stroke waits for the chip while it draws the scene (measured: 50–85× slower
-// for the firs). The finished picture is handed to the graphics chip once, when it is laid down.
+// Pictures filled pixel by pixel (putImageData: no drawing, so the same pixels either way) are kept on the main processor.
 var CPU = { willReadFrequently: true };
 
 var PI = Math.PI, TAU = PI * 2;
@@ -374,9 +372,10 @@ function job(o) {
   firs.forEach(function (T) { grow([T.f.x - T.f.h * 0.6, T.f.foot - T.f.h * 1.12]); grow([T.f.x + T.f.h * 0.6, T.f.foot + 4]); });
   bx0 = Math.max(-2, Math.floor(bx0 - 6)); by0 = Math.max(-2, Math.floor(by0 - 6)); bx1 = Math.min(W + 2, Math.ceil(bx1 + 6)); by1 = Math.min(H + 2, Math.ceil(by1 + 6));
   var LW = Math.max(1, Math.round((bx1 - bx0) * PR)), LH = Math.max(1, Math.round((by1 - by0) * PR));
-  // (OUT is the finished picture the scene lays down every frame: the graphics chip's; the rest are built here, then laid onto it once)
+  // (OUT, the finished picture the scene lays down every frame, and BODY, where the timber is drawn: the graphics chip's;
+  // the ground and roof-snow pictures, filled pixel by pixel, the main processor's)
   function mkLayer(cpu) { var cv = document.createElement('canvas'); cv.width = LW; cv.height = LH; cv.getContext('2d', cpu ? CPU : undefined); return cv; }
-  var OUT = mkLayer(false), BODY = mkLayer(true), GB = mkLayer(true), GF = mkLayer(true);
+  var OUT = mkLayer(false), BODY = mkLayer(false), GB = mkLayer(true), GF = mkLayer(true);
   var gBack = new Float32Array(LW * LH * 8), gFront = new Float32Array(LW * LH * 8), roofI = new Float32Array(LW * LH * 4);
   var gHit = new Uint8Array(LW * LH), rHit = new Uint8Array(LW * LH);   // 0 nothing, 1 back, 2 in front of the hall / 1 snow
   function sx(i) { return bx0 + (i + 0.5) / PR; }

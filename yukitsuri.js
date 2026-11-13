@@ -65,10 +65,11 @@
 var Yukitsuri = (function () {
 'use strict';
 
-// Pictures built from many strokes or pixels are drawn on canvases the main processor draws (willReadFrequently):
-// on a canvas the graphics chip draws, every stroke waits for the chip while it draws the scene (measured: 50–85× slower
-// for the firs). The finished picture is handed to the graphics chip once, when it is laid down.
-var CPU = { willReadFrequently: true };
+// o.lod's firs (the hill's and the shrine's: small, far, thousands of strokes) are drawn on canvases the main processor
+// draws (willReadFrequently), at twice the size (SS): on a graphics-chip canvas each stroke waits for the chip while it
+// draws the scene (measured: 50–85× slower); at that size the main processor draws the finest strokes harder than the
+// chip, so drawing twice the size and shrinking keeps their true look (measured). The right bank's trees are as before.
+var CPU = { willReadFrequently: true }, SS = 2;
 
 var PI = Math.PI, TAU = PI * 2;
 function lerp(a, b, t) { return a + (b - a) * t; }
@@ -1015,7 +1016,7 @@ function bounds(T, P) {
 }
 function zOf(E) { return E.kind === 'pad' ? E.c[2] : (E.p0[2] + E.p2[2] * 2) / 3; }
 function bakeJob(T, o) {
-  var P = project(o), K = palette(o), box = bounds(T, P), PR = o.PR;
+  var P = project(o), K = palette(o), box = bounds(T, P), sup = o.lod && !o.into ? SS : 1, PR = o.PR * sup;
   T.fol.forEach(function (E) { E._sh = null; });
   function layer(cpu) { var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(box.w * PR)); cv.height = Math.max(1, Math.ceil(box.h * PR)); var c = cv.getContext('2d', cpu ? CPU : undefined); c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); return { cnv: cv, c: c }; }
   // o.into: draw straight onto that context (its own transform: CSS px), with no pictures of its own and no softening
@@ -1024,7 +1025,7 @@ function bakeJob(T, o) {
   // (work: drawn here, stroke by stroke; body: the finished tree the scene lays down every frame. There is no 'front'
   // picture any more: nothing was ever drawn on it, yet it was laid down for every tree every frame)
   // (o.cpuBody: the finished tree goes onto another picture being built, not onto the screen: keep it on the main processor too)
-  var work = o.into ? { cnv: null, c: o.into } : layer(true), body = o.into ? null : layer(!!o.cpuBody), c = work.c;
+  var work = o.into ? { cnv: null, c: o.into } : layer(!!o.lod), body = o.into ? null : layer(!!o.cpuBody), c = work.c;
   function setT() { if (M0) c.setTransform(M0); else c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); }
   // Everything in depth order (the farthest first), so whatever is nearer covers it: the foliage, the wood (trunk and
   // limbs, about the trunk's depth), and the ropes, the pole and the props piece by piece (each piece at its own depth).
@@ -1078,7 +1079,7 @@ function bakeJob(T, o) {
     // laid down a little soft, so no edge is ruler-sharp
     if (body) {
       var bc = body.c; bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0);
-      var bl = Math.hypot(o.soft || 0, o.dof || 0);
+      var bl = Math.hypot(o.soft || 0, o.dof || 0) * sup;          // (device px of this picture: twice the size for o.lod)
       if (bl > 0.05) bc.filter = 'blur(' + bl.toFixed(2) + 'px)';
       bc.drawImage(work.cnv, 0, 0); bc.restore();
       work.cnv.width = 1;
