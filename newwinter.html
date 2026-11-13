@@ -1047,11 +1047,19 @@ function startHall() {
   if (HALL.job) { HALL.job.cancel(); HALL.job = null; }
   if (!V.hallShow || typeof WinterHall === 'undefined') { HALL.cnv = null; return; }
   HALL.t0 = performance.now();
+  var o = hallOpts();
+  // (the ground round it and its edges are worked out by the bake worker on another core, started as soon as loading
+  // began: asidePrefetch; the same code, so the same pixels)
+  o.groundFrom = asideTake('hall', hallAside(o));
+  HALL.job = WinterHall.job(o);
+}
+/* The hall's options (startHall; also for the bake worker, asidePrefetch). */
+function hallOpts() {
   var hy = H * V.horizonLine, pl = blkPlace('hall'), Hb = BLK.hall;
   var cam = WinterHill.camera(W, H, hy, MT.lens);
   var L = { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) };
   var firs = hallFirList(pl);
-  HALL.job = WinterHall.job({
+  return {
     path: trailFor('hall'), stepBase: V.trailShow && V.trailToHall ? V.trailDepth : 0,
     pathLook: { grey: V.trailGrey, shadow: V.trailShadow, bounce: V.trailBounce },
     W: W, H: H, PR: PR, cam: cam, place: { x0: pl.X(Hb.eave0), x1: pl.X(Hb.eave1), top: pl.Y(Hb.top), foot: pl.Y(Hb.base) },
@@ -1068,7 +1076,7 @@ function startHall() {
     firLook: { snow: V.hfSnow, width: V.hfWidth, tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean,
                brush: V.hillBrush, soft: V.hillSoft, needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle),
                painter: V.hfNewFirs ? ytFirPaint : null, cpu: V.firCpu }
-  });
+  };
 }
 /* ============================================================
    8d. THE TRODDEN PATH (step 8): winterpath.js. A shape on the ground in metres, in the scene's own space: a smooth
@@ -1088,12 +1096,15 @@ function hallFirList(pl) {                               // the firs beside the 
 }
 function trailHall() {                                   // where the hall's steps are (only the hall's place is worked out)
   if (typeof WinterHall === 'undefined') return null;
+  return WinterHall.job(trailHallOpts());
+}
+function trailHallOpts() {
   var hy = H * V.horizonLine, pl = blkPlace('hall'), Hb = BLK.hall;
-  return WinterHall.job({ locateOnly: true, W: W, H: H, PR: PR, cam: WinterHill.camera(W, H, hy, MT.lens),
+  return { locateOnly: true, W: W, H: H, PR: PR, cam: WinterHill.camera(W, H, hy, MT.lens),
     place: { x0: pl.X(Hb.eave0), x1: pl.X(Hb.eave1), top: pl.Y(Hb.top), foot: pl.Y(Hb.base) },
     yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, riseFront: V.hallRiseFront, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
     firs: hallFirList(pl), firLook: { width: V.hfWidth },
-    light: { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) } });
+    light: { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) } };
 }
 // the panel's point n on the screen (CSS px), then on the snow (m: x right of the eye, z away)
 function trailScreen(n) { var P = blkPlace('path'); return [P.X(V['trail' + n + 'X']), P.Y(V['trail' + n + 'Y'])]; }
@@ -1128,8 +1139,10 @@ function trailLineM(PM) {
 function trailBuild() {
   var PM = trailPointsM(V.trailBend), hall = PM.hall;
   var pts = trailLineM(PM);
-  var T = WinterPath.build({ pts: pts, width: V.trailWidth, depth: V.trailDepth, wall: V.trailWall, berm: V.trailBerm,
-                             wobble: V.trailWobble, trod: V.trailTrod, endHalf: hall ? hall.stepW + 0.2 : 0, seed: V.seed * 13 + 5 });
+  var bo = { pts: pts, width: V.trailWidth, depth: V.trailDepth, wall: V.trailWall, berm: V.trailBerm,
+             wobble: V.trailWobble, trod: V.trailTrod, endHalf: hall ? hall.stepW + 0.2 : 0, seed: V.seed * 13 + 5 };
+  var T = WinterPath.build(bo);
+  TRAIL.build = bo; TRAIL.hallOpts = hall ? trailHallOpts() : null;   // (the same, for the bake worker to build again)
   var cutS = Infinity;
   if (hall) { var rf = hall.foot(hall.riseM), sr = T.sAt(rf[0], rf[1]); if (sr > 0) cutS = sr; }
   TRAIL.T = T; TRAIL.hall = hall; TRAIL.cutS = cutS;
@@ -1144,19 +1157,7 @@ function trailFor(who) {
   if (key !== TRAIL.key) { TRAIL.key = key; try { trailBuild(); } catch (e) { TRAIL.T = null; note('ERROR in the path: ' + e.message); } }
   var T = TRAIL.T;
   if (!T) return null;
-  if (who === 'field' && TRAIL.hall && TRAIL.hall.ground) {
-    // the snow field draws the whole path, up the hall's rise to its steps: its height there is the rise's (its slope,
-    // swells and the snow banked at the base) plus the path's own; the walls' shadows and the sky they hide are worked
-    // out on the path's own shape (the rise under it is smooth over those few metres)
-    var G = TRAIL.hall.ground;
-    var base = function (x, z) { return Math.max(0, G(x, z)); };
-    // (riseBox: where the rise stands above the field, in the scene's x and z: lines of sight passing over it are
-    // followed over the rise's own surface)
-    return { delta: function (x, z, fz, coarse) { var h = T.delta(x, z, fz, coarse); return T.Q.far ? h : h + base(x, z); },
-             near: T.near, Q: T.Q, trod: T.trod, maxRise: T.maxRise, maxDrop: T.maxDrop, riseBox: TRAIL.hall.riseBox, riseTop: TRAIL.hall.drop + 0.8,
-             sky: function (x, z, h, fz) { return T.sky(x, z, h - base(x, z), fz); },
-             sun: function (x, z, h, Ls, fz) { return T.sun(x, z, h - base(x, z), Ls, fz); } };
-  }
+  if (who === 'field' && TRAIL.hall && TRAIL.hall.ground) return WinterPath.onRise(T, TRAIL.hall);   // (up the hall's rise: winterpath.js)
   return T;
 }
 function smoothstep(a, b, x) { var t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
@@ -2684,7 +2685,19 @@ function bakeField() {
   FIELDT0 = performance.now();
   FIELDN.cnv.width = cv.width; FIELDN.cnv.height = cv.height;
   FIELDN.c.setTransform(1, 0, 0, 1, 0, 0); FIELDN.c.clearRect(0, 0, FIELDN.cnv.width, FIELDN.cnv.height);
-  FIELDJ = WinterLake.groundJob(FIELDN.c, {
+  var o = fieldOpts();
+  // (with the path, the rows are worked out by the bake worker on another core, started as soon as loading began:
+  // asidePrefetch; the same code, so the same pixels)
+  if (o.path) { o.pixelsFrom = asideTake('field', fieldAside(o)); FIELDAS = !o.pixelsFrom.fail; } else FIELDAS = false;
+  FIELDJ = WinterLake.groundJob(FIELDN.c, o);
+  FIELDLAST = FIELDJ;
+  if (!V.trailShow) stepField(1e9);
+}
+var FIELDAS = false;
+/* The snow ground's options (bakeField; also for the bake worker, asidePrefetch). */
+function fieldOpts() {
+  var hy = H * V.horizonLine, F = lakeLens();
+  return {
     W: W, H: H, PR: PR, hy: hy, F: F, eye: V.eyeHeight, res: 0.6, shore: LAKEW.shore,
     light: { dir: LT.dir, sun: LT.sun, vis: LT.vis }, snow: hex(V.colours.snow), shade: SHADE, mist: light(hex(V.colours.mist)),
     groundMist: groundHaze(),
@@ -2692,9 +2705,7 @@ function bakeField() {
     swell: V.fieldSwell, drifts: V.fieldDrifts, grain: V.fieldGrain, sparkle: V.fieldSparkle * (isNight() ? 0.15 : 1),
     haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), seed: V.seed,
     path: trailFor('field'), pathLook: { grey: V.trailGrey, shadow: V.trailShadow, bounce: V.trailBounce }
-  });
-  FIELDLAST = FIELDJ;
-  if (!V.trailShow) stepField(1e9);
+  };
 }
 function stepField(ms) {
   if (!FIELDJ) return;
@@ -2703,7 +2714,7 @@ function stepField(ms) {
   FIELDJ = null;
   scSave('field', FIELD.cnv);
   if (ms === undefined) note('snow ground: ' + Math.round(performance.now() - FIELDT0) + ' ms (in steps of about ' + stepMs() + ' ms a frame)' +
-                             ' · drawing work ' + Math.round(info.cpu) + ' ms' + (V.trailShow && TRAIL.T ? ' · ' + TRAIL.info + ', ' + info.pathPixels + ' pixels on it' : ''));
+                             ' · drawing work ' + Math.round(info.cpu) + ' ms' + (FIELDAS ? ' (its rows on another core, beside the rest)' : '') + (V.trailShow && TRAIL.T ? ' · ' + TRAIL.info + ', ' + info.pathPixels + ' pixels on it' : ''));
 }
 function bakeLake() {
   if (!LAKEW.shore) bakeField();
@@ -2741,6 +2752,19 @@ var lakeInfo = '';
 // the water makes itself a fresh graphics context if Chrome takes its own away (too many open in this page and
 // other tabs; water.js's recover), and switches itself off only under this page's own key, never the app's
 var WATER_OPTS = { recover: true, latchKey: 'waterLatchNewWinter' };
+/* The lake's width on the screen (CSS px, whole pixels): its shore's left and right ends, plus LAKE_MARGIN under the
+   soft banks, within the screen. Worked out again only when the shore changes. */
+var LAKE_MARGIN = 24, lakeSpanC = { sh: null, w: 0, v: null };
+function lakeSpan() {
+  var Sh = LAKEW.shore;
+  if (lakeSpanC.sh === Sh && lakeSpanC.w === W && lakeSpanC.v) return lakeSpanC.v;
+  var a = Infinity, b = -Infinity;
+  Sh.pts.forEach(function (p) { if (p[0] < a) a = p[0]; if (p[0] > b) b = p[0]; });
+  a = Math.max(0, Math.floor(a - LAKE_MARGIN)); b = Math.min(W, Math.ceil(b + LAKE_MARGIN));
+  if (!(b - a > 2)) { a = 0; b = W; }
+  lakeSpanC = { sh: Sh, w: W, v: [a, b] };
+  return lakeSpanC.v;
+}
 function drawLake(t, dt) {
   var Sh = LAKEW.shore;
   if (!Sh || FIELD.cnv.width < 2) return;
@@ -2750,11 +2774,13 @@ function drawLake(t, dt) {
   // the water: on the graphics chip (water.js), as the autumn lake
   if (typeof Water !== 'undefined' && Water.state() === 'ok' && MIRROR.cnv.width > 2) {
     var P = sunPlace(), day = isNight() ? 0 : 1;
-    var pic = Water.render({ w: W * PR * V.lakeRes, h: hh * PR * V.lakeRes, cssW: W, cssH: hh, top: top, horizon: hy, lens: lakeLens(), pad: LAKEW.pad,
+    // only the lake's own width (plus a margin under its soft banks) is drawn: the snow ground covers the rest
+    var xs = lakeSpan(), x0 = xs[0], sw = xs[1] - xs[0];
+    var pic = Water.render({ w: sw * PR * V.lakeRes, h: hh * PR * V.lakeRes, cssW: W, cssH: hh, x0: x0, span: sw, top: top, horizon: hy, lens: lakeLens(), pad: LAKEW.pad,
                              time: t * V.lakeSpeed, distort: V.lakeWaves * 7, calm: V.lakeCalm, waveSize: V.lakeWaveSize, reflect: 0.2, mirror: V.lakeMirror,
                              water: lakeBody(), sun: V.lakeSparkle * LT.vis * day, sunX: P.x, sunY: P.y,
                              sunColour: mix([255, 248, 232], LT.sunRGB, 0.6), fft: lakeFft() });
-    if (pic) { ctx.drawImage(pic, 0, Math.round(top * PR), Math.round(W * PR), Math.round(hh * PR) + 1); drawn = true; }
+    if (pic) { ctx.drawImage(pic, x0 * PR, Math.round(top * PR), sw * PR, Math.round(hh * PR) + 1); drawn = true; }
   }
   // without it (no WebGL 2, or not ready yet): the mirror as it is, with the water's colour over it
   if (!drawn && MIRROR.cnv.width > 2) {
@@ -3443,7 +3469,7 @@ var BAKE_VER = 1;                                   // (raise it to throw every 
 var SC_STAGES = ['hill', 'field', 'hall', 'frost', 'pines'];
 var SC = { db: null, ready: false, giveUp: performance.now() + 4000, rec: {}, pic: { hill: 0, field: 0, hall: 0, frost: 0, pines: 0 }, want: {}, deps: {}, files: null };
 var SC_ROOTS = { hill: ['startHill', 'ytFirPaint'], field: ['bakeField'], hall: ['startHall'], pines: ['startPines', 'stepPines'], frost: ['startFrost', 'stepFrost'] };
-var SC_SKIP = ['note', 'stepMs', 'hillReport', 'scSave', 'scSaveAll', 'scKey', 'scDeps', 'scFiles', 'scRestore', 'scTake'];
+var SC_SKIP = ['note', 'stepMs', 'hillReport', 'asideWorker', 'asideStart', 'asideTake', 'asideKept', 'asidePrefetch', 'fieldAside', 'hallAside', 'scSave', 'scSaveAll', 'scKey', 'scDeps', 'scFiles', 'scRestore', 'scTake'];
 var SC_COMMON = ['sceneLight', 'shadeColour', 'lampLevel', 'sunPlace', 'light', 'isNight', 'nightLights', 'blkPlace', 'blkY'];
 /* What a stage's code reads: its functions and every function of this page they call (read from their own text), and in
    them every value of V (and MT, SUN) they read by name. blkPlace('g') brings g's across / up / size; V['trail' + …]
@@ -3657,9 +3683,87 @@ function watchGL() {
   var k = glState('M') + ' / ' + glState('S');
   if (k !== glSeen) { glSeen = k; note('WebGL mountains: ' + glState('M') + ' · snowfield: ' + glState('S')); wipeWatch(); }
 }
+/* ============================================================
+   14h. THE BAKE WORKERS (winterbake.js). The two slow pixel-by-pixel
+   parts of a first load, the snow ground's rows (with the path) and the
+   ground round the hall with its edges, are worked out on other
+   processor cores by the same code (so the same pixels), started as soon
+   as loading begins (asidePrefetch, at each stage), while the page draws
+   the hill, the hall's firs and timber. The stage then takes what came
+   back (asideTake), or, if a worker cannot run or fails, works it out
+   itself as before (holder.fail). One worker for each.
+   ============================================================ */
+var ASIDE = { w: {}, off: {}, n: 0, wait: {}, pend: {} };
+function asideWorker(kind) {
+  if (ASIDE.off[kind] || typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') return null;
+  if (ASIDE.w[kind]) return ASIDE.w[kind];
+  try {
+    var w = new Worker('winterbake.js');
+    w.onmessage = function (e) {
+      var m = e.data, en = ASIDE.wait[m.id];
+      if (!en) return;
+      delete ASIDE.wait[m.id];
+      var h = en.h;
+      if (!m.ok) { h.fail = true; note('bake worker (' + kind + '): ' + m.error + '; worked out on the page instead'); return; }
+      if (kind === 'field') { h.nPath = m.nPath; h.cpu = m.cpu; h.data = new Uint8ClampedArray(m.data); }
+      else { h.ms = m.ms; h.LW = m.LW; h.LH = m.LH; h.gBack = m.gBack; h.gFront = m.gFront; h.gHit = m.gHit; }
+    };
+    w.onerror = function (e) {
+      note('bake worker (' + kind + '): ERROR ' + (e.message || 'it could not start') + '; worked out on the page instead');
+      ASIDE.off[kind] = true; ASIDE.w[kind] = null;
+      for (var id in ASIDE.wait) if (ASIDE.wait[id].kind === kind) { ASIDE.wait[id].h.fail = true; delete ASIDE.wait[id]; }
+      if (e.preventDefault) e.preventDefault();
+    };
+    ASIDE.w[kind] = w;
+    return w;
+  } catch (e) { ASIDE.off[kind] = true; note('bake worker: ' + e.message + '; worked out on the page instead'); return null; }
+}
+// a request (or the one already made with exactly the same options): a holder the stage's job waits on
+function asideStart(kind, msg) {
+  var key = JSON.stringify(msg), p = ASIDE.pend[kind];
+  if (p && p.key === key && !p.h.fail) return p.h;
+  var h = { kind: kind };
+  ASIDE.pend[kind] = { key: key, h: h };
+  var w = asideWorker(kind);
+  if (!w) { h.fail = true; return h; }
+  var id = ++ASIDE.n;
+  ASIDE.wait[id] = { h: h, kind: kind };
+  msg.id = id; msg.kind = kind;
+  try { w.postMessage(msg); } catch (e) { delete ASIDE.wait[id]; h.fail = true; note('bake worker (' + kind + '): ' + e.message + '; worked out on the page instead'); }
+  return h;
+}
+function asideTake(kind, msg) { var h = asideStart(kind, msg); ASIDE.pend[kind] = null; return h; }
+// what is sent: the options without what cannot be sent (the path, rebuilt there from its numbers; the painter; the shore)
+function fieldAside(o) {
+  var c = {};
+  for (var k in o) if (k !== 'shore' && k !== 'path' && k !== 'pixelsFrom') c[k] = o[k];
+  return { o: c, path: TRAIL.T ? { build: TRAIL.build, hallOpts: TRAIL.hall && TRAIL.hall.ground ? TRAIL.hallOpts : null } : null };
+}
+function hallAside(o) {
+  var c = {};
+  for (var k in o) if (k !== 'path' && k !== 'firLook' && k !== 'groundFrom') c[k] = o[k];
+  c.firLook = { width: o.firLook && o.firLook.width };
+  return { o: c, path: o.path ? { build: TRAIL.build } : null };
+}
+// would this stage lay down its kept picture (so nothing needs working out)?
+function asideKept(st) {
+  if (!V.keepPictures) return false;
+  var r = SC.rec[st];
+  if (!r || !r.bmp) return false;
+  try { return r.key === scKey(st); } catch (e) { return false; }
+}
+// at each stage: start the snow ground's and the hall's ground on their workers if they are still to come and will be baked
+function asidePrefetch() {
+  if (!SC.ready) return;                                   // (not before the kept pictures are known)
+  try {
+    if (stages.indexOf('field') >= 0 && V.trailShow && !asideKept('field')) { var fo = fieldOpts(); if (fo.path) asideStart('field', fieldAside(fo)); }
+    if (stages.indexOf('hall') >= 0 && V.hallShow && typeof WinterHall !== 'undefined' && !asideKept('hall')) asideStart('hall', hallAside(hallOpts()));
+  } catch (e) { note('bake worker: ' + e.message); }
+}
 function runStage(st) {
   LT = sceneLight();
   SHADE = shadeColour();
+  asidePrefetch();
   if (SC_STAGES.indexOf(st) >= 0) {                     // (kept pictures: the label of what would be made now)
     SC.want[st] = null;
     try { SC.want[st] = scKey(st); if (scRestore(st)) return; } catch (e) { note('kept pictures: ' + e.message); }

@@ -1341,9 +1341,23 @@ function job(o) {
   /* ---------- the job: a few rows or a tree at a time ---------- */
   var TT = [], tasks = [], ti = 0, row = 0, edges = null, ei = 0, firI = 0, firPend = null, done = false, t00 = 0, info = '';
   var ROWS = 4;
-  tasks.push(function (lim) { while (row < LH) { rasterRows('g', row, Math.min(LH, row + ROWS)); row += ROWS; if (performance.now() > lim) return false; } row = 0; return true; });
-  tasks.push(function (lim) { if (!edges) { edges = findEdges('g'); ei = 0; } while (ei < edges.length) { edgeOne('g', edges[ei++]); if ((ei & 63) === 0 && performance.now() > lim) return false; } edges = null; return true; });
-  tasks.push(function () { toCanvas(compose(gBack), GB); toCanvas(compose(gFront), GF); gBack = gFront = null; return true; });
+  // (o.groundFrom: a holder { gHit, gBack, gFront, ms } that a bake worker fills with the ground's raster and edges, the
+  // same code run there (o.groundOnly, below); the hall then draws its firs, timber and roof meanwhile and takes the
+  // ground when it comes (holder.fail: works it out here after all). The ground's pictures are separate from the
+  // timber's, so the order does not change a pixel. TT keeps each part's time under its own name.)
+  var GH = o.groundFrom || null, TN = [];
+  function groundTasks() {
+    TN.push('ground'); tasks.push(function (lim) {
+      if (GH && !GH.fail && GH.gHit && (GH.LW !== LW || GH.LH !== LH)) GH.fail = true;      // (not the same layer: worked out here)
+      if (GH && !GH.fail) { if (!GH.gHit) return false; gHit.set(GH.gHit); gBack.set(GH.gBack); gFront.set(GH.gFront); TGW = GH.ms; GH.gHit = GH.gBack = GH.gFront = null; return 'skip'; }
+      while (row < LH) { rasterRows('g', row, Math.min(LH, row + ROWS)); row += ROWS; if (performance.now() > lim) return false; } row = 0; return true;
+    });
+    TN.push('its edges'); tasks.push(function (lim) { if (!edges) { edges = findEdges('g'); ei = 0; } while (ei < edges.length) { edgeOne('g', edges[ei++]); if ((ei & 63) === 0 && performance.now() > lim) return false; } edges = null; return true; });
+    TN.push('ground pictures'); tasks.push(function () { toCanvas(compose(gBack), GB); toCanvas(compose(gFront), GF); gBack = gFront = null; return true; });
+  }
+  var TGW = -1;
+  if (!GH) groundTasks();
+  TN.push('firs');
   tasks.push(function (lim) {
     // the firs beside the hall, farthest first (each its own tree, from its own seed)
     if (typeof WinterHill === 'undefined') return true;
@@ -1363,10 +1377,11 @@ function job(o) {
     }
     return true;
   });
-  tasks.push(function () { drawBody(); return true; });
-  tasks.push(function (lim) { while (row < LH) { rasterRows('r', row, Math.min(LH, row + ROWS)); row += ROWS; if (performance.now() > lim) return false; } row = 0; return true; });
-  tasks.push(function (lim) { if (!edges) { edges = findEdges('r'); ei = 0; } while (ei < edges.length) { edgeOne('r', edges[ei++]); if ((ei & 63) === 0 && performance.now() > lim) return false; } edges = null; return true; });
-  tasks.push(function () {
+  TN.push('timber'); tasks.push(function () { drawBody(); return true; });
+  TN.push('roof snow'); tasks.push(function (lim) { while (row < LH) { rasterRows('r', row, Math.min(LH, row + ROWS)); row += ROWS; if (performance.now() > lim) return false; } row = 0; return true; });
+  TN.push('its edges'); tasks.push(function (lim) { if (!edges) { edges = findEdges('r'); ei = 0; } while (ei < edges.length) { edgeOne('r', edges[ei++]); if ((ei & 63) === 0 && performance.now() > lim) return false; } edges = null; return true; });
+  if (GH) groundTasks();
+  TN.push('laid down'); tasks.push(function () {
     var RC = mkLayer(true); toCanvas(roofI, RC); roofI = null;
     bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0); bc.filter = 'blur(' + (0.35 * PR).toFixed(2) + 'px)'; bc.drawImage(RC, 0, 0); bc.restore();
     bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0); bc.drawImage(RC, 0, 0); bc.restore();   // (sharp over its own soft copy: a soft edge, no see-through)
@@ -1382,6 +1397,12 @@ function job(o) {
     GB.width = GB.height = GF.width = GF.height = BODY.width = BODY.height = RC.width = RC.height = 1;
     return true;
   });
+  // (o.groundOnly, for a bake worker: the ground's raster and its edges only, worked out at once and handed back)
+  if (o.groundOnly) return { run: function () {
+    var t0 = performance.now();
+    rasterRows('g', 0, LH); var E = findEdges('g'); for (var q = 0; q < E.length; q++) edgeOne('g', E[q]);
+    return { gHit: gHit, gBack: gBack, gFront: gFront, ms: performance.now() - t0, LW: LW, LH: LH };
+  } };
   dofHall = dofAt(Z);
   info = 'hall ' + (2 * ex).toFixed(1) + ' m wide at the eaves, ' + Z.toFixed(0) + ' m away' + (dofHall > 0 ? ' (depth of field ' + (dofHall / PR).toFixed(1) + ' px)' : '') + ', its ground ' + drop.toFixed(2) + ' m above the field; ' + firs.length + ' firs';
   return {
@@ -1394,13 +1415,17 @@ function job(o) {
         var ts0 = performance.now(), okT = tasks[ti](lim);
         TT[ti] = (TT[ti] || 0) + performance.now() - ts0;
         if (!okT) return false;
+        if (okT === 'skip') ti++;                          // (the ground came from the worker: its edges are in it too)
         ti++;
         if (performance.now() > lim) return ti >= tasks.length ? (done = true) : false;
       }
       done = true; return true;
     },
     cancel: function () { done = true; },
-    times: function () { return ['ground', 'its edges', 'ground pictures', 'firs', 'timber', 'roof snow', 'its edges', 'laid down'].map(function (n, i) { return n + ' ' + Math.round(TT[i] || 0); }).join(', ') + ' ms'; },
+    times: function () {
+      return TN.map(function (n, i) { return n + ' ' + Math.round(TT[i] || 0); }).join(', ') + ' ms' +
+             (TGW >= 0 ? ' (the ground and its edges worked out beside it, on another core: ' + Math.round(TGW) + ' ms)' : '');
+    },
     geom: { X: X, Y0: Y0, Z: Z, drop: drop, firs: firs, Ll: Ll, TER: TER }
   };
 }

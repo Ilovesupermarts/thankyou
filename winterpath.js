@@ -267,5 +267,18 @@ function build(o) {
            sAt: function (x, z) { return locate(x, z) ? Q.s : -1; } };
 }
 
-return { build: build };
+/* The path as the snow field draws it, up the hall's rise to its steps (hall: WinterHall.job({ locateOnly })): its height
+   there is the rise's (its slope, swells and the snow banked at the base) plus the path's own; the walls' shadows and the
+   sky they hide are worked out on the path's own shape (the rise under it is smooth over those few metres). riseBox:
+   where the rise stands above the field: lines of sight passing over it are followed over the rise's own surface.
+   (Used by newwinter.html and by its bake worker, so both draw exactly the same path.) */
+function onRise(T, hall) {
+  var G = hall.ground;
+  var base = function (x, z) { return Math.max(0, G(x, z)); };
+  return { delta: function (x, z, fz, coarse) { var h = T.delta(x, z, fz, coarse); return T.Q.far ? h : h + base(x, z); },
+           near: T.near, Q: T.Q, trod: T.trod, maxRise: T.maxRise, maxDrop: T.maxDrop, riseBox: hall.riseBox, riseTop: hall.drop + 0.8,
+           sky: function (x, z, h, fz) { return T.sky(x, z, h - base(x, z), fz); },
+           sun: function (x, z, h, Ls, fz) { return T.sun(x, z, h - base(x, z), Ls, fz); } };
+}
+return { build: build, onRise: onRise };
 })();
