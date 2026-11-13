@@ -1346,8 +1346,23 @@ function drawFalling(c, A, K, powder) {
   }
   c.globalAlpha = 1;
 }
+/* Keeping a baked tree (the page keeps it in the browser, so a reload need not bake it again): pack(R) gives its numbers
+   (plain data) and its pictures in order (the tree's picture, then each loose clump's); unpack(o, data, pics) makes the
+   same result again from them (with the tree's own options o: its projection and colours are worked out afresh). */
+function pack(R) {
+  var pics = [R.body], loose = R.loose.map(function (Lc) {
+    pics.push(Lc.spr);
+    return { pad: Lc.pad, mass: Lc.mass, out: Lc.out, pos: Lc.pos, sx: Lc.sx, sy: Lc.sy, x: Lc.x, y: Lc.y, w: Lc.w, h: Lc.h, z: Lc.z };
+  });
+  return { data: { box: R.box, wood: R.wood, pads: R.pads, loose: loose }, pics: pics };
+}
+function unpack(o, d, pics) {
+  var R = { box: d.box, P: project(o), K: palette(o), wood: d.wood, pads: d.pads, body: pics[0], loose: [] };
+  d.loose.forEach(function (L, i) { var Lc = {}; for (var k in L) Lc[k] = L[k]; Lc.spr = pics[i + 1]; R.loose.push(Lc); });
+  return R;
+}
 function busy(A) { if (A.bits.length || A.puffs.length) return true; for (var i = 0; i < A.rest.length; i++) if (A.rest[i].state === 'wait' || A.rest[i].state === 'slip') return true; return false; }
 
 return { build: build, project: project, bakeJob: bakeJob, shadow: shadow, anim: anim, shed: shed, update: update,
-         drawRest: drawRest, drawFalling: drawFalling, busy: busy, palette: palette };
+         drawRest: drawRest, drawFalling: drawFalling, busy: busy, palette: palette, pack: pack, unpack: unpack };
 })();
