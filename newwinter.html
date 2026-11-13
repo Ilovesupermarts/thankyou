@@ -25,6 +25,7 @@
 <script src="trunks.js"></script>
 <script src="yukitsuri.js"></script>
 <script src="frosttree.js"></script>
+<script src="wintermist.js"></script>
 
 <style>
   /* ============================================================
@@ -414,6 +415,9 @@ var V_DEFAULTS = {
   trailWidth: 4, trailDepth: 0.3, trailWall: 0.22, trailBerm: 0.03, trailWobble: 0.45, trailTrod: 1, trailGrey: 0.5, trailShadow: 1, trailBounce: 0.65,
   // the valley mist: its middle (share of the height, as on the reference), its height and strength
   mistY: 0.645, mistHeight: 0.14, mistStrength: 0.85,
+  // the valley mist (wintermist.js, step 4): ground fog drifting in the valley in front of the hill's lower slopes
+  vmShow: true, vmRise: 0.09, vmBelow: 0.03, vmDensity: 1, vmScale: 1, vmWarp: 1, vmSpeed: 1, vmMorph: 1, vmStrength: 0.9,
+  vmWarm: 1, vmSparkle: 0.6, vmRes: 0.5,
   // the snow ground and the lake (step 6, winterlake.js): the eye's height above the snow (m), the banks' height above
   // the water (m) and how uneven their edge is; the snow's swells, wind-carved drifts, grain and sparkle, its haze
   // (how strong, and the distance (m) at which it is about two thirds mist), the low sun's warmth on the far snow
@@ -2446,12 +2450,15 @@ function drawBlockIn(c, part) {
   if (part === 'back') {
 
   // 4. the valley mist: a soft golden-cream band (the one soft shape here; its place is set on the panel)
+  // (the real drifting mist, wintermist.js, takes its place while it is on and the graphics chip draws it)
+  if (!mistLive()) {
   grp();
   var mt = Y(V.mistY - V.mistHeight / 2), mm = Y(V.mistY), mb = Y(V.mistY + V.mistHeight / 2);
   var g = c.createLinearGradient(0, mt, 0, mb);
   g.addColorStop(0, rgb(K.mist, 0)); g.addColorStop(clamp((mm - mt) / Math.max(1, mb - mt), 0.01, 0.99), rgb(K.mist, V.mistStrength)); g.addColorStop(1, rgb(K.mist, 0));
   c.fillStyle = g; c.fillRect(0, mt, W, mb - mt);
   label('4  Valley mist', 0.62, V.mistY - 0.02);
+  }
   }
 
   // (the snow ground and 6. the lake: the real ones, step 6, drawn between the two parts)
@@ -3177,6 +3184,38 @@ function ftDust(E, G) {
 }
 
 /* ============================================================
+   14f. THE VALLEY MIST (step 4) — wintermist.js: freezing ground fog
+   lying in the valley in front of the hill's lower slopes, between the
+   hill and the hall, drawn on the graphics chip every frame (fBm noise,
+   bent by more noise, in three layers at different depths), drifting
+   with the wind and the gusts and slowly changing shape. Laid down over
+   the hill, Fuji's foot and the far snow, under the hall and everything
+   nearer. Without WebGL 2 (or after repeated losses of its context) the
+   flat block-in band is drawn instead.
+   ============================================================ */
+var MIST = { drift: 0, info: '' };
+function mistLive() { return V.vmShow && typeof WinterMist !== 'undefined' && WinterMist.state() === 'ok'; }
+function drawMist(t, dt) {
+  if (!mistLive()) return;
+  var hy = H * V.horizonLine, top = Math.max(0, hy - V.vmRise * H * 2.2), bot = Math.min(H, hy + V.vmBelow * H * 1.2), hh = bot - top;
+  if (hh < 2) return;
+  // the wind carries it (the breeze, its ripples and the gusts passing), slowly: fog in still cold air hardly moves
+  MIST.drift += dt * V.vmSpeed * (6 + 40 * Math.max(0, fieldAt(W * 0.35)));
+  var mc = hex(V.colours.mist), P = sunPlace(), night = isNight();
+  var lit = light(mix(mc, [255, 252, 248], 0.5));
+  var shade = mix(SHADE || [196, 204, 228], light(mc), 0.3);
+  var glow = scale(light(mix(LT ? LT.sunRGB : [255, 247, 236], mc, 0.35)), (LT ? LT.vis : 1) * (night ? 0.25 : 1));
+  var pic = WinterMist.render({ w: W * PR * V.vmRes, h: hh * PR * V.vmRes, W: W, H: H, top: top, height: hh, horizon: hy,
+                                time: t * V.vmMorph, drift: MIST.drift, rise: V.vmRise, below: V.vmBelow, density: V.vmDensity,
+                                scale: V.vmScale, warp: V.vmWarp, strength: V.vmStrength, lit: lit, shade: shade, glow: glow,
+                                sunX: P.x, sunY: P.y, warm: V.vmWarm * (night ? 0.3 : 1), sparkle: V.vmSparkle * (night ? 0.2 : 1) });
+  MIST.info = pic ? 'wintermist.js (WebGL 2' + (WinterMist.renewals() ? ', context made again ' + WinterMist.renewals() + '×' : '') + ')' : 'not drawn';
+  if (!pic) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  ctx.drawImage(pic, 0, Math.round(top * PR), Math.round(W * PR), Math.round(hh * PR));
+}
+
+/* ============================================================
    15. THE PANEL'S HOOK — what a change on the panel bakes again: the
    mountains ('mtn'), the branches ('branches'), the light-dependent
    sprites ('sprites'), the sun ('sun'), everything ('all'), the
@@ -3187,7 +3226,8 @@ var dirty = {}, dirtyAt = 0;
 window.winterLab = {
   V: V, MT: MT, CLOUD: CLOUD, SUN: SUN, defaults: { V: V_DEFAULTS, MT: MT_DEFAULTS, CLOUD: CLOUD_DEFAULTS, SUN: SDEF },
   plums: function () { return WS.branches; },
-  frost: function () { return FT; },                      // the frosted trees (14e), for check scripts
+  frost: function () { return FT; },
+  mist: function () { return { drift: MIST.drift, info: MIST.info, state: typeof WinterMist !== 'undefined' ? WinterMist.state() : 'missing' }; },   // the valley mist (14f), for check scripts                      // the frosted trees (14e), for check scripts
   gustAt: function (x, str) { WS.gusts.push({ dir: 1, x: x, v: 300, str: str || 0.6, hit: {} }); },   // (checks: a gust front starting at x, CSS px)
   stepBudget: function (ms) { STEP_MS = ms; },             // (check scripts only: the headless browser draws a frame in about 1.5 s)                 // the plum branches (step 10), for check scripts
   ytFirPaint: function () { return ytFirPaint.apply(null, arguments); },   // the right bank's fir as the hill and shrine draw it (checks)
@@ -3634,6 +3674,7 @@ function frame(now) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawBlockIn(ctx, 'back');
     drawLake(t, dt);                                   // step 6: the snow ground, the banks and the water (14c)
+    drawMist(t, dt);                                   // step 4: the valley mist, in front of the hill's lower slopes (14f)
     drawHall();                                        // step 5: the shrine hall and the firs beside it (7c)
     drawFrost(t, dt);                                  // the frosted trees right of the hall (14e)
     drawPines(t, dt);                                  // step 7: the right bank's roped pines and firs (14d)
@@ -3675,6 +3716,7 @@ resize();
 // the water's graphics context and shaders made now, before the scene's bakes start (as the app does on the name
 // screen, dynWarmGpu), so the first bake of the lake does not wait for them
 if (typeof Water !== 'undefined' && !waterInit) { waterInit = true; Water.init('textures/waternormals.jpg', WATER_OPTS); if (Water.warm && V.lakeFft) Water.warm(null); }
+if (typeof WinterMist !== 'undefined') WinterMist.init();   // (the mist's context and shader made on page open, not on its first frame)
 rebuildAll();
 requestAnimationFrame(frame);
 })();
@@ -3908,6 +3950,18 @@ var G = [
     { o: 'V', k: 'mistY', label: 'Middle (share of the height, on the reference)', min: 0.45, max: 0.8, step: 0.005, re: 'live' },
     { o: 'V', k: 'mistHeight', label: 'Height', min: 0.02, max: 0.4, step: 0.005, re: 'live' },
     { o: 'V', k: 'mistStrength', label: 'Strength', min: 0, max: 1, step: 0.01, re: 'live' },
+    { chk: 'V', k: 'vmShow', label: 'Drifting mist (wintermist.js)', re: 'live', note: 'Ground fog in the valley in front of the hill\'s lower slopes, between the hill and the hall, drifting and changing shape. Off: the flat band above (its middle, height and strength apply only to it).' },
+    { o: 'V', k: 'vmRise', label: 'How high it lies above the valley floor', min: 0.02, max: 0.25, step: 0.005, re: 'live', note: 'Share of the screen\'s height above the horizon line.' },
+    { o: 'V', k: 'vmBelow', label: 'How far it reaches over the far snow', min: 0, max: 0.1, step: 0.005, re: 'live' },
+    { o: 'V', k: 'vmDensity', label: 'Density', min: 0, max: 2, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmStrength', label: 'Strength (how opaque)', min: 0, max: 1.5, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmScale', label: 'Size of the wisps (smaller = finer)', min: 0.3, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmWarp', label: 'How much it curls and tears', min: 0, max: 2.5, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmSpeed', label: 'Drift with the wind', min: 0, max: 4, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmMorph', label: 'How fast it changes shape', min: 0, max: 4, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmWarm', label: 'Glow toward the low sun', min: 0, max: 2.5, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmSparkle', label: 'Diamond dust (ice crystals catching the sun)', min: 0, max: 2, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmRes', label: 'Resolution (share of the screen\'s)', min: 0.25, max: 1, step: 0.05, re: 'live', note: 'Lower is lighter for the graphics chip; the mist is soft, so 0.5 loses nothing visible.' },
     { col: 'V', keys: [['mist', 'Mist']], re: 'all' } ] },
   { name: 'Snow ground and lake (step 6)', file: 'winterlake.js, water.js', note: 'The lake\'s outline is the reference\'s; move and size it with "Lake and its banks" in the layout group.', ctls: [
     { o: 'V', k: 'eyeHeight', label: 'Eye above the snow (m)', min: 1, max: 12, step: 0.1, re: 'lake', note: 'Sets how big everything on the ground looks: higher = the banks, ice and drifts look smaller.' },
