@@ -983,8 +983,9 @@ function swapHill() {
   hillJob = null; hillDrawn = true;
   note('hill and pagoda: ' + Math.round(performance.now() - hillT0) + ' ms (in steps of about 8 ms a frame)');
 }
+var STEP_MS = 8;                                         // the hill's and the hall's drawing work a frame (checks may raise it: winterLab.stepBudget)
 function stepHill() {
-  var fin = hillJob.step(8);
+  var fin = hillJob.step(STEP_MS);
   if (fin) swapHill();
 }
 function drawHill() {
@@ -1199,7 +1200,7 @@ var TRAIL_EDIT = {
   put: function (o) { for (var k in o) V[k] = o[k]; }
 };
 function stepHall() {
-  if (HALL.job.step(8)) {
+  if (HALL.job.step(STEP_MS)) {
     HALL.cnv = HALL.job.canvas; HALL.x = HALL.job.x; HALL.y = HALL.job.y; HALL.info = HALL.job.info; HALL.times = HALL.job.times();
     HALL.job = null;
     note('hall and the firs beside it: ' + Math.round(performance.now() - HALL.t0) + ' ms (in steps of about 8 ms a frame) · ' + HALL.info + ' · ' + HALL.times);
@@ -2954,7 +2955,8 @@ function drawPines(t, dt) {
 var dirty = {}, dirtyAt = 0;
 window.winterLab = {
   V: V, MT: MT, CLOUD: CLOUD, SUN: SUN, defaults: { V: V_DEFAULTS, MT: MT_DEFAULTS, CLOUD: CLOUD_DEFAULTS, SUN: SDEF },
-  plums: function () { return WS.branches; },                 // the plum branches (step 10), for check scripts
+  plums: function () { return WS.branches; },
+  stepBudget: function (ms) { STEP_MS = ms; },             // (check scripts only: the headless browser draws a frame in about 1.5 s)                 // the plum branches (step 10), for check scripts
   ytFirPaint: function () { return ytFirPaint.apply(null, arguments); },   // the right bank's fir as the hill and shrine draw it (checks)
   changed: function (what) {
     saveAll();
