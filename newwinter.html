@@ -420,7 +420,7 @@ var V_DEFAULTS = {
   vmWarm: 1, vmSparkle: 0.6, vmRes: 0.5,
   // its layer in front of the hall and its firs (so it passes through the shrine): how strong, how high above the hall's
   // foot it reaches (share of the height), how many gaps; how puffy (rounded heaps, like smoke or low cloud) both are
-  vmFront: 0.8, vmFrontRise: 0.06, vmFrontGaps: 1, vmBillow: 1,
+  vmFront: 1, vmFrontRise: 0.08, vmFrontGaps: 1, vmBillow: 1,
   // depth fog (as three.js's FogExp2): everything fades toward the fog's colour with its distance, 1 − e^−(density·d)²
   // (density per km), at most dfMax (so Fuji still shows)
   dfShow: true, dfDensity: 1.4, dfMax: 0.5,
@@ -3208,7 +3208,7 @@ var VMIST = { drift: 0, drift2: 0, info: '', pic: null };   // (not MIST: that i
 function mistLive() { return V.vmShow && typeof WinterMist !== 'undefined' && WinterMist.state() === 'ok'; }
 /* the fog's colours (shared with the depth fog, so the two read as one fog): the side lit by the sun, the cold shade */
 function fogLit() { return light(mix(hex(V.colours.mist), [244, 248, 255], 0.7)); }
-function fogShade() { return mix(SHADE || [196, 204, 228], [150, 168, 205], 0.45); }
+function fogShade() { return mix(mix(SHADE || [196, 204, 228], [150, 168, 205], 0.45), fogLit(), 0.3); }
 function fogColour() { return mix(fogLit(), fogShade(), 0.4); }
 /* the two layers: behind the hall (on the valley floor at the horizon, up over the hill's foot and the pagoda) and in
    front of the hall and its firs (on the hall's ground, a little way up its walls) */
@@ -3216,12 +3216,12 @@ function mistLayers() {
   var hy = H * V.horizonLine, out = [];
   var tb = Math.max(0, hy - V.vmRise * H * 1.25), bb = Math.min(H, hy + V.vmBelow * H * 1.1);
   out.push({ top: tb, height: bb - tb, floor: hy, rise: V.vmRise, below: V.vmBelow, drift: VMIST.drift * 0.7,
-             density: V.vmDensity, scale: V.vmScale, warp: V.vmWarp, billow: V.vmBillow, cover: 0.42, alpha: V.vmStrength, seed: 1 });
+             density: V.vmDensity, scale: V.vmScale, warp: V.vmWarp, billow: V.vmBillow, cover: 0.5, alpha: V.vmStrength, seed: 1 });
   if (V.vmFront > 0) {
     var pl = blkPlace('hall'), foot = pl.Y(BLK.hall.base) + 0.004 * H;
     var tf = Math.max(0, foot - V.vmFrontRise * H * 1.3), bf = Math.min(H, foot + V.vmBelow * H * 1.1);
     out.push({ top: tf, height: bf - tf, floor: foot, rise: V.vmFrontRise, below: V.vmBelow, drift: VMIST.drift,
-               density: V.vmDensity, scale: V.vmScale * 0.8, warp: V.vmWarp, billow: V.vmBillow, cover: 0.42 + 0.1 * V.vmFrontGaps,
+               density: V.vmDensity, scale: V.vmScale * 0.85, warp: V.vmWarp, billow: V.vmBillow, cover: 0.5 + 0.1 * V.vmFrontGaps,
                alpha: V.vmStrength * V.vmFront, seed: 2 });
   }
   return out;

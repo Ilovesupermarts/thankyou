@@ -64,20 +64,23 @@ var FS = '#version 300 es\n' +
 'float fbm(vec2 p, float t, int n){ float s = 0.0, a = 0.5, w = 0.0; for (int i = 0; i < 6; i++) { if (i >= n) break; s += a * noise(vec3(p, t)); w += a; p = R * p * 2.02 + 7.3; t *= 1.35; a *= 0.5; } return s / w; }\n' +
 // puffy: each octave folded (1 - |2n - 1|) so the edges come out as rounded heaps, like cumulus or smoke
 'float billow(vec2 p, float t){ float s = 0.0, a = 0.5, w = 0.0; for (int i = 0; i < 4; i++) { s += a * (1.0 - abs(2.0 * noise(vec3(p, t)) - 1.0)); w += a; p = R * p * 2.07 + 3.1; t *= 1.4; a *= 0.5; } return s / w; }\n' +
-// the fog's density at a point of the screen (q: x across, y up from this layer's floor, both in screen heights)
-'float dens(vec2 q){\n' +
+// the fog's density at a point of the screen (q: x across, y up from this layer's floor, both in screen heights);
+// h: how far up its heap it is there (0 on the floor, 1 at its top)
+'float dens(vec2 q, out float h){\n' +
 '  float t = uTime * 0.06 + uSeed * 3.7;\n' +
-'  vec2 p = vec2((q.x + uDrift) * 1.7, q.y * 3.4) * uScale + vec2(uSeed * 11.3, uSeed * 5.1);\n' +
+'  float x = q.x + uDrift;\n' +
+'  vec2 p = vec2(x * 5.6, q.y * 9.1) * uScale + vec2(uSeed * 11.3, uSeed * 5.1);\n' +
 // it is carried round in slow eddies (the warp turns with time), so it rolls and swirls as it drifts instead of sliding
 '  vec2 w = vec2(fbm(p * 0.45 + vec2(0.0, 4.1), t * 0.55, 3), fbm(p * 0.45 + vec2(6.7, 1.9), t * 0.55, 3)) - 0.5;\n' +
-'  vec2 pw = p + w * 2.4 * uWarp + vec2(0.0, -q.y * 0.6 * w.x);\n' +
-'  float body = fbm(pw, t, 5);\n' +
-'  float puff = billow(pw * 1.9 + 2.3, t * 1.3);\n' +
-'  float n = mix(body, puff, 0.42 * uBillow);\n' +
-// it lies on the floor: thick low down, its top rising and falling in heaps; a little reaches below (over the far snow)
-'  float h = q.y / max(0.004, uRise);\n' +
-'  float prof = clamp(1.0 - h * 0.85, 0.0, 1.0) * smoothstep(-uBelow, 0.0, q.y);\n' +
-'  float d = smoothstep(uCover, uCover + 0.22, n + prof * 0.5 - 0.25) * smoothstep(0.0, 0.35, prof + n * 0.25 - 0.1);\n' +
+'  vec2 pw = p + w * 2.4 * uWarp;\n' +
+'  float n = mix(fbm(pw, t, 5), billow(pw * 1.8 + 2.3, t * 1.3), 0.45 * uBillow);\n' +
+// along the valley its banks pile up to different heights and its foot wanders (no level top, no straight line)
+'  float big = fbm(vec2(x * 3.2 * uScale + uSeed * 3.1, uSeed) + w * 0.8, t * 0.5, 3);\n' +
+'  float y = q.y + (big - 0.5) * uRise * 0.35;\n' +
+'  h = max(y, 0.0) / (uRise * (0.45 + 1.1 * big));\n' +
+'  float env = (1.0 - smoothstep(0.3, 1.0, h + (n - 0.5) * 0.9)) * smoothstep(-uBelow, 0.0, y);\n' +
+// thick low down with holes where the noise is thin; higher up only its heaps; the far hill shows through the gaps
+'  float d = smoothstep(uCover, uCover + 0.16, n * 0.85 + env * 0.3) * env;\n' +
 '  return clamp(d * uDensity, 0.0, 1.0);\n' +
 '}\n' +
 'void main(){\n' +
@@ -85,14 +88,15 @@ var FS = '#version 300 es\n' +
 '  vec2 css = vec2(loc.x * uScr.x, uScr.z + (1.0 - loc.y) * uScr.w);\n' +          // CSS px on the screen
 '  float H = uScr.y;\n' +
 '  vec2 q = vec2(css.x / H, (uFloor - css.y) / H);\n' +
-'  float d = dens(q);\n' +
-'  float A = d * uAlpha;\n' +
+'  float h; float d = dens(q, h);\n' +
+'  float A = d * uAlpha * 0.92;\n' +
 '  vec3 col = vec3(0.0);\n' +
 '  if (A > 0.002) {\n' +
 // lit as a cloud: a step toward the sun finds less fog on the side turned to it (that side lit), more inside (shade)
 '    vec2 toSun = normalize(uSun - css + vec2(0.001));\n' +
-'    float dl = dens(q + vec2(toSun.x, -toSun.y) * 0.018);\n' +
-'    float lit = clamp(0.55 + (d - dl) * 2.2 + q.y / max(0.004, uRise) * 0.35 - d * 0.3, 0.0, 1.0);\n' +
+'    float hl; float dl = dens(q + vec2(toSun.x, -toSun.y) * 0.02, hl);\n' +
+'    float lit = clamp(0.7 + (d - dl) * 4.0 + min(h, 1.0) * 0.2 - d * d * 0.35, 0.0, 1.0);\n' +
+'    lit = mix(1.0, lit, smoothstep(0.0, 0.45, h));\n' +                       // (where it lies on the snow it melts into it: no shaded underline)
 '    col = mix(uShade, uLit, lit);\n' +
 // the low sun shining through the thin edges (light scattered forward in the droplets)
 '    float sd = length((css - uSun) / H);\n' +
