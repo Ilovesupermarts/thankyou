@@ -1,51 +1,46 @@
 /* ============================================================
-   WINTERMIST — the valley mist of the new winter scene (newwinter.html,
-   step 4): freezing ground fog lying in the valley in front of the
-   pagoda hill's lower slopes, between the hill and the hall, drifting
-   and slowly changing shape. Drawn on the graphics chip (WebGL 2), every
-   frame, at a reduced resolution; the page lays the picture down over
-   the hill and the far snow and under the hall.
+   WINTERMIST — the drifting fog of the new winter scene (newwinter.html,
+   step 4): banks of freezing fog rolling slowly through the valley, past
+   and through the pagoda hill and the shrine hall. Drawn on the graphics
+   chip (WebGL 2), every frame, at a reduced resolution, in LAYERS: the
+   page lays each one down at its own depth (one behind the hall, over the
+   hill's foot and the pagoda; one in front of the hall and its firs), so
+   the fog passes both in front of and behind the buildings.
 
-   How it looks real:
-   - Its shapes come from fractal noise (fBm: several sizes of smooth
-     noise added up) bent by more noise (domain warping, after Inigo
-     Quilez's article "warp"), so it curls, thins, tears and gathers as
-     real fog does and never repeats.
-   - It is ground fog: dense and flat close to the valley floor (the
-     horizon line), thinning upward into loose wisps; its sheets are
-     drawn out sideways, as fog in still cold air is.
-   - Three layers at different depths: the far one finer and slower on
-     the screen, the near one larger and quicker (parallax). Each drifts
-     with the wind (and a gust's push) and slowly changes shape.
-   - Lit by the scene: the side of each bank turned to the sun brighter
-     and warm; the rest in the sky's cold blue; thin edges glow toward
-     the low sun (light scattered forward through the droplets), the
-     dense cores stay cold and bluish.
-   - Diamond dust: a few ice crystals catching the sun, twinkling, where
-     the mist is thin.
+   How it looks like fog (smoke, low cloud), not a stream:
+   - Its shapes are 3D value noise (x, y and TIME), so they change
+     smoothly and continuously, as smoke does, never sliding as one sheet.
+   - Rounded heaps: a puffy ("billow") noise is mixed into the body, so
+     the banks' edges are soft cauliflower heaps like cloud.
+   - It rolls: the noise is carried round in slow eddies that turn with
+     time (domain warping), and drifts with the wind; the far layer drifts
+     slower on the screen than the near one (parallax).
+   - It lies on its layer's floor: thick low down, its top rising and
+     falling in heaps, gaps where the buildings show through.
+   - Lit as a cloud: one step toward the sun finds less fog on the side
+     turned to it (that side lit, warm-white), more inside (the cold blue
+     shade); the low sun glows through the thin edges.
+   - Diamond dust: a few ice crystals twinkling where it is thin.
    The noise functions are written here (no library), after the common
    public-domain hash / value-noise / fBm forms.
 
    If WebGL 2 is not there, or the graphics chip takes the context away
    more than 3 times in 10 minutes, state() is 'off' and the page draws its
-   flat mist band instead. After a single loss a fresh context is made (Chrome
-   never gives one back that it took because too many were open).
+   flat mist band instead. After a single loss a fresh context is made.
 
    Use:
      WinterMist.init()              make the context and compile the shader now (on page open)
      WinterMist.state()             'ok', 'off' or 'none'
-     WinterMist.render(o)           → the picture (a canvas, premultiplied), or null
-       o: w, h          the picture's size (px)
-          W, H          the screen (CSS px); top, height: the band drawn (CSS px from the top)
-          horizon       CSS px from the top: the valley floor (the eye line)
+     WinterMist.render(o)           → { canvas, rects: [{ sx, sy, sw, sh, top, height }] } (premultiplied), or null
+       o: w             the picture's width (px); res, PR: the share of the screen's resolution, the pixel ratio
+          W, H          the screen (CSS px)
           time          seconds (the slow change of shape)
-          drift         CSS px the mist has drifted (the page adds the wind up over time)
-          rise          how high the fog lies above the horizon (share of the screen's height)
-          below         how far it reaches down over the far snow (share of the height)
-          density, scale, warp, strength (0 … 1.5 each, 1 = as tuned)
-          lit, shade, glow   [r, g, b] 0 … 255: the sun's side, the sky's cold blue, the low sun's glow
-          sunX, sunY    the sun on the screen (CSS px); warm (0 … 2: the glow toward it)
-          sparkle       0 … 2: the ice crystals
+          lit, shade, glow   [r, g, b] 0 … 255: the sun's side, the cold blue shade, the low sun's glow
+          sunX, sunY    the sun on the screen (CSS px); warm (0 … 2), sparkle (0 … 2)
+          layers        [{ top, height: the rows drawn (CSS px), floor: CSS y where it lies thickest,
+                           rise, below: how far it reaches above / below the floor (shares of H),
+                           drift (CSS px carried by the wind), density, scale, warp, billow, cover
+                           (higher = more gaps), alpha, seed }]
    ============================================================ */
 var WinterMist = (function () {
 'use strict';
@@ -57,56 +52,61 @@ var VS = '#version 300 es\n' +
 
 var FS = '#version 300 es\n' +
 'precision highp float;\n' +
-'uniform vec2 uRes; uniform vec4 uScr; uniform float uHy, uTime, uDrift, uRise, uBelow, uDensity, uScale, uWarp, uStrength, uWarm, uSparkle;\n' +
+'uniform vec4 uVp; uniform vec4 uScr; uniform float uFloor, uRise, uBelow, uTime, uDrift, uDensity, uScale, uWarp, uBillow, uCover, uAlpha, uSeed, uWarm, uSparkle;\n' +
 'uniform vec3 uLit, uShade, uGlow; uniform vec2 uSun;\n' +
 'out vec4 outC;\n' +
-'float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n' +
-'float noise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);\n' +
-'  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }\n' +
+// value noise in 3D (x, y on the screen, z = time: the shapes change smoothly, never jump), Dave Hoskins' hash
+'float hash(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }\n' +
+'float noise(vec3 p){ vec3 i = floor(p), f = fract(p); vec3 u = f * f * (3.0 - 2.0 * f);\n' +
+'  return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), u.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), u.x), u.y),\n' +
+'             mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), u.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), u.x), u.y), u.z); }\n' +
 'const mat2 R = mat2(0.8, -0.6, 0.6, 0.8);\n' +
-'float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { s += a * noise(p); p = R * p * 2.03 + 17.1; a *= 0.5; } return s; }\n' +
-// one layer of fog: its density at screen point (x, h above the horizon), the layer's own depth k (0 far … 2 near)
-'float fog(vec2 q, float k, out float lightSide){\n' +
-'  float f = mix(2.2, 1.0, k / 2.0);\n' +                                   // far layers: finer on the screen
-'  vec2 p = vec2((q.x + uDrift * mix(0.35, 1.0, k / 2.0)) * 0.55, q.y * 7.5) * f * uScale * 3.2 + vec2(k * 31.7, k * 7.3);\n' +
-'  float t = uTime * 0.035;\n' +
-'  vec2 w1 = vec2(fbm(p + vec2(0.0, t)), fbm(p + vec2(5.2, 1.3 - t)));\n' +
-'  vec2 w2 = vec2(fbm(p + 3.0 * uWarp * w1 + vec2(1.7, 9.2) + t * 0.7), fbm(p + 3.0 * uWarp * w1 + vec2(8.3, 2.8) - t * 0.5));\n' +
-'  float n = fbm(p + 3.5 * uWarp * w2);\n' +
-'  float n2 = fbm(p + 3.5 * uWarp * w2 + vec2(-0.09, 0.05));\n' +             // a little toward the sun's side (left, up)
-'  lightSide = clamp(0.5 + (n - n2) * 6.0, 0.0, 1.0);\n' +
-// ground fog: dense on the floor, thinning upward; each layer lies a little higher the nearer it is
-'  float top = uRise * mix(0.75, 1.15, k / 2.0);\n' +
-'  float prof = exp(-max(q.y, 0.0) / max(0.003, top * 0.42)) * smoothstep(-uBelow, 0.0, q.y);\n' +
-'  float d = smoothstep(0.40, 0.78, n * 0.75 + prof * 0.42 - 0.04);\n' +      // banks with gaps: the noise decides where it is thick and where the far hill shows through\n' +
-'  return d * prof * uDensity;\n' +
+'float fbm(vec2 p, float t, int n){ float s = 0.0, a = 0.5, w = 0.0; for (int i = 0; i < 6; i++) { if (i >= n) break; s += a * noise(vec3(p, t)); w += a; p = R * p * 2.02 + 7.3; t *= 1.35; a *= 0.5; } return s / w; }\n' +
+// puffy: each octave folded (1 - |2n - 1|) so the edges come out as rounded heaps, like cumulus or smoke
+'float billow(vec2 p, float t){ float s = 0.0, a = 0.5, w = 0.0; for (int i = 0; i < 4; i++) { s += a * (1.0 - abs(2.0 * noise(vec3(p, t)) - 1.0)); w += a; p = R * p * 2.07 + 3.1; t *= 1.4; a *= 0.5; } return s / w; }\n' +
+// the fog's density at a point of the screen (q: x across, y up from this layer's floor, both in screen heights)
+'float dens(vec2 q){\n' +
+'  float t = uTime * 0.06 + uSeed * 3.7;\n' +
+'  vec2 p = vec2((q.x + uDrift) * 1.7, q.y * 3.4) * uScale + vec2(uSeed * 11.3, uSeed * 5.1);\n' +
+// it is carried round in slow eddies (the warp turns with time), so it rolls and swirls as it drifts instead of sliding
+'  vec2 w = vec2(fbm(p * 0.45 + vec2(0.0, 4.1), t * 0.55, 3), fbm(p * 0.45 + vec2(6.7, 1.9), t * 0.55, 3)) - 0.5;\n' +
+'  vec2 pw = p + w * 2.4 * uWarp + vec2(0.0, -q.y * 0.6 * w.x);\n' +
+'  float body = fbm(pw, t, 5);\n' +
+'  float puff = billow(pw * 1.9 + 2.3, t * 1.3);\n' +
+'  float n = mix(body, puff, 0.42 * uBillow);\n' +
+// it lies on the floor: thick low down, its top rising and falling in heaps; a little reaches below (over the far snow)
+'  float h = q.y / max(0.004, uRise);\n' +
+'  float prof = clamp(1.0 - h * 0.85, 0.0, 1.0) * smoothstep(-uBelow, 0.0, q.y);\n' +
+'  float d = smoothstep(uCover, uCover + 0.22, n + prof * 0.5 - 0.25) * smoothstep(0.0, 0.35, prof + n * 0.25 - 0.1);\n' +
+'  return clamp(d * uDensity, 0.0, 1.0);\n' +
 '}\n' +
 'void main(){\n' +
-'  vec2 frag = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);\n' +
-'  vec2 css = vec2(frag.x / uRes.x * uScr.x, uScr.z + frag.y / uRes.y * uScr.w);\n' +       // CSS px on the screen
+'  vec2 loc = (gl_FragCoord.xy - uVp.xy) / uVp.zw;\n' +
+'  vec2 css = vec2(loc.x * uScr.x, uScr.z + (1.0 - loc.y) * uScr.w);\n' +          // CSS px on the screen
 '  float H = uScr.y;\n' +
-'  vec2 q = vec2(css.x / H, (uHy - css.y) / H);\n' +
-'  vec3 col = vec3(0.0); float A = 0.0;\n' +
-'  float sd = length((css - uSun) / H);\n' +
-'  float glowK = exp(-sd * 2.2) * uWarm;\n' +
-'  for (int i = 0; i < 3; i++) {\n' +
-'    float k = float(i), ls;\n' +
-'    float d = fog(q, k, ls);\n' +
-'    float a = clamp(d * mix(0.55, 0.85, k / 2.0), 0.0, 1.0);\n' +
-'    if (a <= 0.001) continue;\n' +
-// the dense cores cold and bluish, the side toward the sun lighter and warmer, the thin edges glowing toward the low sun
-'    vec3 c = mix(uShade, uLit, clamp(ls * 0.7 + 0.2 - d * 0.25 + q.y * 2.0, 0.0, 1.0));\n' +
-'    c += uGlow * glowK * (1.0 - d) * 0.55;\n' +
-'    col = col * (1.0 - a) + c * a; A = A * (1.0 - a) + a;\n' +
+'  vec2 q = vec2(css.x / H, (uFloor - css.y) / H);\n' +
+'  float d = dens(q);\n' +
+'  float A = d * uAlpha;\n' +
+'  vec3 col = vec3(0.0);\n' +
+'  if (A > 0.002) {\n' +
+// lit as a cloud: a step toward the sun finds less fog on the side turned to it (that side lit), more inside (shade)
+'    vec2 toSun = normalize(uSun - css + vec2(0.001));\n' +
+'    float dl = dens(q + vec2(toSun.x, -toSun.y) * 0.018);\n' +
+'    float lit = clamp(0.55 + (d - dl) * 2.2 + q.y / max(0.004, uRise) * 0.35 - d * 0.3, 0.0, 1.0);\n' +
+'    col = mix(uShade, uLit, lit);\n' +
+// the low sun shining through the thin edges (light scattered forward in the droplets)
+'    float sd = length((css - uSun) / H);\n' +
+'    col += uGlow * exp(-sd * 2.0) * uWarm * (1.0 - d) * 0.5;\n' +
+'    col *= A;\n' +
 '  }\n' +
-// diamond dust: an ice crystal here and there catching the sun, twinkling, where the mist is thin
+// diamond dust: an ice crystal here and there catching the sun, twinkling, where the fog is thin
 '  if (uSparkle > 0.0) {\n' +
-'    vec2 cell = floor(css / 2.0); float h = hash(cell);\n' +
-'    if (h > 0.9965) { float tw = pow(0.5 + 0.5 * sin(uTime * (2.0 + h * 9.0) + h * 400.0), 24.0);\n' +
+'    vec2 cell = floor(css / 2.0); float hh = hash(vec3(cell, uSeed));\n' +
+'    if (hh > 0.9965) { float tw = pow(0.5 + 0.5 * sin(uTime * (2.0 + hh * 9.0) + hh * 400.0), 24.0);\n' +
 '      float s = tw * uSparkle * smoothstep(0.02, 0.25, A) * (1.0 - smoothstep(0.55, 0.9, A)) * 0.9;\n' +
 '      col += uGlow * s; A = max(A, s * 0.8); }\n' +
 '  }\n' +
-'  outC = vec4(min(col, vec3(A)) * uStrength, A * uStrength);\n' +
+'  outC = vec4(min(col, vec3(A)), A);\n' +
 '}';
 
 function compile(type, src) {
@@ -130,7 +130,7 @@ function create() {
     gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
     gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-    ['uRes', 'uScr', 'uHy', 'uTime', 'uDrift', 'uRise', 'uBelow', 'uDensity', 'uScale', 'uWarp', 'uStrength', 'uWarm', 'uSparkle', 'uLit', 'uShade', 'uGlow', 'uSun']
+    ['uVp', 'uScr', 'uFloor', 'uRise', 'uBelow', 'uTime', 'uDrift', 'uDensity', 'uScale', 'uWarp', 'uBillow', 'uCover', 'uAlpha', 'uSeed', 'uWarm', 'uSparkle', 'uLit', 'uShade', 'uGlow', 'uSun']
       .forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
     vao = gl.createVertexArray(); gl.bindVertexArray(vao);
     var b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
@@ -148,31 +148,35 @@ function c3(c) { return [c[0] / 255, c[1] / 255, c[2] / 255]; }
 function render(o) {
   if (failed) return null;
   if (lost || !gl || gl.isContextLost()) { if (!create()) return null; }
-  var w = Math.max(2, Math.round(o.w)), h = Math.max(2, Math.round(o.h));
-  if (cnv.width !== w || cnv.height !== h) { cnv.width = w; cnv.height = h; }
-  gl.viewport(0, 0, w, h);
+  // every layer in one picture, one above the other (no new picture each frame): layer i gets the rows rect[i]
+  var Ls = o.layers, w = Math.max(2, Math.round(o.w)), hs = [], h = 0, i;
+  for (i = 0; i < Ls.length; i++) { hs.push(Math.max(2, Math.round(Ls[i].height * o.res * o.PR))); h += hs[i]; }
+  if (cnv.width !== w || cnv.height < h) { cnv.width = w; cnv.height = Math.max(h, cnv.height, 2); }
+  gl.viewport(0, 0, cnv.width, cnv.height);
   gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
   gl.useProgram(prog);
-  gl.uniform2f(U.uRes, w, h);
-  gl.uniform4f(U.uScr, o.W, o.H, o.top, o.height);
-  gl.uniform1f(U.uHy, o.horizon);
   gl.uniform1f(U.uTime, o.time || 0);
-  gl.uniform1f(U.uDrift, (o.drift || 0) / o.H);
-  gl.uniform1f(U.uRise, o.rise);
-  gl.uniform1f(U.uBelow, o.below);
-  gl.uniform1f(U.uDensity, o.density);
-  gl.uniform1f(U.uScale, o.scale);
-  gl.uniform1f(U.uWarp, o.warp);
-  gl.uniform1f(U.uStrength, o.strength);
-  gl.uniform1f(U.uWarm, o.warm);
-  gl.uniform1f(U.uSparkle, o.sparkle);
+  gl.uniform1f(U.uWarm, o.warm); gl.uniform1f(U.uSparkle, o.sparkle);
   gl.uniform3fv(U.uLit, c3(o.lit)); gl.uniform3fv(U.uShade, c3(o.shade)); gl.uniform3fv(U.uGlow, c3(o.glow));
   gl.uniform2f(U.uSun, o.sunX, o.sunY);
   gl.bindVertexArray(vao);
-  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  var rects = [], y = 0;
+  for (i = 0; i < Ls.length; i++) {
+    var L = Ls[i], vy = cnv.height - y - hs[i];         // (WebGL counts rows from the bottom)
+    gl.viewport(0, vy, w, hs[i]);
+    gl.uniform4f(U.uVp, 0, vy, w, hs[i]);
+    gl.uniform4f(U.uScr, o.W, o.H, L.top, L.height);
+    gl.uniform1f(U.uFloor, L.floor); gl.uniform1f(U.uRise, L.rise); gl.uniform1f(U.uBelow, L.below);
+    gl.uniform1f(U.uDrift, (L.drift || 0) / o.H);
+    gl.uniform1f(U.uDensity, L.density); gl.uniform1f(U.uScale, L.scale); gl.uniform1f(U.uWarp, L.warp);
+    gl.uniform1f(U.uBillow, L.billow); gl.uniform1f(U.uCover, L.cover); gl.uniform1f(U.uAlpha, L.alpha); gl.uniform1f(U.uSeed, L.seed);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    rects.push({ sx: 0, sy: y, sw: w, sh: hs[i], top: L.top, height: L.height });
+    y += hs[i];
+  }
   gl.bindVertexArray(null);
   if (gl.isContextLost()) return null;
-  return cnv;
+  return { canvas: cnv, rects: rects };
 }
 return { init: init, state: state, render: render, renewals: function () { return Math.max(0, made - 1); } };
 })();

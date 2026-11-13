@@ -418,6 +418,12 @@ var V_DEFAULTS = {
   // the valley mist (wintermist.js, step 4): ground fog drifting in the valley in front of the hill's lower slopes
   vmShow: true, vmRise: 0.14, vmBelow: 0.03, vmDensity: 1, vmScale: 1, vmWarp: 1, vmSpeed: 1, vmMorph: 1, vmStrength: 0.9,
   vmWarm: 1, vmSparkle: 0.6, vmRes: 0.5,
+  // its layer in front of the hall and its firs (so it passes through the shrine): how strong, how high above the hall's
+  // foot it reaches (share of the height), how many gaps; how puffy (rounded heaps, like smoke or low cloud) both are
+  vmFront: 0.8, vmFrontRise: 0.06, vmFrontGaps: 1, vmBillow: 1,
+  // depth fog (as three.js's FogExp2): everything fades toward the fog's colour with its distance, 1 − e^−(density·d)²
+  // (density per km), at most dfMax (so Fuji still shows)
+  dfShow: true, dfDensity: 1.4, dfMax: 0.5,
   // the snow ground and the lake (step 6, winterlake.js): the eye's height above the snow (m), the banks' height above
   // the water (m) and how uneven their edge is; the snow's swells, wind-carved drifts, grain and sparkle, its haze
   // (how strong, and the distance (m) at which it is about two thirds mist), the low sun's warmth on the far snow
@@ -1008,7 +1014,7 @@ function stepHill() {
 function drawHill() {
   if (!hillDrawn || (!V.hillShow && !V.pagodaShow)) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(HILL.cnv, 0, 0);
+  ctx.drawImage(V.blockIn ? fogged(HILL.cnv, 0, 1 / PR, pagodaDist()) : HILL.cnv, 0, 0);
 }
 
 /* ============================================================
@@ -1227,7 +1233,7 @@ function stepHall() {
 function drawHall() {
   if (!V.hallShow || !HALL.cnv) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(HALL.cnv, Math.round(HALL.x * PR), Math.round(HALL.y * PR));
+  ctx.drawImage(V.blockIn ? fogged(HALL.cnv, HALL.y, 1 / PR, hallDist()) : HALL.cnv, Math.round(HALL.x * PR), Math.round(HALL.y * PR));
 }
 
 var mtnJob = null, mtnT0 = 0;
@@ -1240,6 +1246,7 @@ function stepScenery() {
        ', ' + Math.round(mtnMs) + ' ms' + (glRetry.mtn ? ', again soon' : ''));
 }
 function bakeScenery(result) {
+  FOG.gen++;                                           // (the depth fog's faded copy of the mountains is made again)
   var C = cols(), hy = H * V.horizonLine, mistC = light(C.mist), m = MTN.c;
   var want = Math.round(W * SR), wantH = Math.round(H * SR);
   if (MTN.cnv.width !== want || MTN.cnv.height !== wantH) { MTN.cnv.width = want; MTN.cnv.height = wantH; }
@@ -2984,7 +2991,7 @@ function drawPines(t, dt) {
     var E = L[i], R = E.R, b = R.box;
     Yukitsuri.update(E.A, dt, ytWind(E.P.x), V.ytReturn);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(R.body, Math.round(b.bx * PR), Math.round(b.by * PR));
+    ctx.drawImage(V.blockIn ? fogged(R.body, b.by, 1 / PR, E.o.D) : R.body, Math.round(b.bx * PR), Math.round(b.by * PR));
     ctx.setTransform(PR, 0, 0, PR, 0, 0);
     Yukitsuri.drawRest(ctx, E.A);
     Yukitsuri.drawFalling(ctx, E.A, E.K, PINES.powder);
@@ -3156,7 +3163,7 @@ function drawFrost(t, dt) {
     ctx.setTransform(PR, 0, 0, PR, 0, 0);
     ctx.translate(mx, my); ctx.scale(mk, mk); ctx.translate(-E.P.x, -E.P.foot);   // (to its place now)
     ctx.transform(1, 0, -sh, 1, sh * E.P.foot, 0);                 // (a shear about the foot: x moves by sh × the height above it)
-    ctx.drawImage(E.R.body, b.bx, b.by, b.w, b.h);
+    ctx.drawImage(V.blockIn ? fogged(E.R.body, b.by, b.h / E.R.body.height, E.o.D) : E.R.body, b.bx, b.by, b.w, b.h);
   }
   // the rime dust: fine glittering specks drifting down and away with the wind
   var D = FT.dust;
@@ -3197,26 +3204,105 @@ function ftDust(E, G) {
    nearer. Without WebGL 2 (or after repeated losses of its context) the
    flat block-in band is drawn instead.
    ============================================================ */
-var VMIST = { drift: 0, info: '' };          // (not MIST: that is the shed-snow puffs' picture)
+var VMIST = { drift: 0, drift2: 0, info: '', pic: null };   // (not MIST: that is the shed-snow puffs' picture)
 function mistLive() { return V.vmShow && typeof WinterMist !== 'undefined' && WinterMist.state() === 'ok'; }
-function drawMist(t, dt) {
+/* the fog's colours (shared with the depth fog, so the two read as one fog): the side lit by the sun, the cold shade */
+function fogLit() { return light(mix(hex(V.colours.mist), [244, 248, 255], 0.7)); }
+function fogShade() { return mix(SHADE || [196, 204, 228], [150, 168, 205], 0.45); }
+function fogColour() { return mix(fogLit(), fogShade(), 0.4); }
+/* the two layers: behind the hall (on the valley floor at the horizon, up over the hill's foot and the pagoda) and in
+   front of the hall and its firs (on the hall's ground, a little way up its walls) */
+function mistLayers() {
+  var hy = H * V.horizonLine, out = [];
+  var tb = Math.max(0, hy - V.vmRise * H * 1.25), bb = Math.min(H, hy + V.vmBelow * H * 1.1);
+  out.push({ top: tb, height: bb - tb, floor: hy, rise: V.vmRise, below: V.vmBelow, drift: VMIST.drift * 0.7,
+             density: V.vmDensity, scale: V.vmScale, warp: V.vmWarp, billow: V.vmBillow, cover: 0.42, alpha: V.vmStrength, seed: 1 });
+  if (V.vmFront > 0) {
+    var pl = blkPlace('hall'), foot = pl.Y(BLK.hall.base) + 0.004 * H;
+    var tf = Math.max(0, foot - V.vmFrontRise * H * 1.3), bf = Math.min(H, foot + V.vmBelow * H * 1.1);
+    out.push({ top: tf, height: bf - tf, floor: foot, rise: V.vmFrontRise, below: V.vmBelow, drift: VMIST.drift,
+               density: V.vmDensity, scale: V.vmScale * 0.8, warp: V.vmWarp, billow: V.vmBillow, cover: 0.42 + 0.1 * V.vmFrontGaps,
+               alpha: V.vmStrength * V.vmFront, seed: 2 });
+  }
+  return out;
+}
+/* once a frame: both layers drawn on the graphics chip (one picture, one band each); drawMist(0) lays the back one down
+   (after the hill and the snow ground), drawMist(1) the front one (after the hall) */
+function mistFrame(t, dt) {
+  VMIST.pic = null;
   if (!mistLive()) return;
-  var hy = H * V.horizonLine, top = Math.max(0, hy - V.vmRise * H * 2.2), bot = Math.min(H, hy + V.vmBelow * H * 1.2), hh = bot - top;
-  if (hh < 2) return;
   // the wind carries it (the breeze, its ripples and the gusts passing), slowly: fog in still cold air hardly moves
   VMIST.drift += dt * V.vmSpeed * (6 + 40 * Math.max(0, fieldAt(W * 0.35)));
   var mc = hex(V.colours.mist), P = sunPlace(), night = isNight();
-  var lit = light(mix(mc, [244, 248, 255], 0.7));
-  var shade = mix(SHADE || [196, 204, 228], [150, 168, 205], 0.45);
   var glow = scale(light(mix(LT ? LT.sunRGB : [255, 247, 236], mc, 0.35)), (LT ? LT.vis : 1) * (night ? 0.25 : 1));
-  var pic = WinterMist.render({ w: W * PR * V.vmRes, h: hh * PR * V.vmRes, W: W, H: H, top: top, height: hh, horizon: hy,
-                                time: t * V.vmMorph, drift: VMIST.drift, rise: V.vmRise, below: V.vmBelow, density: V.vmDensity,
-                                scale: V.vmScale, warp: V.vmWarp, strength: V.vmStrength, lit: lit, shade: shade, glow: glow,
-                                sunX: P.x, sunY: P.y, warm: V.vmWarm * (night ? 0.3 : 1), sparkle: V.vmSparkle * (night ? 0.2 : 1) });
-  VMIST.info = pic ? 'wintermist.js (WebGL 2' + (WinterMist.renewals() ? ', context made again ' + WinterMist.renewals() + '×' : '') + ')' : 'not drawn';
-  if (!pic) return;
+  var Ls = mistLayers();
+  VMIST.pic = WinterMist.render({ w: W * PR * V.vmRes, res: V.vmRes, PR: PR, W: W, H: H, layers: Ls,
+                                  time: t * V.vmMorph, lit: fogLit(), shade: fogShade(), glow: glow,
+                                  sunX: P.x, sunY: P.y, warm: V.vmWarm * (night ? 0.3 : 1), sparkle: V.vmSparkle * (night ? 0.2 : 1) });
+  VMIST.info = VMIST.pic ? 'wintermist.js (WebGL 2, ' + Ls.length + ' layers' + (WinterMist.renewals() ? ', context made again ' + WinterMist.renewals() + '×' : '') + ')' : 'not drawn';
+}
+function drawMist(i) {
+  var pic = VMIST.pic, r = pic && pic.rects[i];
+  if (!r) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
-  ctx.drawImage(pic, 0, Math.round(top * PR), Math.round(W * PR), Math.round(hh * PR));
+  ctx.drawImage(pic.canvas, r.sx, r.sy, r.sw, r.sh, 0, Math.round(r.top * PR), Math.round(W * PR), Math.round(r.height * PR));
+}
+
+/* ============================================================
+   14g. DEPTH FOG (as three.js's FogExp2): everything fades toward the
+   fog's colour by its distance from the eye, 1 − e^−(density·d)², at
+   most V.dfMax. Laid on when each picture is drawn (not baked in), so
+   the kept pictures stay as they are: each picture's faded copy is made
+   once and made again only when the picture or the fog changes. A
+   picture standing in one place fades by its own distance (the hall, the
+   pagoda and its hill, each tree); the ground below the horizon by the
+   distance of each row of it (a point d px below the eye line is
+   eye · F / d m away); the mountains as far as it goes.
+   ============================================================ */
+var FOG = { gen: 0, cache: new WeakMap(), key: '' };
+function fogOn() { return V.dfShow && V.dfDensity > 0 && V.dfMax > 0; }
+function fogAt(d) { var k = V.dfDensity * d / 1000; return Math.min(V.dfMax, 1 - Math.exp(-k * k)); }
+// how much fog at screen row y (CSS px) for a thing no farther than Dmax m: the ground there, if nearer
+function fogRow(y, Dmax) {
+  var hy = H * V.horizonLine;
+  if (y <= hy + 0.5) return fogAt(Dmax);
+  return fogAt(Math.min(Dmax, V.eyeHeight * lakeLens() / (y - hy)));
+}
+function fogKey() { var c = fogColour(); return [V.dfDensity, V.dfMax, V.eyeHeight, V.horizonLine, W, H, c.join(',')].join('|'); }
+/* the faded copy of picture src: it covers CSS rows y0 … y0 + src.height · perPx; Dmax its distance (m) */
+function fogged(src, y0, perPx, Dmax) {
+  if (!fogOn() || !src || src.width < 2) return src;
+  var key = FOG.key + '|' + FOG.gen + '|' + Math.round(y0 * 10) + '|' + perPx.toFixed(4) + '|' + Math.round(Dmax), E = FOG.cache.get(src);
+  if (E && E.key === key) return E.cnv;
+  var c = (E && E.cnv) || document.createElement('canvas');
+  if (c.width !== src.width || c.height !== src.height) { c.width = src.width; c.height = src.height; }
+  var g = c.getContext('2d'), col = fogColour();
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'copy'; g.drawImage(src, 0, 0);
+  g.globalCompositeOperation = 'source-atop';
+  var gr = g.createLinearGradient(0, 0, 0, src.height), n = 24;
+  for (var i = 0; i <= n; i++) gr.addColorStop(i / n, rgb(col, fogRow(y0 + src.height * perPx * i / n, Dmax)));
+  g.fillStyle = gr; g.fillRect(0, 0, src.width, src.height);
+  g.globalCompositeOperation = 'source-over';
+  FOG.cache.set(src, { key: key, cnv: c });
+  return c;
+}
+/* the ground (snow and water) below the horizon, row by row: one gradient over it, after drawLake */
+function drawGroundFog() {
+  if (!fogOn()) return;
+  var hy = H * V.horizonLine;
+  if (FOG.gk !== FOG.key) {
+    var gr = ctx.createLinearGradient(0, hy * PR, 0, H * PR), n = 32, col = fogColour();
+    for (var i = 0; i <= n; i++) { var u = i / n, y = hy + (H - hy) * u * u; gr.addColorStop(u * u, rgb(col, fogRow(y, 1e9))); }
+    FOG.ground = gr; FOG.gk = FOG.key;
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  ctx.fillStyle = FOG.ground; ctx.fillRect(0, Math.floor(hy * PR), cv.width, cv.height - Math.floor(hy * PR));
+}
+function pagodaDist() { var pp = blkPlace('pagoda'), cam = WinterHill.camera(W, H, H * V.horizonLine, MT.lens); return cam.F * 60 / Math.max(1, pp.Y(0.505) - pp.Y(0.185)); }
+function hallDist() {
+  var k = [V.hallX, V.hallY, V.hallSize, V.hallTurn, V.horizonLine, V.eyeHeight, W, H].join('|');
+  if (FOG.hk !== k) { var L = null; try { L = trailHall(); } catch (e) { L = null; } FOG.hd = L && L.Z ? L.Z : 200; FOG.hk = k; }
+  return FOG.hd;
 }
 
 /* ============================================================
@@ -3386,7 +3472,8 @@ function scReady(w) { SC_WAIT[w] = true; if (SC_WAIT.db && SC_WAIT.files) SC.rea
    change and every picture bake again on such a reload. */
 function scMeasureFiles() {
   var names = [];
-  Array.prototype.forEach.call(document.scripts, function (sc) { var n = (sc.getAttribute('src') || '').split('?')[0]; if (/\.js$/.test(n)) names.push(n); });
+  // (wintermist.js is left out: the fog is drawn live every frame, no kept picture holds any of it)
+  Array.prototype.forEach.call(document.scripts, function (sc) { var n = (sc.getAttribute('src') || '').split('?')[0]; if (/\.js$/.test(n) && !/wintermist\.js$/.test(n)) names.push(n); });
   if (!names.length || typeof fetch !== 'function') { scReady('files'); return; }
   Promise.all(names.map(function (n) {
     return fetch(n, { cache: 'force-cache' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) { return n.split('/').pop() + ':' + t.length; }, function () { return n.split('/').pop() + ':?'; });
@@ -3396,7 +3483,7 @@ function scFiles() {                                 // the drawing files' sizes
   if (SC.files) return SC.files;
   var f = {};
   try {
-    performance.getEntriesByType('resource').forEach(function (e) { var n = e.name.split('/').pop().split('?')[0]; if (/\.js$/.test(n)) f[n] = e.decodedBodySize; });
+    performance.getEntriesByType('resource').forEach(function (e) { var n = e.name.split('/').pop().split('?')[0]; if (/\.js$/.test(n)) if (n !== 'wintermist.js') f[n] = e.decodedBodySize; });
   } catch (e) { /* none */ }
   return (SC.files = Object.keys(f).sort().map(function (n) { return n + ':' + f[n]; }).join(','));
 }
@@ -3471,7 +3558,7 @@ function scRestore(st) {
     if (hillJob) { hillJob.cancel(); hillJob = null; }
     if (HILL.cnv.width !== cv.width || HILL.cnv.height !== cv.height) { HILL.cnv.width = cv.width; HILL.cnv.height = cv.height; }
     HILL.c.setTransform(1, 0, 0, 1, 0, 0); HILL.c.clearRect(0, 0, HILL.cnv.width, HILL.cnv.height); HILL.c.drawImage(b, 0, 0);
-    hillDrawn = true;
+    hillDrawn = true; FOG.gen++;
   } else if (st === 'field') {
     var hy = H * V.horizonLine, F = lakeLens();
     LAKEW.shore = WinterLake.shore(lakeOutline(), { W: W, H: H, hy: hy, F: F, eye: V.eyeHeight, drop: V.bankDrop, wobble: V.bankWobble, seed: V.seed });
@@ -3622,7 +3709,7 @@ function checkRetry(t) {
 
 /* The mountains (baked), and the mist drifting along their foot. */
 function drawMountains(dt) {
-  if (V.showMountains) { ctx.globalAlpha = MT.strength; ctx.drawImage(MTN.cnv, 0, 0, cv.width, cv.height); ctx.globalAlpha = 1; }
+  if (V.showMountains) { ctx.globalAlpha = MT.strength; ctx.drawImage(V.blockIn ? fogged(MTN.cnv, 0, H / MTN.cnv.height, 1e9) : MTN.cnv, 0, 0, cv.width, cv.height); ctx.globalAlpha = 1; }
   if (V.showMountains && V.mistDrift > 0) {
     ctx.setTransform(PR, 0, 0, PR, 0, 0);
     ctx.globalAlpha = V.mistDrift * 0.5;
@@ -3641,6 +3728,7 @@ var last = 0, barTimer = 0, sideDirty = true;
 function frame(now) {
   var t = now / 1000, dt = last ? Math.min(0.05, t - last) : 0.016;
   last = t; nowT = t;
+  FOG.key = fogOn() ? fogKey() : '';
   if (Object.keys(dirty).length && t - dirtyAt > 0.25) rebake();
   // one step at a time, a little apart, so the graphics chip has time between them (a step asked for twice runs once)
   if (mtnJob) { try { stepScenery(); } catch (e) { mtnJob = null; glRetry.mtn = true; note('ERROR in mountains: ' + e.message); } stageAt = t + 0.35; }
@@ -3678,8 +3766,11 @@ function frame(now) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawBlockIn(ctx, 'back');
     drawLake(t, dt);                                   // step 6: the snow ground, the banks and the water (14c)
-    drawMist(t, dt);                                   // step 4: the valley mist, in front of the hill's lower slopes (14f)
+    drawGroundFog();                                   // the depth fog on the ground, row by row (14g)
+    mistFrame(t, dt);                                  // step 4: the drifting fog, both layers (14f) …
+    drawMist(0);                                       // … the one behind the hall, over the hill's foot and the pagoda
     drawHall();                                        // step 5: the shrine hall and the firs beside it (7c)
+    drawMist(1);                                       // … the one in front of the hall and its firs
     drawFrost(t, dt);                                  // the frosted trees right of the hall (14e)
     drawPines(t, dt);                                  // step 7: the right bank's roped pines and firs (14d)
     drawBlockIn(ctx, 'front');
@@ -3954,19 +4045,26 @@ var G = [
     { o: 'V', k: 'mistY', label: 'Middle (share of the height, on the reference)', min: 0.45, max: 0.8, step: 0.005, re: 'live' },
     { o: 'V', k: 'mistHeight', label: 'Height', min: 0.02, max: 0.4, step: 0.005, re: 'live' },
     { o: 'V', k: 'mistStrength', label: 'Strength', min: 0, max: 1, step: 0.01, re: 'live' },
-    { chk: 'V', k: 'vmShow', label: 'Drifting mist (wintermist.js)', re: 'live', note: 'Ground fog in the valley in front of the hill\'s lower slopes, between the hill and the hall, drifting and changing shape. Off: the flat band above (its middle, height and strength apply only to it).' },
-    { o: 'V', k: 'vmRise', label: 'How high it lies above the valley floor', min: 0.02, max: 0.25, step: 0.005, re: 'live', note: 'Share of the screen\'s height above the horizon line.' },
+    { chk: 'V', k: 'vmShow', label: 'Drifting fog (wintermist.js)', re: 'live', note: 'Banks of fog rolling slowly past and through the pagoda hill and the shrine: one layer behind the hall (over the hill\'s foot and the pagoda), one in front of the hall and its firs. Off: the flat band above (its middle, height and strength apply only to it).' },
+    { o: 'V', k: 'vmRise', label: 'Behind the hall: how high it reaches above the valley floor', min: 0.02, max: 0.3, step: 0.005, re: 'live', note: 'Share of the screen\'s height above the horizon line (the pagoda\'s foot is about 0.16 above it).' },
+    { o: 'V', k: 'vmFront', label: 'In front of the hall: strength (0 = none)', min: 0, max: 1.5, step: 0.05, re: 'live', note: 'The layer drifting in front of the hall and its firs, so the fog passes through the shrine.' },
+    { o: 'V', k: 'vmFrontRise', label: 'In front of the hall: how high up its walls', min: 0.01, max: 0.2, step: 0.005, re: 'live', note: 'Share of the screen\'s height above the hall\'s foot.' },
+    { o: 'V', k: 'vmFrontGaps', label: 'In front of the hall: gaps (the hall showing through)', min: 0, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmBillow', label: 'Puffiness (rounded heaps, like smoke or cloud)', min: 0, max: 2, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmBelow', label: 'How far it reaches over the far snow', min: 0, max: 0.1, step: 0.005, re: 'live' },
     { o: 'V', k: 'vmDensity', label: 'Density', min: 0, max: 2, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmStrength', label: 'Strength (how opaque)', min: 0, max: 1.5, step: 0.05, re: 'live' },
-    { o: 'V', k: 'vmScale', label: 'Size of the wisps (smaller = finer)', min: 0.3, max: 3, step: 0.05, re: 'live' },
-    { o: 'V', k: 'vmWarp', label: 'How much it curls and tears', min: 0, max: 2.5, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmScale', label: 'Size of the banks (smaller = finer)', min: 0.3, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmWarp', label: 'How much it rolls and swirls', min: 0, max: 2.5, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmSpeed', label: 'Drift with the wind', min: 0, max: 4, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmMorph', label: 'How fast it changes shape', min: 0, max: 4, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmWarm', label: 'Glow toward the low sun', min: 0, max: 2.5, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmSparkle', label: 'Diamond dust (ice crystals catching the sun)', min: 0, max: 2, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmRes', label: 'Resolution (share of the screen\'s)', min: 0.25, max: 1, step: 0.05, re: 'live', note: 'Lower is lighter for the graphics chip; the mist is soft, so 0.5 loses nothing visible.' },
-    { col: 'V', keys: [['mist', 'Mist']], re: 'all' } ] },
+    { col: 'V', keys: [['mist', 'Mist']], re: 'all' },
+    { chk: 'V', k: 'dfShow', label: 'Depth fog (as three.js\'s FogExp2)', re: 'live', note: 'Everything fades toward the fog\'s colour by its distance: the near snow hardly, the hall a little, the pagoda more, the mountains most. Laid on as each picture is drawn: nothing bakes again.' },
+    { o: 'V', k: 'dfDensity', label: 'Depth fog: density (per km)', min: 0, max: 5, step: 0.05, re: 'live', note: 'Fades by 1 − e^−(density × distance)². At 1.4: the hall (about 200 m) 7 %, the pagoda (about 470 m) 35 %.' },
+    { o: 'V', k: 'dfMax', label: 'Depth fog: the most it fades anything', min: 0, max: 1, step: 0.01, re: 'live', note: 'So Fuji and the far ridges still show.' } ] },
   { name: 'Snow ground and lake (step 6)', file: 'winterlake.js, water.js', note: 'The lake\'s outline is the reference\'s; move and size it with "Lake and its banks" in the layout group.', ctls: [
     { o: 'V', k: 'eyeHeight', label: 'Eye above the snow (m)', min: 1, max: 12, step: 0.1, re: 'lake', note: 'Sets how big everything on the ground looks: higher = the banks, ice and drifts look smaller.' },
     { o: 'V', k: 'bankDrop', label: 'Banks: height above the water (m)', min: 0.05, max: 1, step: 0.01, re: 'lake', note: 'The dark earth face under the snow\'s lip.' },
