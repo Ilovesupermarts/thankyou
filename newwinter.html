@@ -488,12 +488,13 @@ var V_DEFAULTS = {
 };
 var MT_DEFAULTS = {
   seed: 7,
-  rangeHeight: 0.01, featureKm: 6, sharpness: 0.41, layering: 0.81, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
+  // the ridges between the pagoda hill and Fuji: winter2.html's ranges and the mountains' light (the user's values; Fuji's place and gullies kept)
+  rangeHeight: 0.06, featureKm: 6, sharpness: 0.55, layering: 0.81, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
   fujiX: 0.83, fujiHeight: 0.367, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.05, fujiSnow: 0.65, fujiTongues: 0.6, fujiClear: 0.9,
-  snowLine: 0.25, snow: 0.9, treeLine: 0.87, forestSnow: 0.65, snowSlope: 0.55,
-  sunStrength: 1.35, ambient: 0.5, shadows: 0.85, alpenglow: 0.6,
-  haze: 0.68, hazeKm: 43, mist: 0.52, mistHeightKm: 0.3, fadeToSky: 0.78, footMist: 0.69,
-  strength: 1, softness: 0.4, resolution: 0.85,
+  snowLine: 0.25, snow: 0.9, treeLine: 1.12, forestSnow: 0.65, snowSlope: 0.55,
+  sunStrength: 1.15, ambient: 0.65, shadows: 0.55, alpenglow: 0.6,
+  haze: 0.44, hazeKm: 43, mist: 0.52, mistHeightKm: 0.3, fadeToSky: 0.78, footMist: 0.69,
+  strength: 1, softness: 0.9, resolution: 0.85,
   colours: {
     rock: '#7C7473',
     fujiRock: '#4E4A55',
@@ -635,13 +636,15 @@ try {
     if (saved.V && !(saved.ver >= 5)) { delete saved.V.pagodaDofStrength; delete saved.V.pagodaDofMax; }
     // (ver 6: the path's walls doubled to 0.24 m: a height saved before is not read)
     if (saved.V && !(saved.ver >= 6)) delete saved.V.trailDepth;
+    // (ver 7: the ridges from winter2.html: the ranges' height, crests, tree line and the mountains' light saved before are not read)
+    if (saved.MT && !(saved.ver >= 7)) ['rangeHeight', 'sharpness', 'treeLine', 'sunStrength', 'ambient', 'shadows', 'haze', 'softness'].forEach(function (k) { delete saved.MT[k]; });
     merge(V, saved.V || {}, V_DEFAULTS);
     // the sun and the clouds saved before step 1, and the mountains saved before step 2, were winter2.html's: not read
     if (saved.ver >= 2) { merge(CLOUD, saved.CLOUD || {}, CLOUD_DEFAULTS); merge(SUN, saved.SUN || {}, SDEF); }
     if (saved.ver >= 3) merge(MT, saved.MT || {}, MT_DEFAULTS);
   }
 } catch (e) { /* a private window: the defaults */ }
-function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 6, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
+function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 7, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
 
 /* Toolbar date and time (Nagoya). */
 function tickClock() {
@@ -3985,7 +3988,7 @@ var G = [
     { chk: 'V', k: 'moon', label: 'Moon (night)', re: 'live' },
     { o: 'V', k: 'moonSize', label: 'Moon size', min: 0.5, max: 2.5, step: 0.05, re: 'live' } ] },
   { name: 'Mountains and Fuji (step 2)', file: 'mountains.js', ctls: placeCtls('fuji', 'Mt Fuji', 'mtn', -0.85, 0.15).concat([
-    { o: 'MT', k: 'rangeHeight', label: 'Height of the ranges', min: 0, max: 0.4, step: 0.005, re: 'mtn', note: 'The ranges either side of Fuji (the reference has none: keep it low).' },
+    { o: 'MT', k: 'rangeHeight', label: 'Height of the ranges', min: 0, max: 0.4, step: 0.005, re: 'mtn', note: 'The ridges between the pagoda hill and Fuji (winter2.html\'s ranges).' },
     { o: 'MT', k: 'featureKm', label: 'Size of the mountains (km)', min: 3, max: 30, step: 0.5, re: 'mtn' },
     { o: 'MT', k: 'sharpness', label: 'Sharp crests', min: 0, max: 1, step: 0.01, re: 'mtn' },
     { o: 'MT', k: 'layering', label: 'Ranges one behind another', min: 0, max: 1, step: 0.01, re: 'mtn' },
