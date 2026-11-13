@@ -65,10 +65,11 @@
 var Yukitsuri = (function () {
 'use strict';
 
-// o.lod's firs (the hill's and the shrine's: small, far, thousands of strokes) are drawn on canvases the main processor
-// draws (willReadFrequently), at twice the size (SS): on a graphics-chip canvas each stroke waits for the chip while it
-// draws the scene (measured: 50–85× slower); at that size the main processor draws the finest strokes harder than the
-// chip, so drawing twice the size and shrinking keeps their true look (measured). The right bank's trees are as before.
+// o.lod's firs (the hill's and the shrine's: small, far, thousands of strokes) are drawn on graphics-chip canvases by
+// default, as before. With o.cpu they are drawn on canvases the main processor draws (willReadFrequently), at twice the
+// size (SS), and shrunk: faster where the graphics chip is emulated in software (this sandbox: 50-85x), but on the
+// tablet's real graphics chip that path was the SLOWER one (its Report: hill and pagoda 32 s). At that size the main
+// processor draws the finest strokes harder than the chip, so twice the size keeps their true look (measured).
 var CPU = { willReadFrequently: true }, SS = 2;
 
 var PI = Math.PI, TAU = PI * 2;
@@ -1016,7 +1017,7 @@ function bounds(T, P) {
 }
 function zOf(E) { return E.kind === 'pad' ? E.c[2] : (E.p0[2] + E.p2[2] * 2) / 3; }
 function bakeJob(T, o) {
-  var P = project(o), K = palette(o), box = bounds(T, P), sup = o.lod && !o.into ? SS : 1, PR = o.PR * sup;
+  var P = project(o), K = palette(o), box = bounds(T, P), sup = o.lod && o.cpu && !o.into ? SS : 1, PR = o.PR * sup;
   T.fol.forEach(function (E) { E._sh = null; });
   function layer(cpu) { var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(box.w * PR)); cv.height = Math.max(1, Math.ceil(box.h * PR)); var c = cv.getContext('2d', cpu ? CPU : undefined); c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); return { cnv: cv, c: c }; }
   // o.into: draw straight onto that context (its own transform: CSS px), with no pictures of its own and no softening
@@ -1025,7 +1026,7 @@ function bakeJob(T, o) {
   // (work: drawn here, stroke by stroke; body: the finished tree the scene lays down every frame. There is no 'front'
   // picture any more: nothing was ever drawn on it, yet it was laid down for every tree every frame)
   // (o.cpuBody: the finished tree goes onto another picture being built, not onto the screen: keep it on the main processor too)
-  var work = o.into ? { cnv: null, c: o.into } : layer(!!o.lod), body = o.into ? null : layer(!!o.cpuBody), c = work.c;
+  var work = o.into ? { cnv: null, c: o.into } : layer(!!(o.lod && o.cpu)), body = o.into ? null : layer(!!o.cpuBody), c = work.c;
   function setT() { if (M0) c.setTransform(M0); else c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); }
   // Everything in depth order (the farthest first), so whatever is nearer covers it: the foliage, the wood (trunk and
   // limbs, about the trunk's depth), and the ropes, the pole and the props piece by piece (each piece at its own depth).

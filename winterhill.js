@@ -29,12 +29,10 @@
 var WinterHill = (function () {
 'use strict';
 
-// The right bank's firs as drawn on the hill and beside the shrine (o.lod / look.painter) are drawn on canvases the main
-// processor draws (willReadFrequently): on a graphics-chip canvas each of their thousands of strokes waits for the chip
-// while it draws the scene (measured: 50–85× slower). At these small sizes the main processor draws their finest strokes
-// harder than the chip does, so they are drawn at twice the size (SS) and shrunk when laid down: that matches the true
-// look (the same tree drawn 8× larger and shrunk) as closely as the chip did (measured). Everything else keeps the
-// graphics chip's canvas, so it looks exactly as before.
+// The right bank's firs as drawn on the hill (look.painter) go on a graphics-chip canvas by default. With look.cpu
+// (the test bed's firCpu) the row is a main-processor canvas (willReadFrequently) at twice the size (SS), shrunk when
+// laid down: faster where the graphics chip is emulated in software, slower on the tablet's real chip (its Report).
+// At these small sizes the main processor draws the finest strokes harder, so twice the size keeps the true look.
 var CPU = { willReadFrequently: true }, SS = 2;
 
 var PI = Math.PI, TAU = PI * 2;
@@ -907,7 +905,7 @@ function hillJob(c, o) {
     ry0 -= hgt * 2.2; var ry1 = foot + 4;
     // (the new firs, look0.painter: on the main processor at twice the size, shrunk when the row is laid down; the older
     // firs as before)
-    var ss = look0.painter ? SS : 1, lay = document.createElement('canvas');
+    var ss = look0.painter && look0.cpu ? SS : 1, lay = document.createElement('canvas');
     lay.width = Math.max(1, Math.ceil((rx1 - rx0) * sc * ss)); lay.height = Math.max(1, Math.ceil((ry1 - ry0) * sc * ss));
     var lc = lay.getContext('2d', ss > 1 ? CPU : undefined); lc.setTransform(sc * ss, 0, 0, sc * ss, -rx0 * sc * ss, -ry0 * sc * ss);
     var look = { light: L, haze: haze, snow: o.snow, width: o.treeWidth, direct: true };
