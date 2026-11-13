@@ -3175,6 +3175,7 @@ window.winterLab = {
   V: V, MT: MT, CLOUD: CLOUD, SUN: SUN, defaults: { V: V_DEFAULTS, MT: MT_DEFAULTS, CLOUD: CLOUD_DEFAULTS, SUN: SDEF },
   plums: function () { return WS.branches; },
   frost: function () { return FT; },                      // the frosted trees (14e), for check scripts
+  gustAt: function (x, str) { WS.gusts.push({ dir: 1, x: x, v: 300, str: str || 0.6, hit: {} }); },   // (checks: a gust front starting at x, CSS px)
   stepBudget: function (ms) { STEP_MS = ms; },             // (check scripts only: the headless browser draws a frame in about 1.5 s)                 // the plum branches (step 10), for check scripts
   ytFirPaint: function () { return ytFirPaint.apply(null, arguments); },   // the right bank's fir as the hill and shrine draw it (checks)
   changed: function (what) {
