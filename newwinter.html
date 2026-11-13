@@ -378,7 +378,7 @@ var V_DEFAULTS = {
   // at the foot (shares of the height), their look, snow, mist with distance and softness (the preview's option B, the user's choice)
   // the hill's and the shrine's firs drawn as the right bank's (yukitsuri.js, variant 1: no ropes, pole or props, painted wood);
   // off: their own older firs (winterhill.js)
-  hillNewFirs: true, hfNewFirs: true, firCpu: false,
+  hillNewFirs: true, hfNewFirs: true, firCpu: false, keepPictures: true,
   hillShow: true, hillFirs: true, hillSeed: 11, hillRows: 9, hillDensity: 0.55, hillFill: 0.92, hillFirFar: 0.03, hillFirNear: 0.08,
   hillFirWidth: 0.78, hillTiers: 1, hillSparse: 0.35, hillDroop: 1, hillLean: 1, hillFirSnow: 0.7, hillBrush: 1, hillSoft: 1,
   hillHazeFar: 0.68, hillHazeNear: 0.18, hillNeedleTint: 0,
@@ -981,6 +981,7 @@ function startHill() {
 function swapHill() {
   var t = HILL; HILL = HILLN; HILLN = t;
   hillJob = null; hillDrawn = true;
+  scSave('hill', HILL.cnv);
   note('hill and pagoda: ' + Math.round(performance.now() - hillT0) + ' ms (in steps of about 8 ms a frame)');
 }
 var STEP_MS = 8;                                         // the hill's and the hall's drawing work a frame (checks may raise it: winterLab.stepBudget)
@@ -1203,6 +1204,7 @@ function stepHall() {
   if (HALL.job.step(STEP_MS)) {
     HALL.cnv = HALL.job.canvas; HALL.x = HALL.job.x; HALL.y = HALL.job.y; HALL.info = HALL.job.info; HALL.times = HALL.job.times();
     HALL.job = null;
+    scSave('hall', HALL.cnv, { x: HALL.x, y: HALL.y, info: HALL.info, times: HALL.times });
     note('hall and the firs beside it: ' + Math.round(performance.now() - HALL.t0) + ' ms (in steps of about 8 ms a frame) · ' + HALL.info + ' · ' + HALL.times);
   }
 }
@@ -2651,6 +2653,7 @@ function stepField(ms) {
   if (!FIELDJ.step(ms === undefined ? 8 : ms)) return;
   var info = FIELDJ.info(), q = FIELD; FIELD = FIELDN; FIELDN = q;
   FIELDJ = null;
+  scSave('field', FIELD.cnv);
   if (ms === undefined) note('snow ground: ' + Math.round(performance.now() - FIELDT0) + ' ms (in steps of about 8 ms a frame)' +
                              ' · drawing work ' + Math.round(info.cpu) + ' ms' + (V.trailShow && TRAIL.T ? ' · ' + TRAIL.info + ', ' + info.pathPixels + ' pixels on it' : ''));
 }
@@ -2993,12 +2996,15 @@ window.winterLab = {
     sunDirty = true; saveAll(); resize(); rebuildAll();
   },
   gust: function () { startGust(Math.random() < 0.5 ? 1 : -1, 1.5); },
+  forgetPictures: function () { scForget(); },
+  depsOf: function (roots) { return scDeps('x', roots); },
+  keptLabel: function (st) { return { want: scKey(st), kept: SC.rec[st] ? SC.rec[st].key : null, deps: scDeps(st) }; },   // (checks)
   ytShakeAll: function () { for (var k = 0; k < PINES.list.length; k++) this.shake(k); },
   report: function () {
     return 'New winter report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
            ' (drawn at ' + PR.toFixed(2) + ') · 2D pictures wiped ' + lost2d + '×\n' + REPORT.join('\n');
   },
-  layers: function () { return { field: FIELD.cnv, still: STILL.cnv, mirror: MIRROR.cnv, pineShadow: PINES.shadow.cnv }; },
+  layers: function () { return { field: FIELD.cnv, still: STILL.cnv, mirror: MIRROR.cnv, pineShadow: PINES.shadow.cnv, hill: HILL.cnv, hall: HALL.cnv }; },
   // (for checking the falling snow: every clump on tree k, the farthest 0, lets go now)
   shake: function (k) { var E = PINES.list[k || 0]; if (E) for (var j = 0; j < E.A.rest.length; j++) Yukitsuri.shed(E.A, j, j * 0.15); },
   pines: function () { return PINES; },   // (for checking each picture on its own)
@@ -3047,6 +3053,155 @@ function paintSkyTint() {
   var wd = SKY_TINT * ((COVER[SUN.condition] || 0) / 100 * 0.1 + (SUN.condition === 'rain' ? 0.06 : 0));
   if (wd > 0.003) { sctx.fillStyle = 'rgba(70,64,82,' + wd.toFixed(3) + ')'; sctx.fillRect(0, 0, W, H); }
 }
+/* ============================================================
+   KEPT PICTURES. The three slow pictures (the hill and pagoda, the snow
+   ground with the path, the hall with its firs) are kept in this
+   browser (IndexedDB) once baked, each with a label of everything that
+   went into it: the values its code reads (found by reading that code
+   itself, see scDeps), the light, the time, the screen's size and the
+   versions of the code. When the page opens and a label still matches,
+   the kept picture is laid down instead of baking it again (the same
+   pixels). Anything that changes a label bakes that picture afresh,
+   once. Panel: Report, "Keep baked pictures".
+   ============================================================ */
+var BAKE_VER = 1;                                   // (raise it to throw every kept picture away after a change no label sees)
+var SC_STAGES = ['hill', 'field', 'hall'];
+var SC = { db: null, ready: false, giveUp: performance.now() + 4000, rec: {}, pic: { hill: 0, field: 0, hall: 0 }, want: {}, deps: {}, files: null };
+var SC_ROOTS = { hill: ['startHill', 'ytFirPaint'], field: ['bakeField'], hall: ['startHall'] };
+var SC_COMMON = ['sceneLight', 'shadeColour', 'lampLevel', 'sunPlace', 'light', 'isNight', 'nightLights', 'blkPlace', 'blkY'];
+/* What a stage's code reads: its functions and every function of this page they call (read from their own text), and in
+   them every value of V (and MT, SUN) they read by name. blkPlace('g') brings g's across / up / size; V['trail' + …]
+   every value starting 'trail'; any other reading of V by a worked-out name, or V handed on whole, brings all of V. */
+function scDeps(st, roots) {
+  if (!roots && SC.deps[st]) return SC.deps[st];
+  var seen = {}, todo = (roots || SC_ROOTS[st].concat(SC_COMMON)).slice(), text = '', all = false, from = {};
+  while (todo.length) {
+    var n = todo.pop();
+    if (seen[n]) continue;
+    seen[n] = true;
+    var fn = null;
+    try { fn = eval(n); } catch (e) { fn = null; }      // (only names of this page's own functions)
+    if (typeof fn !== 'function' || /\[native code\]/.test(String(fn))) continue;
+    var src = String(fn).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');   // (without comments)
+    text += '\n' + src;
+    var code = src.replace(/'(?:[^'\\\n]|\\.)*'/g, "''");                                  // (without quoted text)
+    var re = /\b([A-Za-z_$][\w$]*)\s*\(/g, m;
+    while ((m = re.exec(code))) if (!seen[m[1]] && !/^(if|for|while|switch|return|function|catch|typeof|new)$/.test(m[1])) { todo.push(m[1]); if (!from[m[1]]) from[m[1]] = n; }
+  }
+  var keys = {}, mt = {}, sun = {};
+  text.replace(/\bV\.(\w+)/g, function (_, k) { keys[k] = 1; });
+  text.replace(/\bMT\.(\w+)/g, function (_, k) { mt[k] = 1; });
+  text.replace(/\bSUN\.(\w+)/g, function (_, k) { sun[k] = 1; });
+  text.replace(/blkPlace\('(\w+)'\)/g, function (_, g) { keys[g + 'X'] = keys[g + 'Y'] = keys[g + 'Size'] = 1; });
+  var pre = [];
+  text.replace(/\bV\[\s*'(\w+)'\s*\+/g, function (_, p) { pre.push(p); });
+  var stripped = text.replace(/\bV\[\s*'\w+'\s*\+/g, '').replace(/function blkPlace[\s\S]*?\n\}/, '');
+  if (/\bV\[/.test(stripped) || /[(,:=]\s*V\s*[,)};]/.test(stripped)) all = true;
+  Object.keys(V).forEach(function (k) { if (pre.some(function (p) { return k.indexOf(p) === 0; })) keys[k] = 1; });
+  var h = 0;
+  for (var i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
+  if (roots) return { seen: Object.keys(seen).filter(function (k) { try { return typeof eval(k) === 'function'; } catch (e) { return false; } }).map(function (k) { return k + '<' + from[k]; }) };
+  return (SC.deps[st] = { keys: all ? null : Object.keys(keys).sort(), mt: Object.keys(mt).sort(), sun: Object.keys(sun).sort(), code: h, n: Object.keys(seen).length });
+}
+function scFiles() {                                 // the drawing files' sizes as loaded (a change to one changes its size)
+  if (SC.files) return SC.files;
+  var f = {};
+  try {
+    performance.getEntriesByType('resource').forEach(function (e) { var n = e.name.split('/').pop().split('?')[0]; if (/\.js$/.test(n)) f[n] = e.decodedBodySize; });
+  } catch (e) { /* none */ }
+  return (SC.files = Object.keys(f).sort().map(function (n) { return n + ':' + f[n]; }).join(','));
+}
+function scKey(st) {
+  var d = scDeps(st), v = {}, m = {}, u = {};
+  (d.keys || Object.keys(V)).forEach(function (k) { v[k] = V[k]; });
+  d.mt.forEach(function (k) { m[k] = MT[k]; });
+  d.sun.forEach(function (k) { u[k] = SUN[k]; });
+  var LT0 = LT, Lt = sceneLight(); LT = Lt;
+  var sh = shadeColour(); LT = LT0;
+  return JSON.stringify({ st: st, ver: BAKE_VER, code: d.code, files: scFiles(), V: v, MT: m, SUN: u, LT: Lt, SH: sh, lamp: lampLevel(),
+                          sunX: sunPlace().x, W: W, H: H, PR: PR, cw: cv.width, ch: cv.height }, function (k, x) {
+    return typeof x === 'number' ? Math.round(x * 1e4) / 1e4 : x; });
+}
+function scOpen() {
+  try {
+    var rq = indexedDB.open('newWinter-pictures', 1);
+    rq.onupgradeneeded = function () { rq.result.createObjectStore('p'); };
+    rq.onsuccess = function () { SC.db = rq.result; scLoadAll(); };
+    rq.onerror = rq.onblocked = function () { SC.ready = true; };
+  } catch (e) { SC.ready = true; }
+}
+function scLoadAll() {
+  var left = SC_STAGES.length;
+  function one() { if (--left <= 0) SC.ready = true; }
+  try {
+    var os = SC.db.transaction('p', 'readonly').objectStore('p');
+    SC_STAGES.forEach(function (st) {
+      var g = os.get(st);
+      g.onsuccess = function () {
+        var r = g.result;
+        if (!r || !r.blob || typeof createImageBitmap !== 'function') { one(); return; }
+        createImageBitmap(r.blob, { premultiplyAlpha: 'premultiply', colorSpaceConversion: 'none' })
+          .then(function (b) { r.bmp = b; SC.rec[st] = r; one(); }, one);
+      };
+      g.onerror = one;
+    });
+  } catch (e) { SC.ready = true; }
+}
+/* The kept picture for stage st, when its label matches what would make it now. */
+function scTake(st) {
+  if (!V.keepPictures) return null;
+  var r = SC.rec[st];
+  if (!r || !r.bmp) return null;
+  return r.key === SC.want[st] ? r : null;
+}
+function scSave(st, cnv, meta) {
+  var id = ++SC.pic[st], key = SC.want[st];
+  if (!V.keepPictures || !SC.db || !key || !cnv || !cnv.width || !cnv.height) return;
+  cnv.toBlob(function (blob) {
+    if (!blob || SC.pic[st] !== id) return;         // (a newer picture came meanwhile)
+    try {
+      var tx = SC.db.transaction('p', 'readwrite');
+      tx.objectStore('p').put({ key: key, blob: blob, meta: meta || {}, at: Date.now() }, st);
+      tx.oncomplete = function () { if (SC.pic[st] === id) SC.rec[st] = { key: key, bmp: null, meta: meta || {} }; };
+    } catch (e) { /* not kept */ }
+  }, 'image/png');
+}
+function scForget() {
+  SC.rec = {};
+  try { SC.db.transaction('p', 'readwrite').objectStore('p').clear(); } catch (e) { /* none */ }
+  note('kept pictures thrown away: the next load bakes everything');
+}
+/* Lay down a kept picture in place of a bake (true when it did). */
+function scRestore(st) {
+  var t0 = performance.now(), r = scTake(st);
+  if (!r) return false;
+  var b = r.bmp;
+  if (st === 'hill') {
+    if (hillJob) { hillJob.cancel(); hillJob = null; }
+    if (HILL.cnv.width !== cv.width || HILL.cnv.height !== cv.height) { HILL.cnv.width = cv.width; HILL.cnv.height = cv.height; }
+    HILL.c.setTransform(1, 0, 0, 1, 0, 0); HILL.c.clearRect(0, 0, HILL.cnv.width, HILL.cnv.height); HILL.c.drawImage(b, 0, 0);
+    hillDrawn = true;
+  } else if (st === 'field') {
+    var hy = H * V.horizonLine, F = lakeLens();
+    LAKEW.shore = WinterLake.shore(lakeOutline(), { W: W, H: H, hy: hy, F: F, eye: V.eyeHeight, drop: V.bankDrop, wobble: V.bankWobble, seed: V.seed });
+    if (FIELDJ) { FIELDJ.cancel(); FIELDJ = null; }
+    FIELDLAST = null;
+    if (FIELD.cnv.width !== cv.width || FIELD.cnv.height !== cv.height) { FIELD.cnv.width = cv.width; FIELD.cnv.height = cv.height; }
+    FIELD.c.setTransform(1, 0, 0, 1, 0, 0); FIELD.c.clearRect(0, 0, FIELD.cnv.width, FIELD.cnv.height); FIELD.c.drawImage(b, 0, 0);
+  } else if (st === 'hall') {
+    if (!V.hallShow || typeof WinterHall === 'undefined') return false;
+    if (HALL.job) { HALL.job.cancel(); HALL.job = null; }
+    var c = document.createElement('canvas'); c.width = b.width; c.height = b.height;
+    c.getContext('2d').drawImage(b, 0, 0);
+    HALL.cnv = c; HALL.x = r.meta.x; HALL.y = r.meta.y; HALL.info = r.meta.info || ''; HALL.times = r.meta.times || '';
+  }
+  SC.pic[st]++;
+  var names = { hill: 'hill and pagoda', field: 'snow ground', hall: 'hall and the firs beside it' };
+  note(names[st] + ': the kept picture, ' + Math.round(performance.now() - t0) + ' ms');
+  return true;
+}
+scOpen();
+
 /* Everything is baked again in steps, one heavy step a frame (the
    mountains, the snowdrift, the snowfield, the sprites), so the graphics
    chip is never asked for all of it at once: asked for too much at once,
@@ -3106,6 +3261,10 @@ function watchGL() {
 function runStage(st) {
   LT = sceneLight();
   SHADE = shadeColour();
+  if (SC_STAGES.indexOf(st) >= 0) {                     // (kept pictures: the label of what would be made now)
+    SC.want[st] = null;
+    try { SC.want[st] = scKey(st); if (scRestore(st)) return; } catch (e) { note('kept pictures: ' + e.message); }
+  }
   if (st === 'mtn') bakeScenery();
   else if (st === 'hill') startHill();
   else if (st === 'field') bakeField();
@@ -3191,7 +3350,7 @@ function frame(now) {
   else if (HALL.job) { try { stepHall(); } catch (e) { HALL.job = null; note('ERROR in the hall: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
   else if (FIELDJ) { try { stepField(); } catch (e) { FIELDJ = null; note('ERROR in the snow ground: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
   else if (PINES.job) { try { stepPines(); } catch (e) { PINES.job = null; note('ERROR in the pines: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
-  else if (stages.length) { if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
+  else if (stages.length) { if (!SC.ready && SC_STAGES.indexOf(stages[0]) >= 0 && performance.now() < SC.giveUp) { /* (the kept pictures are still being read) */ } else if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
   else { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
   watchGL();
   barTimer -= dt;
@@ -3476,7 +3635,9 @@ function ytCtls() {
 }
 var G = [
   { name: 'Report', note: 'What happened on this tablet. After a change, wait 10 s, then tap Copy report and paste it to Claude.', ctls: [
-    { report: true } ] },
+    { report: true },
+    { chk: 'V', k: 'keepPictures', label: 'Keep baked pictures (fast reload)', re: 'live', note: 'The hill and pagoda, the snow ground and the hall are kept in this browser once baked; when the page opens with the same values, light, time and screen they are laid down at once instead of baked again. Off: everything is baked every time.' },
+    { btn: 'forgetPictures', label: 'Throw the kept pictures away' } ] },
   { name: 'Block-in (step 0)', note: 'Every element as a plain flat shape where it stands in the reference, to agree the layout before anything is painted. The reference picture can be laid over the scene to compare (its wind chime is painted out).', ctls: [
     { chk: 'V', k: 'blockIn', label: 'Show the block-in', re: 'block', note: 'Off: only what is built so far (the sky; Fuji, the plum branches and the snowfall as they came from winter2.html).' },
     { chk: 'V', k: 'blockLabels', label: 'Names on the shapes', re: 'live' },
