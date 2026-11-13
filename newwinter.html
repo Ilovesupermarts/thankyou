@@ -380,7 +380,7 @@ var V_DEFAULTS = {
   // at the foot (shares of the height), their look, snow, mist with distance and softness (the preview's option B, the user's choice)
   // the hill's and the shrine's firs drawn as the right bank's (yukitsuri.js, variant 1: no ropes, pole or props, painted wood);
   // off: their own older firs (winterhill.js)
-  hillNewFirs: true, hfNewFirs: true, firCpu: false, keepPictures: true, loadBudget: 24,
+  hillNewFirs: true, hfNewFirs: true, firCpu: false, firBatch: 4, keepPictures: true, loadBudget: 24,
   hillShow: true, hillFirs: true, hillSeed: 11, hillRows: 9, hillDensity: 0.55, hillFill: 0.92, hillFirFar: 0.03, hillFirNear: 0.08,
   hillFirWidth: 0.78, hillTiers: 1, hillSparse: 0.35, hillDroop: 1, hillLean: 1, hillFirSnow: 0.7, hillBrush: 1, hillSoft: 1,
   hillHazeFar: 0.68, hillHazeNear: 0.18, hillNeedleTint: 0,
@@ -395,7 +395,7 @@ var V_DEFAULTS = {
   // roof (×), how far its eaves stand out (×), its roof's height (×), how much its corners turn up (×), mist on it, the
   // low mist at its foot, the shadows it and the firs cast on the snow, its lamps after dusk and their light on the snow
   // the frosted trees (frosttree.js): bare trees white with rime, right of the hall (the reference's two, more by the seed)
-  ftShow: true, ftCount: 2, ftSeed: 5, ftTrunks: 3, ftSpread: 1, ftTwigs: 0.35, ftRime: 1, ftFeather: 0.6, ftSnow: 1, ftBark3d: true,
+  ftShow: true, ftShrine: true, ftCount: 2, ftSeed: 5, ftTrunks: 3, ftSpread: 1, ftTwigs: 0.35, ftRime: 1, ftFeather: 0.6, ftSnow: 1, ftBark3d: true,
   ftHaze: 0.55, ftSoft: 1, ftShadow: 1, ftReflect: true, ftSway: 1, ftDust: 1,
   hallShow: true, hallTurn: 15, hallSnow: 1, hallEave: 1, hallRoof: 1, hallSori: 1, hallHaze: 0.12, hallFootMist: 0.8,
   hallShadow: 1, hallLamps: 1, hallSpill: 1, hallWeather: 1, hallRidge: true, hallRailing: true, hallRope: true,
@@ -1072,7 +1072,7 @@ function hallOpts() {
     field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: groundHaze(),
              haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis,
              grain: V.fieldGrain, res: 0.6, swell: V.fieldSwell, drifts: V.fieldDrifts, seed: V.seed },
-    firs: firs,
+    firs: firs, firsHidden: !!(V.ftShrine && V.ftShow && typeof FrostTree !== 'undefined'),
     firLook: { snow: V.hfSnow, width: V.hfWidth, tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean,
                brush: V.hillBrush, soft: V.hillSoft, needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle),
                painter: V.hfNewFirs ? ytFirPaint : null, cpu: V.firCpu }
@@ -2903,6 +2903,7 @@ function ytFirPaint(c, x, y, h, seed, look) {
     soft: look.direct ? 0 : (0.3 + hz * 0.3) * sc * (look.soft === undefined ? 1 : look.soft),
     loose: 0, dof: 0, trunks: false, lod: true,      // (less detail where a pixel cannot show it: these are small and far)
     into: look.direct ? c : null,                    // (the hill: straight onto its row's layer)
+    batch: V.firBatch,                               // (neighbouring boughs drawn together, one stroke per colour: yukitsuri.js o.batch; 1 = each on its own)
     cpu: !!look.cpu,                                 // (V.firCpu: drawn on the main processor at twice the size; off = the graphics chip)
     cpuBody: !!look.cpu                              // (the shrine's firs: laid onto the hall's picture being built)
   };
@@ -3085,14 +3086,25 @@ function frostPlaces() {
       extra++;
     }
   }
+  // (after the others are placed, so none of them moves: they were placed without these trees)
+  // V.ftShrine: seven frosted trees where the shrine's seven firs stood (they stand on the rise the hall stands on: the eye is
+  // only a little above that snow, so their size and distance follow from where their feet are on it, as the hall's)
+  if (V.ftShrine && V.hallShow && V.hfShow && typeof WinterHall !== 'undefined') {
+    var hall = trailHall(), eyeR = hall ? -hall.Y0 : 0;
+    if (eyeR > 0.2) hallFirList(blkPlace('hall')).forEach(function (f, k) {
+      var d = f.foot - hy; if (d < 1) return;
+      var D = eyeR * F / d;
+      out.push({ i: 50 + k, x: f.x, foot: f.foot, D: D, h: f.h * D / F, trunks: 1, eye: eyeR, shrine: true });
+    });
+  }
   return out.sort(function (a, b) { return a.foot - b.foot; });
 }
 function ftOptions(P) {
-  var hy = H * V.horizonLine, F = lakeLens(), D = V.eyeHeight * F / Math.max(1, P.foot - hy);
+  var hy = H * V.horizonLine, F = lakeLens(), eyeH = P.eye || V.eyeHeight, D = eyeH * F / Math.max(1, P.foot - hy);
   var hz = clamp((1 - Math.exp(-Math.pow(D / Math.max(10, V.fieldHazeDist), 1.6))) * V.fieldHaze * V.ftHaze, 0, 0.92);
   var bark = hex(V.colours.frostBark), sn = hex(V.colours.snow);
   return {
-    cam: { F: F, cx: W / 2, hy: hy }, eye: V.eyeHeight, footX: P.x, footY: P.foot, PR: PR, W: W, H: H, D: D,
+    cam: { F: F, cx: W / 2, hy: hy }, eye: eyeH, footX: P.x, footY: P.foot, PR: PR, W: W, H: H, D: D,
     light: { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, vis: LT.vis }, shade: SHADE, snow: sn, rime: mix(sn, [236, 242, 252], 0.45),
     bark: { bark: bark, dark: scale(bark, 0.42), light: mix(bark, [200, 196, 192], 0.5), lichen: [168, 172, 160], moss: [78, 90, 48] },
     rimeK: V.ftRime, snowK: V.ftSnow, feather: V.ftFeather, trunks: V.ftBark3d,
@@ -3166,6 +3178,7 @@ function frostMirror(c) {
   if (!V.ftShow || !V.ftReflect || !FT.list.length) return;
   var hy = H * V.horizonLine, F = lakeLens(), res = LAKEW.res, pad = LAKEW.pad, top = LAKEW.top;
   FT.list.forEach(function (E) {
+    if (E.P.shrine) return;                         // (the shrine's trees stand on the hall's rise, far from the water)
     var yw = hy + (V.eyeHeight + V.bankDrop) * F / E.o.D, b = E.R.box;
     c.setTransform(res, 0, 0, -res, pad * res, (2 * yw - top) * res);
     c.drawImage(E.R.body, b.bx, b.by, b.w, b.h);
@@ -4297,6 +4310,7 @@ var G = [
     { chk: 'V', k: 'hillShow', label: 'Show the hill', re: 'hill' },
     { chk: 'V', k: 'hillFirs', label: 'Firs on the hill', re: 'hill' },
     { chk: 'V', k: 'hillNewFirs', label: 'Firs as the right bank\'s (no ropes)', re: 'hill', note: 'On: the right bank\'s firs (yukitsuri.js; their snow and width follow "Roped pines and firs"). Off: the older hill firs, with the values below.' },
+    { o: 'V', k: 'firBatch', label: 'These firs: boughs drawn together (1 = each on its own)', min: 1, max: 16, step: 1, re: 'hill hall', note: 'Neighbouring boughs of the small far firs are drawn in groups, one stroke per colour for the group instead of one per bough: the same needles in the same places, far less work for the graphics chip. 4 (default) looks practically as before; larger groups are faster but the far firs read a little lighter and flatter. 1 = as before.' },
     { chk: 'V', k: 'firCpu', label: 'Draw these firs on the main processor (2× size)', re: 'hill hall', note: 'Off (default): on the graphics chip, as before the last speed round. On: on the main processor at twice the size, shrunk (faster in a browser without a graphics chip). For timing both ways: see the Report lines "hill and pagoda" and "hall and the firs beside it". Applies to the hill\'s and the shrine\'s firs.' },
     { o: 'V', k: 'hillSeed', label: 'Which forest (seed)', min: 1, max: 99, step: 1, re: 'hill', note: 'Each number lays out a different forest, with different trees.' },
     { o: 'V', k: 'hillRows', label: 'Rows of firs', min: 2, max: 16, step: 1, re: 'hill', note: 'From the crest down to the foot.' },
@@ -4343,6 +4357,7 @@ var G = [
     { chk: 'V', k: 'hallRailing', label: 'Vermilion veranda railing (with copper knobs)', re: 'hall' },
     { chk: 'V', k: 'hallRope', label: 'Sacred rope with paper streamers, and the name plaque, over the doors', re: 'hall' },
     { o: 'V', k: 'hallRiseFront', label: 'The rise it stands on: length of its slope in front (m)', min: 14, max: 120, step: 1, re: 'hall trail', note: 'The hall stands 2.5 m above the snow field (where the reference has it). The path climbs this slope to its steps: longer is gentler.' },
+    { chk: 'V', k: 'ftShrine', label: 'Frosted trees beside it instead of the firs', re: 'hall frost', note: 'On: seven frosted trees (the frosted trees\' painter) stand where the seven firs stood, and the firs are not drawn (the rise of snow they stood on stays). Off: the firs, as before.' },
     { chk: 'V', k: 'hfShow', label: 'Show the firs beside it', re: 'hall' },
     { chk: 'V', k: 'hfNewFirs', label: 'Firs as the right bank\'s (no ropes)', re: 'hall', note: 'On: the right bank\'s firs (yukitsuri.js). Off: the older firs.' },
     { o: 'V', k: 'hfSeed', label: 'Which firs (seed)', min: 1, max: 99, step: 1, re: 'hall', note: 'Every fir is its own tree from this.' },
