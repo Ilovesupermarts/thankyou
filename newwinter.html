@@ -417,7 +417,7 @@ var V_DEFAULTS = {
   mistY: 0.645, mistHeight: 0.14, mistStrength: 0.85,
   // the valley mist (wintermist.js, step 4): ground fog drifting in the valley in front of the hill's lower slopes
   vmShow: true, vmRise: 0.14, vmBelow: 0.03, vmDensity: 1, vmScale: 1, vmWarp: 1, vmSpeed: 1, vmMorph: 1, vmStrength: 0.9,
-  vmWarm: 1, vmSparkle: 0.6, vmRes: 0.5,
+  vmWarm: 1, vmRes: 0.5,
   // its layer in front of the hall and its firs (so it passes through the shrine): how strong, how high above the hall's
   // foot it reaches (share of the height), how many gaps; how puffy (rounded heaps, like smoke or low cloud) both are
   vmFront: 1, vmFrontRise: 0.08, vmFrontGaps: 1, vmBillow: 1,
@@ -3238,7 +3238,7 @@ function mistFrame(t, dt) {
   var Ls = mistLayers();
   VMIST.pic = WinterMist.render({ w: W * PR * V.vmRes, res: V.vmRes, PR: PR, W: W, H: H, layers: Ls,
                                   time: t * V.vmMorph, lit: fogLit(), shade: fogShade(), glow: glow,
-                                  sunX: P.x, sunY: P.y, warm: V.vmWarm * (night ? 0.3 : 1), sparkle: V.vmSparkle * (night ? 0.2 : 1) });
+                                  sunX: P.x, sunY: P.y, warm: V.vmWarm * (night ? 0.3 : 1) });
   VMIST.info = VMIST.pic ? 'wintermist.js (WebGL 2, ' + Ls.length + ' layers' + (WinterMist.renewals() ? ', context made again ' + WinterMist.renewals() + '×' : '') + ')' : 'not drawn';
 }
 function drawMist(i) {
@@ -4045,21 +4045,20 @@ var G = [
     { o: 'V', k: 'mistY', label: 'Middle (share of the height, on the reference)', min: 0.45, max: 0.8, step: 0.005, re: 'live' },
     { o: 'V', k: 'mistHeight', label: 'Height', min: 0.02, max: 0.4, step: 0.005, re: 'live' },
     { o: 'V', k: 'mistStrength', label: 'Strength', min: 0, max: 1, step: 0.01, re: 'live' },
-    { chk: 'V', k: 'vmShow', label: 'Drifting fog (wintermist.js)', re: 'live', note: 'Banks of fog rolling slowly past and through the pagoda hill and the shrine: one layer behind the hall (over the hill\'s foot and the pagoda), one in front of the hall and its firs. Off: the flat band above (its middle, height and strength apply only to it).' },
+    { chk: 'V', k: 'vmShow', label: 'Drifting fog (wintermist.js)', re: 'live', note: 'Many large soft puffs of smoke, each turning and drifting on its own (as ykob\'s three.js sketch "fog"), rolling slowly past and through the pagoda hill and the shrine: one layer behind the hall (over the hill\'s foot and the pagoda), one in front of the hall and its firs. Off: the flat band above (its middle, height and strength apply only to it).' },
     { o: 'V', k: 'vmRise', label: 'Behind the hall: how high it reaches above the valley floor', min: 0.02, max: 0.3, step: 0.005, re: 'live', note: 'Share of the screen\'s height above the horizon line (the pagoda\'s foot is about 0.16 above it).' },
     { o: 'V', k: 'vmFront', label: 'In front of the hall: strength (0 = none)', min: 0, max: 1.5, step: 0.05, re: 'live', note: 'The layer drifting in front of the hall and its firs, so the fog passes through the shrine.' },
     { o: 'V', k: 'vmFrontRise', label: 'In front of the hall: how high up its walls', min: 0.01, max: 0.2, step: 0.005, re: 'live', note: 'Share of the screen\'s height above the hall\'s foot.' },
     { o: 'V', k: 'vmFrontGaps', label: 'In front of the hall: gaps (the hall showing through)', min: 0, max: 3, step: 0.05, re: 'live' },
-    { o: 'V', k: 'vmBillow', label: 'Puffiness (rounded heaps, like smoke or cloud)', min: 0, max: 2, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmBillow', label: 'Puffiness (rounded billows in each puff)', min: 0, max: 2, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmBelow', label: 'How far it reaches over the far snow', min: 0, max: 0.1, step: 0.005, re: 'live' },
     { o: 'V', k: 'vmDensity', label: 'Density', min: 0, max: 2, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmStrength', label: 'Strength (how opaque)', min: 0, max: 1.5, step: 0.05, re: 'live' },
-    { o: 'V', k: 'vmScale', label: 'Size of the banks (smaller = finer)', min: 0.3, max: 3, step: 0.05, re: 'live' },
-    { o: 'V', k: 'vmWarp', label: 'How much it rolls and swirls', min: 0, max: 2.5, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmScale', label: 'Size of the puffs', min: 0.3, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmWarp', label: 'How fast the puffs turn (the swirl)', min: 0, max: 2.5, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmSpeed', label: 'Drift with the wind', min: 0, max: 4, step: 0.05, re: 'live' },
-    { o: 'V', k: 'vmMorph', label: 'How fast it changes shape', min: 0, max: 4, step: 0.05, re: 'live' },
+    { o: 'V', k: 'vmMorph', label: 'How fast it lives (puffs turning, fading in and out)', min: 0, max: 4, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmWarm', label: 'Glow toward the low sun', min: 0, max: 2.5, step: 0.05, re: 'live' },
-    { o: 'V', k: 'vmSparkle', label: 'Diamond dust (ice crystals catching the sun)', min: 0, max: 2, step: 0.05, re: 'live' },
     { o: 'V', k: 'vmRes', label: 'Resolution (share of the screen\'s)', min: 0.25, max: 1, step: 0.05, re: 'live', note: 'Lower is lighter for the graphics chip; the mist is soft, so 0.5 loses nothing visible.' },
     { col: 'V', keys: [['mist', 'Mist']], re: 'all' },
     { chk: 'V', k: 'dfShow', label: 'Depth fog (as three.js\'s FogExp2)', re: 'live', note: 'Everything fades toward the fog\'s colour by its distance: the near snow hardly, the hall a little, the pagoda more, the mountains most. Laid on as each picture is drawn: nothing bakes again.' },
