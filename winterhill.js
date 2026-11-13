@@ -649,6 +649,9 @@ function pagoda(c, cam, o) {
    ===================================================================== */
 var NEEDLES = ['#2F4A3B', '#2B4440', '#35473A', '#283C37', '#3A4C3C', '#2E3F3E', '#3E5040'].map(hex);
 function fir(c, x, y, h, seed, look) {
+  // another painter can draw the tree in this one's place (the page's: the right bank's firs, yukitsuri.js); the hill's
+  // own random numbers and places are untouched by it
+  if (look.painter) { look.painter(c, x, y, h, seed, look); return; }
   var r = rng(seed * 7919 + 13), L = look.light, hz = look.haze || 0;
   // this tree's own build: every tree is different (crown shape, fullness, lopsidedness, snow, colour)
   var wr = lerp(0.3, 0.62, r()) * (look.width || 1);            // width / height

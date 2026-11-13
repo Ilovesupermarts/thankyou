@@ -376,6 +376,9 @@ var V_DEFAULTS = {
   plumRX: 0, plumRY: 0, plumRSize: 1,
   // step 3, the hill of firs (winterhill.js): which forest, rows, how close and how full, the firs' sizes at the crest and
   // at the foot (shares of the height), their look, snow, mist with distance and softness (the preview's option B, the user's choice)
+  // the hill's and the shrine's firs drawn as the right bank's (yukitsuri.js, variant 1: no ropes, pole or props, painted wood);
+  // off: their own older firs (winterhill.js)
+  hillNewFirs: true, hfNewFirs: true,
   hillShow: true, hillFirs: true, hillSeed: 11, hillRows: 9, hillDensity: 0.55, hillFill: 0.92, hillFirFar: 0.03, hillFirNear: 0.08,
   hillFirWidth: 0.78, hillTiers: 1, hillSparse: 0.35, hillDroop: 1, hillLean: 1, hillFirSnow: 0.7, hillBrush: 1, hillSoft: 1,
   hillHazeFar: 0.68, hillHazeNear: 0.18, hillNeedleTint: 0,
@@ -948,7 +951,7 @@ function startHill() {
     treeFar: V.hillFirFar * H * ph.sz, treeNear: V.hillFirNear * H * ph.sz, density: V.hillDensity, fill: V.hillFill, snow: V.hillFirSnow,
     hazeFar: V.hillHazeFar, hazeNear: V.hillHazeNear, treeWidth: V.hillFirWidth, light: L, soft: V.hillSoft, noTrees: !V.hillFirs,
     look: { tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean, brush: V.hillBrush,
-            needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle) },
+            needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle), painter: V.hillNewFirs ? ytFirPaint : null },
     // no tree right behind the pagoda's lowest storey in the rows in front of it, none on or just in front of its steps
     clearing: function (x, y, u) {
       if (!V.pagodaShow) return false;
@@ -1023,7 +1026,8 @@ function startHall() {
              grain: V.fieldGrain, res: 0.6, swell: V.fieldSwell, drifts: V.fieldDrifts, seed: V.seed },
     firs: firs,
     firLook: { snow: V.hfSnow, width: V.hfWidth, tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean,
-               brush: V.hillBrush, soft: V.hillSoft, needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle) }
+               brush: V.hillBrush, soft: V.hillSoft, needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle),
+               painter: V.hfNewFirs ? ytFirPaint : null }
   });
 }
 /* ============================================================
@@ -2799,6 +2803,33 @@ function ytOptions(P) {
     haze: hz, hazeCol: light(hex(V.colours.mist)), soft: V.ytSoft * 0.35 * PR, loose: V.ytLoose, dof: ytDofBlur(D)
   };
 }
+/* The hill's and the shrine's firs drawn as the right bank's (the user: "Replace the firs on the pagoda hill and around the
+   shrine with those on the right hand bank … Exclude the ropes and sticks"): yukitsuri.js's variant 1 (the tall slender
+   fir), no ropes, pole or props, painted wood (their 3D bark is too slow for hundreds of trees: the user's choice), no
+   snow that falls. Called by winterhill.js's fir() in its place: foot (x, y), height h (CSS px), its own seed; the tree is
+   built in metres and seen through a camera that puts it exactly there (the shrine's firs at their real distance). */
+function ytFirPaint(c, x, y, h, seed, look) {
+  if (typeof Yukitsuri === 'undefined' || h < 1) return;
+  var sc = c.getTransform().a, rr = rngFrom(seed * 131 + 7);
+  var Hm = look.Hm || lerp(7, 12, rr()), D = look.D || 250, F = h * D / Hm, eye = V.eyeHeight;
+  var T = Yukitsuri.build({ variant: 1, seed: seed, height: Hm, roped: false, crown: lerp(0.16, 0.26, rr()), props: 0, ropes: 0,
+                            width: V.ytFirWidth * (look.width || 1), snow: V.ytSnow, cover: V.ytSnowCover });
+  var hz = clamp(look.haze || 0, 0, 0.95), bark = hex(V.colours.pineBark);
+  var o = {
+    cam: { F: F, cx: x, hy: y - eye * F / D }, eye: eye, footX: x, footY: y, PR: sc, W: W, H: H, D: D,
+    light: { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, vis: LT.vis }, shade: SHADE, snow: hex(V.colours.snow),
+    needle: hex(V.colours.needle), rope: hex(V.colours.rope), bamboo: hex(V.colours.bamboo),
+    bark: { bark: bark, dark: scale(bark, 0.42), light: mix(bark, [190, 186, 184], 0.45), lichen: [150, 152, 140], moss: [78, 90, 48] },
+    haze: hz, hazeCol: look.light && look.light.haze ? look.light.haze : light(hex(V.colours.mist)),
+    // the hill softens each whole row once (look.direct); the shrine's firs are laid down soft one by one, as before
+    soft: look.direct ? 0 : (0.3 + hz * 0.3) * sc * (look.soft === undefined ? 1 : look.soft),
+    loose: 0, dof: 0, trunks: false
+  };
+  var job = Yukitsuri.bakeJob(T, o);
+  job.step(Infinity);
+  var R = job.result, b = R.box;
+  c.drawImage(R.body, b.bx, b.by, b.w, b.h);
+}
 function startPines() {
   PINES.job = null; PINES.next = [];
   PINES.t0 = performance.now();
@@ -3394,14 +3425,14 @@ function ytCtls() {
     { chk: 'V', k: 'ytShow', label: 'Show the roped pines and firs', re: 'pines block', note: 'Off: the flat block-in shapes come back.' },
     { o: 'V', k: 'ytSeed', label: 'Which trees (seed)', min: 1, max: 99, step: 1, re: 'pines', note: 'Every tree is its own from this: its limbs, pads, boughs and snow.' },
     { o: 'V', k: 'ytCount', label: 'How many trees', min: 0, max: 16, step: 1, re: 'pines', note: 'The first six stand where the scene picture has them (each set below); more are placed on the right bank\'s land by the seed (never on or near the water). Each tree adds to the time the trees take to appear.' },
-    { o: 'V', k: 'ytSnow', label: 'Snow: how deep it lies on the branches', min: 0, max: 2.5, step: 0.05, re: 'pines' },
-    { o: 'V', k: 'ytSnowCover', label: 'Snow: how much of the branches it covers', min: 0, max: 1.5, step: 0.05, re: 'pines', note: '1 = as now; less leaves more bare branch, more covers more of each branch (it still lies only on the branches).' },
+    { o: 'V', k: 'ytSnow', label: 'Snow: how deep it lies on the branches', min: 0, max: 2.5, step: 0.05, re: 'pines hill hall' },
+    { o: 'V', k: 'ytSnowCover', label: 'Snow: how much of the branches it covers', min: 0, max: 1.5, step: 0.05, re: 'pines hill hall', note: '1 = as now; less leaves more bare branch, more covers more of each branch (it still lies only on the branches).' },
     { chk: 'V', k: 'ytDof', label: 'Depth of field', re: 'pines', note: 'Trees nearer or farther than the focus distance are blurred, as by a camera lens.' },
     { o: 'V', k: 'ytFocus', label: 'Depth of field: distance in focus (m)', min: 20, max: 200, step: 1, re: 'pines', note: 'The nearest tree here is about 50 m away, the farthest about 100 m.' },
     { o: 'V', k: 'ytDofStrength', label: 'Depth of field: strength', min: 0, max: 4, step: 0.05, re: 'pines' },
     { o: 'V', k: 'ytDofMax', label: 'Depth of field: most blur (px)', min: 0, max: 10, step: 0.1, re: 'pines' },
     { o: 'V', k: 'ytRopes', label: 'Ropes: how many (×)', min: 0.3, max: 2, step: 0.05, re: 'pines' },
-    { o: 'V', k: 'ytFirWidth', label: 'Variant 1: crown width (×)', min: 0.6, max: 1.8, step: 0.05, re: 'pines' },
+    { o: 'V', k: 'ytFirWidth', label: 'Variant 1: crown width (×)', min: 0.6, max: 1.8, step: 0.05, re: 'pines hill hall' },
     { chk: 'V', k: 'ytProps', label: 'Bamboo props under the long limbs (variants 2, 3, 5)', re: 'pines' },
     { o: 'V', k: 'ytSoft', label: 'Softness of the edges', min: 0, max: 3, step: 0.05, re: 'pines' },
     { o: 'V', k: 'ytHaze', label: 'Mist with distance (× the snow\'s)', min: 0, max: 3, step: 0.05, re: 'pines' },
@@ -3537,6 +3568,7 @@ var G = [
   { name: 'Hill of firs (step 3)', file: 'winterhill.js', note: 'The hill and its rows of firs, from the crest (far, small, misty) to the foot (near, larger, clearer). Every fir is its own tree from its seed. Its place and size: "Layout: where each element stands", Hill of firs. The needle colour: "Colours of the new scene", Pine needles.', ctls: [
     { chk: 'V', k: 'hillShow', label: 'Show the hill', re: 'hill' },
     { chk: 'V', k: 'hillFirs', label: 'Firs on the hill', re: 'hill' },
+    { chk: 'V', k: 'hillNewFirs', label: 'Firs as the right bank\'s (no ropes)', re: 'hill', note: 'On: the right bank\'s firs (yukitsuri.js; their snow and width follow "Roped pines and firs"). Off: the older hill firs, with the values below.' },
     { o: 'V', k: 'hillSeed', label: 'Which forest (seed)', min: 1, max: 99, step: 1, re: 'hill', note: 'Each number lays out a different forest, with different trees.' },
     { o: 'V', k: 'hillRows', label: 'Rows of firs', min: 2, max: 16, step: 1, re: 'hill', note: 'From the crest down to the foot.' },
     { o: 'V', k: 'hillDensity', label: 'Density (how close together)', min: 0, max: 1, step: 0.01, re: 'hill', note: 'Higher = the firs in a row stand closer.' },
@@ -3583,6 +3615,7 @@ var G = [
     { chk: 'V', k: 'hallRope', label: 'Sacred rope with paper streamers, and the name plaque, over the doors', re: 'hall' },
     { o: 'V', k: 'hallRiseFront', label: 'The rise it stands on: length of its slope in front (m)', min: 14, max: 120, step: 1, re: 'hall trail', note: 'The hall stands 2.5 m above the snow field (where the reference has it). The path climbs this slope to its steps: longer is gentler.' },
     { chk: 'V', k: 'hfShow', label: 'Show the firs beside it', re: 'hall' },
+    { chk: 'V', k: 'hfNewFirs', label: 'Firs as the right bank\'s (no ropes)', re: 'hall', note: 'On: the right bank\'s firs (yukitsuri.js). Off: the older firs.' },
     { o: 'V', k: 'hfSeed', label: 'Which firs (seed)', min: 1, max: 99, step: 1, re: 'hall', note: 'Every fir is its own tree from this.' },
     { o: 'V', k: 'hfSize', label: 'Firs: size (×)', min: 0.5, max: 1.6, step: 0.01, re: 'hall' },
     { o: 'V', k: 'hfWidth', label: 'Firs: width (×)', min: 0.5, max: 1.8, step: 0.01, re: 'hall' },
