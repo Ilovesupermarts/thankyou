@@ -364,18 +364,18 @@ var V_DEFAULTS = {
   // where the swipe button (次へ →) and the page dots stand: the middle of each, as a share of the height
   navY: 0.65, dotsY: 0.69,
   // each element's place (step 0): moved across and up/down (shares of the screen) and sized about its foot
-  fujiX: 0, fujiY: 0, fujiSize: 1,
+  fujiX: 0.11, fujiY: 0.005, fujiSize: 1,
   hillX: 0, hillY: 0, hillSize: 1,
-  pagodaX: 0, pagodaY: 0, pagodaSize: 0.77,
-  hallX: 0, hallY: 0, hallSize: 1.25,
-  frostX: 0, frostY: 0, frostSize: 1,
+  pagodaX: 0, pagodaY: 0, pagodaSize: 0.69,
+  hallX: 0, hallY: 0, hallSize: 1.3,
+  frostX: -0.085, frostY: 0.015, frostSize: 1.38,
   lakeX: 0, lakeY: 0, lakeSize: 1,
   pinesX: 0, pinesY: 0, pinesSize: 1,
   pathX: 0, pathY: 0, pathSize: 1,
-  gatesX: 0.3, gatesY: 0, gatesSize: 1,       // the three torii (not 'torii…': winter2.html's old saved toriiX / toriiSize would be read as these)
+  gatesX: -0.3, gatesY: 0, gatesSize: 1,       // the three torii (not 'torii…': winter2.html's old saved toriiX / toriiSize would be read as these)
   lanternsX: 0.3, lanternsY: 0, lanternsSize: 1,
-  plumLX: 0, plumLY: 0, plumLSize: 1,
-  plumRX: 0, plumRY: 0, plumRSize: 1,
+  plumLX: 0, plumLY: 0, plumLSize: 1.33,
+  plumRX: 0, plumRY: 0, plumRSize: 1.41,
   // step 3, the hill of firs (winterhill.js): which forest, rows, how close and how full, the firs' sizes at the crest and
   // at the foot (shares of the height), their look, snow, mist with distance and softness (the preview's option B, the user's choice)
   // the hill's and the shrine's firs drawn as the right bank's (yukitsuri.js, variant 1: no ropes, pole or props, painted wood);
@@ -386,40 +386,40 @@ var V_DEFAULTS = {
   hillHazeFar: 0.68, hillHazeNear: 0.18, hillNeedleTint: 0,
   // step 3, the pagoda: turned (degrees from facing you), dark timber instead of vermilion and white, snow, mist on it, its
   // windows' light after dusk, the row of firs it stands among (0 the crest … 1 the foot), and the clearing round it
-  pagodaShow: true, pagodaTurn: 45, pagodaTimber: false, pagodaSnow: 1, pagodaHaze: 0.12, pagodaLamps: 1, pagodaRow: 0.32, pagodaClear: 1,
+  pagodaShow: true, pagodaTurn: 45, pagodaTimber: false, pagodaSnow: 1, pagodaHaze: 0.23, pagodaLamps: 1, pagodaRow: 0.32, pagodaClear: 1,
   // the pagoda's and the hall's depth of field (each its own lens, as the pines': on, the distance in focus in m, how
   // strongly what is nearer or farther blurs, the most it blurs in CSS px)
-  pagodaDof: false, pagodaFocus: 200, pagodaDofStrength: 3, pagodaDofMax: 8,
+  pagodaDof: true, pagodaFocus: 300, pagodaDofStrength: 0.35, pagodaDofMax: 1.8,
   hallDof: false, hallFocus: 200, hallDofStrength: 1, hallDofMax: 3,
   // step 5, the shrine hall (winterhall.js): shown, turned (degrees; + turns its right end toward you), the snow on its
   // roof (×), how far its eaves stand out (×), its roof's height (×), how much its corners turn up (×), mist on it, the
   // low mist at its foot, the shadows it and the firs cast on the snow, its lamps after dusk and their light on the snow
   // the frosted trees (frosttree.js): bare trees white with rime, right of the hall (the reference's two, more by the seed)
-  ftShow: true, ftShrine: true, ftCount: 2, ftSeed: 5, ftTrunks: 3, ftSpread: 1, ftTwigs: 0.35, ftRime: 1, ftFeather: 0.6, ftSnow: 1, ftBark3d: true,
-  ftHaze: 0.55, ftSoft: 1, ftShadow: 1, ftReflect: true, ftSway: 1, ftDust: 1,
+  ftShow: true, ftShrine: true, ftCount: 8, ftSeed: 1, ftTrunks: 1, ftSpread: 1.15, ftTwigs: 0, ftRime: 0.8, ftFeather: 0.6, ftSnow: 1.5, ftBark3d: true,
+  ftHaze: 0.55, ftSoft: 1, ftShadow: 1, ftReflect: true, ftSway: 2.2, ftDust: 1.65,
   // each of the eight frosted trees by hand (a tree's own: shown, across and foot as shifts from where it stands now, height ×,
   // trunks (0 = as above), crown width ×, shape (0 = as now)); 0 / 1 leave every tree exactly where it was
-  frT1Show: true, frT1X: 0, frT1Foot: 0, frT1H: 1, frT1Trunks: 0, frT1Spread: 1, frT1Seed: 0,
-  frT2Show: true, frT2X: 0, frT2Foot: 0, frT2H: 1, frT2Trunks: 0, frT2Spread: 1, frT2Seed: 0,
-  frT3Show: true, frT3X: 0, frT3Foot: 0, frT3H: 1, frT3Trunks: 0, frT3Spread: 1, frT3Seed: 0,
-  frT4Show: true, frT4X: 0, frT4Foot: 0, frT4H: 1, frT4Trunks: 0, frT4Spread: 1, frT4Seed: 0,
-  frT5Show: true, frT5X: 0, frT5Foot: 0, frT5H: 1, frT5Trunks: 0, frT5Spread: 1, frT5Seed: 0,
-  frT6Show: true, frT6X: 0, frT6Foot: 0, frT6H: 1, frT6Trunks: 0, frT6Spread: 1, frT6Seed: 0,
-  frT7Show: true, frT7X: 0, frT7Foot: 0, frT7H: 1, frT7Trunks: 0, frT7Spread: 1, frT7Seed: 0,
+  frT1Show: true, frT1X: 0.003, frT1Foot: 0, frT1H: 1, frT1Trunks: 0, frT1Spread: 1, frT1Seed: 0,
+  frT2Show: true, frT2X: 0.059, frT2Foot: 0, frT2H: 1, frT2Trunks: 0, frT2Spread: 1, frT2Seed: 0,
+  frT3Show: true, frT3X: -0.073, frT3Foot: 0, frT3H: 1.49, frT3Trunks: 0, frT3Spread: 1, frT3Seed: 0,
+  frT4Show: true, frT4X: 0, frT4Foot: 0, frT4H: 0.65, frT4Trunks: 0, frT4Spread: 1, frT4Seed: 0,
+  frT5Show: true, frT5X: 0.0665, frT5Foot: 0, frT5H: 1, frT5Trunks: 0, frT5Spread: 1, frT5Seed: 0,
+  frT6Show: true, frT6X: 0.0675, frT6Foot: 0, frT6H: 1, frT6Trunks: 0, frT6Spread: 1, frT6Seed: 0,
+  frT7Show: true, frT7X: 0.012, frT7Foot: -0.006, frT7H: 0.71, frT7Trunks: 0, frT7Spread: 1, frT7Seed: 0,
   frT8Show: true, frT8X: 0, frT8Foot: 0, frT8H: 1, frT8Trunks: 0, frT8Spread: 1, frT8Seed: 0,
   hallVivid: 0.9, pagodaVivid: 0.9,
-  hallShow: true, hallTurn: 15, hallSnow: 1, hallEave: 1, hallRoof: 1, hallSori: 1, hallHaze: 0.12, hallFootMist: 0.8,
-  hallShadow: 1, hallLamps: 1, hallSpill: 1, hallWeather: 1, hallRidge: true, hallRailing: true, hallRope: true,
+  hallShow: true, hallTurn: 15, hallSnow: 1, hallEave: 1, hallRoof: 1, hallSori: 1, hallHaze: 0, hallFootMist: 0.39,
+  hallShadow: 1, hallLamps: 1, hallSpill: 1, hallWeather: 1.35, hallRidge: true, hallRailing: true, hallRope: true,
   // the seven frosted trees beside the hall (right of it): which trees (seed), trunks, crown width (×), all heights (×); then
   // each tree: shown, across and foot (fractions of the reference picture, moved with the hall), height (m)
-  ftSSeed: 5, ftSTrunks: 1, ftSSpread: 1, ftSSize: 1,
+  ftSSeed: 13, ftSTrunks: 1, ftSSpread: 0.93, ftSSize: 1.07,
   ftS1Show: true, ftS1X: 0.386, ftS1Foot: 0.665, ftS1H: 4.1,
   ftS2Show: true, ftS2X: 0.398, ftS2Foot: 0.666, ftS2H: 4.27,
   ftS3Show: true, ftS3X: 0.409, ftS3Foot: 0.664, ftS3H: 4.87,
   ftS4Show: true, ftS4X: 0.418, ftS4Foot: 0.665, ftS4H: 4.0,
-  ftS5Show: true, ftS5X: 0.428, ftS5Foot: 0.664, ftS5H: 4.24,
-  ftS6Show: true, ftS6X: 0.437, ftS6Foot: 0.665, ftS6H: 3.53,
-  ftS7Show: true, ftS7X: 0.446, ftS7Foot: 0.663, ftS7H: 3.95,
+  ftS5Show: true, ftS5X: 0.456, ftS5Foot: 0.664, ftS5H: 4.24,
+  ftS6Show: true, ftS6X: 0.5035, ftS6Foot: 0.6628, ftS6H: 4.35,
+  ftS7Show: true, ftS7X: 0.532, ftS7Foot: 0.663, ftS7H: 3.95,
   // the length (m) of the slope of the rise the hall stands on, in front of it (where the path climbs it)
   hallRiseFront: 60,
   // step 8, the trodden path (winterpath.js): five points it curves through (across, how far down: fractions of the
@@ -432,16 +432,16 @@ var V_DEFAULTS = {
   trail5X: 0.2329, trail5Y: 0.7187, trailBend: 1,
   trailWidth: 4, trailDepth: 0.3, trailWall: 0.22, trailBerm: 0.03, trailWobble: 0.45, trailTrod: 1, trailGrey: 0.5, trailShadow: 1, trailBounce: 0.65,
   // the valley mist: its middle (share of the height, as on the reference), its height and strength
-  mistY: 0.645, mistHeight: 0.14, mistStrength: 0.85,
+  mistY: 0.45, mistHeight: 0.02, mistStrength: 0,
   // the valley mist (wintermist.js, step 4): ground fog drifting in the valley in front of the hill's lower slopes
-  vmShow: true, vmRise: 0.14, vmBelow: 0.03, vmDensity: 1, vmScale: 1, vmWarp: 1, vmSpeed: 1, vmMorph: 1, vmStrength: 0.9,
+  vmShow: true, vmRise: 0.14, vmBelow: 0.08, vmDensity: 0.55, vmScale: 2.15, vmWarp: 2, vmSpeed: 1.6, vmMorph: 3.3, vmStrength: 1.45,
   vmWarm: 1, vmRes: 0.5,
   // its layer in front of the hall and its firs (so it passes through the shrine): how strong, how high above the hall's
   // foot it reaches (share of the height), how many gaps; how puffy (rounded heaps, like smoke or low cloud) both are
-  vmFront: 1, vmFrontRise: 0.08, vmFrontGaps: 1, vmBillow: 1,
+  vmFront: 0.45, vmFrontRise: 0.08, vmFrontGaps: 1, vmBillow: 1,
   // depth fog (as three.js's FogExp2): everything fades toward the fog's colour with its distance, 1 − e^−(density·d)²
   // (density per km), at most dfMax (so Fuji still shows)
-  dfShow: true, dfDensity: 1.4, dfMax: 0.5,
+  dfShow: false, dfDensity: 0.9, dfMax: 0.29,
   // the snow ground and the lake (step 6, winterlake.js): the eye's height above the snow (m), the banks' height above
   // the water (m) and how uneven their edge is; the snow's swells, wind-carved drifts, grain and sparkle, its haze
   // (how strong, and the distance (m) at which it is about two thirds mist), the low sun's warmth on the far snow
@@ -458,11 +458,11 @@ var V_DEFAULTS = {
   // sun's, and the sky's shade under each crown), the snow falling off (the share of it that can fall, one clump about
   // every so many seconds, how much a gust shakes off, after how many seconds fallen snow settles back: 0 never)
   ytShow: true, ytSeed: 3, ytSnow: 1, ytRopes: 1, ytFirWidth: 1.25, ytProps: true, ytSoft: 1, ytHaze: 1, ytShadow: 0.8, ytContact: 0.7,
-  ytLoose: 0.5, ytShedEvery: 14, ytShedGust: 1, ytReturn: 240, ytReflect: true,
+  ytLoose: 0.9, ytShedEvery: 14, ytShedGust: 1.85, ytReturn: 240, ytReflect: true,
   // how much of the branches the snow covers (with ytSnow, how deep it lies); how many trees stand on the bank (the first
   // six where the scene picture has them, more placed on the bank's land by the seed); depth of field: on, the distance in
   // focus (m), how strongly what is nearer or farther blurs, the most it blurs (CSS px)
-  ytSnowCover: 1, ytCount: 6, ytDof: false, ytFocus: 75, ytDofStrength: 1, ytDofMax: 3,
+  ytSnowCover: 1, ytCount: 6, ytDof: true, ytFocus: 50, ytDofStrength: 0.55, ytDofMax: 0.5,
   // each tree: shown, its width (×), its variant (1 tall and slender … 5 twin trunk), roped, across and its foot (shares of the screen, as
   // in the scene picture), its height (m: the pole's top, or the tree's top when not roped), variant 1's crown base (share
   // of its height)
@@ -489,7 +489,7 @@ var V_DEFAULTS = {
   bokeh: 6, backlight: 0.6,
   colours: {
     snow: '#FAFAFC',
-    mist: '#FCE8C4',
+    mist: '#ffffff',
     water: '#AEB8C8',
     vermilion: '#C9412C',
     stone: '#8F8B86',
@@ -525,7 +525,7 @@ var V_DEFAULTS = {
 var MT_DEFAULTS = {
   seed: 7,
   // the ridges between the pagoda hill and Fuji: winter2.html's ranges and the mountains' light (the user's values; Fuji's place and gullies kept)
-  rangeHeight: 0.06, featureKm: 6, sharpness: 0.55, layering: 0.81, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
+  rangeHeight: 0.045, featureKm: 3.5, sharpness: 0.55, layering: 0.81, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
   fujiX: 0.83, fujiHeight: 0.367, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.05, fujiSnow: 0.65, fujiTongues: 0.6, fujiClear: 0.9,
   snowLine: 0.25, snow: 0.9, treeLine: 1.12, forestSnow: 0.65, snowSlope: 0.55,
   sunStrength: 1.15, ambient: 0.65, shadows: 0.55, alpenglow: 0.6,
