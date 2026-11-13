@@ -39,6 +39,11 @@
    ============================================================ */
 var WinterLake = (function () {
 'use strict';
+
+// Pictures built from many strokes or pixels are drawn on canvases the main processor draws (willReadFrequently):
+// on a canvas the graphics chip draws, every stroke waits for the chip while it draws the scene (measured: 50–85× slower
+// for the firs). The finished picture is handed to the graphics chip once, when it is laid down.
+var CPU = { willReadFrequently: true };
 var PI = Math.PI, TAU = PI * 2;
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
 function lerp(a, b, t) { return a + (b - a) * t; }
@@ -197,7 +202,7 @@ function groundJob(c, o) {
   var W = o.W, H = o.H, PR = o.PR, hy = o.hy, F = o.F, eye = o.eye || 3, Sh = o.shore;
   var res = PR * (o.res || 0.6), gw = Math.max(2, Math.round(W * res)), y0 = Math.floor(hy), gh = Math.max(2, Math.round((H - y0) * res));
   var tmp = document.createElement('canvas'); tmp.width = gw; tmp.height = gh;
-  var tc = tmp.getContext('2d'), im = tc.createImageData(gw, gh), D = im.data;
+  var tc = tmp.getContext('2d', CPU), im = tc.createImageData(gw, gh), D = im.data;
   var L = o.light.dir, sun = o.light.sun, snow = o.snow, shade = mix(o.shade, snow, 0.12), mist = o.groundMist || o.mist, glowCol = o.sunRGB || [255, 220, 170];
   var vis = o.light.vis === undefined ? 1 : o.light.vis, hazeM = o.hazeM || 150, eps = 0.18, gs = o.grain || 0;
   /* ---- the trodden path (o.path: a WinterPath). The snow ground is drawn as if flat (its swells only shade it); the

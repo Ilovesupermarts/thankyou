@@ -65,6 +65,12 @@
 var Yukitsuri = (function () {
 'use strict';
 
+// o.lod's firs (the hill's and the shrine's: small, far, thousands of strokes) are drawn on canvases the main processor
+// draws (willReadFrequently), at twice the size (SS): on a graphics-chip canvas each stroke waits for the chip while it
+// draws the scene (measured: 50–85× slower); at that size the main processor draws the finest strokes harder than the
+// chip, so drawing twice the size and shrinking keeps their true look (measured). The right bank's trees are as before.
+var CPU = { willReadFrequently: true }, SS = 2;
+
 var PI = Math.PI, TAU = PI * 2;
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -942,6 +948,8 @@ function paintWood(c, T, P, o, K, box) {
         // (copied once into a picture of its own, so where the bark meets the snow can be found from it: the dark gap
         // between them is drawn only where there is bark, never across bare snow)
         var tmp = document.createElement('canvas'); tmp.width = g.w; tmp.height = g.h;
+        // (a graphics-chip canvas on purpose: copying the 3D picture into a main-processor canvas reads back the whole
+        // screen-sized picture from the chip; here only this small copy is read, by barkAlong)
         var tc = tmp.getContext('2d'); tc.drawImage(g.cnv, 0, 0, g.w, g.h, 0, 0, g.w, g.h);
         J.bark = barkAlong(tc, g, J, o.PR);
         c.save(); clipAbove(c, J, J.x - J.half * 3, J.x + J.half * 3, box.by - 10);
@@ -1008,13 +1016,16 @@ function bounds(T, P) {
 }
 function zOf(E) { return E.kind === 'pad' ? E.c[2] : (E.p0[2] + E.p2[2] * 2) / 3; }
 function bakeJob(T, o) {
-  var P = project(o), K = palette(o), box = bounds(T, P), PR = o.PR;
+  var P = project(o), K = palette(o), box = bounds(T, P), sup = o.lod && !o.into ? SS : 1, PR = o.PR * sup;
   T.fol.forEach(function (E) { E._sh = null; });
-  function layer() { var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(box.w * PR)); cv.height = Math.max(1, Math.ceil(box.h * PR)); var c = cv.getContext('2d'); c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); return { cnv: cv, c: c }; }
+  function layer(cpu) { var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(box.w * PR)); cv.height = Math.max(1, Math.ceil(box.h * PR)); var c = cv.getContext('2d', cpu ? CPU : undefined); c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); return { cnv: cv, c: c }; }
   // o.into: draw straight onto that context (its own transform: CSS px), with no pictures of its own and no softening
   // (the hill's firs: the hill softens each row at once; copying hundreds of small pictures cost far more than the drawing)
   var M0 = o.into ? o.into.getTransform() : null;
-  var work = o.into ? { cnv: null, c: o.into } : layer(), body = o.into ? null : layer(), front = o.into ? null : layer(), c = work.c;
+  // (work: drawn here, stroke by stroke; body: the finished tree the scene lays down every frame. There is no 'front'
+  // picture any more: nothing was ever drawn on it, yet it was laid down for every tree every frame)
+  // (o.cpuBody: the finished tree goes onto another picture being built, not onto the screen: keep it on the main processor too)
+  var work = o.into ? { cnv: null, c: o.into } : layer(!!o.lod), body = o.into ? null : layer(!!o.cpuBody), c = work.c;
   function setT() { if (M0) c.setTransform(M0); else c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); }
   // Everything in depth order (the farthest first), so whatever is nearer covers it: the foliage, the wood (trunk and
   // limbs, about the trunk's depth), and the ropes, the pole and the props piece by piece (each piece at its own depth).
@@ -1068,7 +1079,7 @@ function bakeJob(T, o) {
     // laid down a little soft, so no edge is ruler-sharp
     if (body) {
       var bc = body.c; bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0);
-      var bl = Math.hypot(o.soft || 0, o.dof || 0);
+      var bl = Math.hypot(o.soft || 0, o.dof || 0) * sup;          // (device px of this picture: twice the size for o.lod)
       if (bl > 0.05) bc.filter = 'blur(' + bl.toFixed(2) + 'px)';
       bc.drawImage(work.cnv, 0, 0); bc.restore();
       work.cnv.width = 1;
@@ -1082,7 +1093,7 @@ function bakeJob(T, o) {
       return { id: E.id, c: E.kind === 'pad' ? E.c : E.p1, rx: E.rx, rz: E.rz, top: top, z: zOf(E), scr: sc };
     });
   });
-  R.body = body ? body.cnv : null; R.front = front ? front.cnv : null;
+  R.body = body ? body.cnv : null;
   var ti = 0;
   return {
     result: R,

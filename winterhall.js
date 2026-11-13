@@ -47,6 +47,9 @@
 var WinterHall = (function () {
 'use strict';
 
+// Pictures filled pixel by pixel (putImageData: no drawing, so the same pixels either way) are kept on the main processor.
+var CPU = { willReadFrequently: true };
+
 var PI = Math.PI, TAU = PI * 2;
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -369,8 +372,10 @@ function job(o) {
   firs.forEach(function (T) { grow([T.f.x - T.f.h * 0.6, T.f.foot - T.f.h * 1.12]); grow([T.f.x + T.f.h * 0.6, T.f.foot + 4]); });
   bx0 = Math.max(-2, Math.floor(bx0 - 6)); by0 = Math.max(-2, Math.floor(by0 - 6)); bx1 = Math.min(W + 2, Math.ceil(bx1 + 6)); by1 = Math.min(H + 2, Math.ceil(by1 + 6));
   var LW = Math.max(1, Math.round((bx1 - bx0) * PR)), LH = Math.max(1, Math.round((by1 - by0) * PR));
-  function mkLayer() { var cv = document.createElement('canvas'); cv.width = LW; cv.height = LH; return cv; }
-  var OUT = mkLayer(), BODY = mkLayer(), GB = mkLayer(), GF = mkLayer();
+  // (OUT, the finished picture the scene lays down every frame, and BODY, where the timber is drawn: the graphics chip's;
+  // the ground and roof-snow pictures, filled pixel by pixel, the main processor's)
+  function mkLayer(cpu) { var cv = document.createElement('canvas'); cv.width = LW; cv.height = LH; cv.getContext('2d', cpu ? CPU : undefined); return cv; }
+  var OUT = mkLayer(false), BODY = mkLayer(false), GB = mkLayer(true), GF = mkLayer(true);
   var gBack = new Float32Array(LW * LH * 8), gFront = new Float32Array(LW * LH * 8), roofI = new Float32Array(LW * LH * 4);
   var gHit = new Uint8Array(LW * LH), rHit = new Uint8Array(LW * LH);   // 0 nothing, 1 back, 2 in front of the hall / 1 snow
   function sx(i) { return bx0 + (i + 0.5) / PR; }
@@ -1334,7 +1339,7 @@ function job(o) {
   }
 
   /* ---------- the job: a few rows or a tree at a time ---------- */
-  var TT = [], tasks = [], ti = 0, row = 0, edges = null, ei = 0, firI = 0, done = false, t00 = 0, info = '';
+  var TT = [], tasks = [], ti = 0, row = 0, edges = null, ei = 0, firI = 0, firPend = null, done = false, t00 = 0, info = '';
   var ROWS = 4;
   tasks.push(function (lim) { while (row < LH) { rasterRows('g', row, Math.min(LH, row + ROWS)); row += ROWS; if (performance.now() > lim) return false; } row = 0; return true; });
   tasks.push(function (lim) { if (!edges) { edges = findEdges('g'); ei = 0; } while (ei < edges.length) { edgeOne('g', edges[ei++]); if ((ei & 63) === 0 && performance.now() > lim) return false; } edges = null; return true; });
@@ -1344,7 +1349,8 @@ function job(o) {
     if (typeof WinterHill === 'undefined') return true;
     bc.setTransform(PR, 0, 0, PR, -bx0 * PR, -by0 * PR);
     var order = firs.slice().sort(function (A, B) { return B.D - A.D; });
-    while (firI < order.length) {
+    while (firPend || firI < order.length) {
+      if (firPend) { if (!firPend.step(Math.max(0.5, lim - performance.now()))) return false; firPend = null; if (performance.now() > lim) return false; continue; }
       var T = order[firI++], look = {};
       for (var kk in (o.firLook || {})) look[kk] = o.firLook[kk];
       look.light = o.light; look.haze = T.f.haze === undefined ? 0.4 : T.f.haze;
@@ -1352,7 +1358,7 @@ function job(o) {
       // its own depth of field (by its own distance), added to how soft the painter lays it down
       var dF = dofAt(T.D);
       if (dF > 0.05) { var s0 = (0.3 + look.haze * 0.3) * PR * (look.soft === undefined ? 1 : look.soft); look.soft = Math.hypot(s0, dF) / ((0.3 + look.haze * 0.3) * PR); }
-      WinterHill.fir(bc, T.f.x, T.f.foot, T.f.h, T.f.seed, look);
+      firPend = WinterHill.fir(bc, T.f.x, T.f.foot, T.f.h, T.f.seed, look) || null;   // (a painter's job, finished a bough at a time)
       if (performance.now() > lim) return false;
     }
     return true;
@@ -1361,7 +1367,7 @@ function job(o) {
   tasks.push(function (lim) { while (row < LH) { rasterRows('r', row, Math.min(LH, row + ROWS)); row += ROWS; if (performance.now() > lim) return false; } row = 0; return true; });
   tasks.push(function (lim) { if (!edges) { edges = findEdges('r'); ei = 0; } while (ei < edges.length) { edgeOne('r', edges[ei++]); if ((ei & 63) === 0 && performance.now() > lim) return false; } edges = null; return true; });
   tasks.push(function () {
-    var RC = mkLayer(); toCanvas(roofI, RC); roofI = null;
+    var RC = mkLayer(true); toCanvas(roofI, RC); roofI = null;
     bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0); bc.filter = 'blur(' + (0.35 * PR).toFixed(2) + 'px)'; bc.drawImage(RC, 0, 0); bc.restore();
     bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0); bc.drawImage(RC, 0, 0); bc.restore();   // (sharp over its own soft copy: a soft edge, no see-through)
     ridgeOrnaments(bc);
