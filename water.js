@@ -123,6 +123,7 @@ var FS = [
 'uniform sampler2D uMirror, uNormal;',
 'uniform float uMirror0;        // (o.mirror) > 0: everything mirrored by the full Fresnel of the angle, times this',
 'uniform vec2 uSize;            // the water on the screen (CSS px)',
+'uniform float uX0, uSpanX;     // (o.x0, o.span) the strip across that is drawn (CSS px); default 0 and the full width',
 'uniform float uTop, uHy, uF, uPad, uMirrorW, uTime, uDistort, uWave, uReflect, uSun, uFarK, uShade;',
 'uniform float uCalm;           // (o.calm) 0 … 1: the waves flattened toward still water (0: as they are)',
 'uniform vec3 uWater, uSunCol, uSunDir;',
@@ -190,7 +191,7 @@ var FS = [
 '  }',
 '}',
 'void main() {',
-'  float x = vUv.x * uSize.x, yIn = vUv.y * uSize.y, y = uTop + yIn;',
+'  float x = uX0 + vUv.x * uSpanX, yIn = vUv.y * uSize.y, y = uTop + yIn;',
 '  float d = max(0.6, y - uHy), z = uF / d, wx = (x - uSize.x * 0.5) * z / uF;',
 '  vec3 n = waves(vec2(wx, z));',
 '  vec2 rg = vec2(0.0); float blip = 0.0;',
@@ -278,7 +279,7 @@ function setup() {
   texM = gl.createTexture(); texN = gl.createTexture();
   return true;
 }
-var NAMES = ['uMirror', 'uNormal', 'uSize', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir', 'uFarK', 'uShade', 'uRain', 'uRainT', 'uPx', 'uRainSky', 'uMirror0', 'uCalm'];
+var NAMES = ['uMirror', 'uNormal', 'uSize', 'uX0', 'uSpanX', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir', 'uFarK', 'uShade', 'uRain', 'uRainT', 'uPx', 'uRainSky', 'uMirror0', 'uCalm'];
 /* The simulated waves (fftwaves.js), made the first time a page asks for them. */
 function fftSetup() {
   if (fftSim) return true;
@@ -367,6 +368,9 @@ function render(o) {
     gl.uniform1f(u.uEye, o.fft.eye || 1.6); gl.uniform1f(u.uDetail, o.fft.detail !== undefined ? o.fft.detail : 0.2); gl.uniform1f(u.uL0, fftSim.L[0]); gl.uniform1f(u.uL1, fftSim.L[1]);
   }
   gl.uniform2f(u.uSize, o.cssW, o.cssH);
+  // (opt-in, newwinter.html only: o.x0 / o.span draw just a strip across, e.g. the lake's own width; without them the whole width, as before)
+  var span = o.span > 0 ? o.span : o.cssW;
+  gl.uniform1f(u.uX0, o.x0 || 0); gl.uniform1f(u.uSpanX, span);
   gl.uniform1f(u.uTop, o.top); gl.uniform1f(u.uHy, o.horizon); gl.uniform1f(u.uF, o.lens);
   gl.uniform1f(u.uPad, o.pad); gl.uniform1f(u.uMirrorW, o.cssW + o.pad * 2);
   gl.uniform1f(u.uTime, o.time); gl.uniform1f(u.uDistort, o.distort); gl.uniform1f(u.uWave, o.waveSize || 1);
@@ -379,7 +383,7 @@ function render(o) {
   // toward the sun, from the water: across from where it is on the screen, up by its height above the eye line
   var sx = ((o.sunX || o.cssW / 2) - o.cssW / 2) / o.lens, sy = Math.max(0.02, (o.horizon - (o.sunY || 0)) / o.lens), sl = Math.hypot(sx, sy, 1);
   gl.uniform3f(u.uSunDir, sx / sl, sy / sl, 1 / sl);
-  gl.uniform1f(u.uRain, o.rain || 0); gl.uniform1f(u.uRainT, o.rainT || 0); gl.uniform1f(u.uPx, o.cssW / w);
+  gl.uniform1f(u.uRain, o.rain || 0); gl.uniform1f(u.uRainT, o.rainT || 0); gl.uniform1f(u.uPx, span / w);
   var rs = o.rainSky || [200, 204, 212];
   gl.uniform3f(u.uRainSky, rs[0] / 255, rs[1] / 255, rs[2] / 255);
   gl.drawArrays(gl.TRIANGLES, 0, 3);

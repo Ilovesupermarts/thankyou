@@ -399,13 +399,23 @@ function groundJob(c, o) {
     c.restore();
   }
   var j = 0, done = false, cpu = 0;
+  // (o.rowsOnly: the rows' pixels only, no picture: for a bake worker, which hands back pixels(). o.pixelsFrom: a holder
+  // { data, nPath, cpu } whose data (the same rows, worked out by such a worker) arrives later: the job waits for it and
+  // then finishes as usual; holder.fail: work the rows out here after all. Without either: as before.)
+  var PF = o.pixelsFrom || null;
   return {
     step: function (ms) {
       if (done) return true;
       var t0 = performance.now(), lim = ms === undefined ? Infinity : t0 + ms;
+      if (PF && !PF.fail && j < gh) {
+        if (!PF.data) return false;
+        D.set(PF.data); nPath = PF.nPath; cpu += PF.cpu; j = gh; PF.data = null;
+      }
       while (j < gh) { row(j++); if (performance.now() > lim) { cpu += performance.now() - t0; return false; } }
+      if (o.rowsOnly) { done = true; cpu += performance.now() - t0; return true; }
       finish(); done = true; cpu += performance.now() - t0; return true;
     },
+    pixels: function () { return D; },
     cancel: function () { done = true; },
     info: function () { return { rows: gh, pathPixels: nPath, cpu: cpu }; },
     // (for checking: what the line of sight through a point of the screen (CSS px) meets)
