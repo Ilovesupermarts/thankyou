@@ -378,7 +378,7 @@ var V_DEFAULTS = {
   // at the foot (shares of the height), their look, snow, mist with distance and softness (the preview's option B, the user's choice)
   // the hill's and the shrine's firs drawn as the right bank's (yukitsuri.js, variant 1: no ropes, pole or props, painted wood);
   // off: their own older firs (winterhill.js)
-  hillNewFirs: true, hfNewFirs: true, firCpu: false, keepPictures: true,
+  hillNewFirs: true, hfNewFirs: true, firCpu: false, keepPictures: true, loadBudget: 24,
   hillShow: true, hillFirs: true, hillSeed: 11, hillRows: 9, hillDensity: 0.55, hillFill: 0.92, hillFirFar: 0.03, hillFirNear: 0.08,
   hillFirWidth: 0.78, hillTiers: 1, hillSparse: 0.35, hillDroop: 1, hillLean: 1, hillFirSnow: 0.7, hillBrush: 1, hillSoft: 1,
   hillHazeFar: 0.68, hillHazeNear: 0.18, hillNeedleTint: 0,
@@ -982,11 +982,15 @@ function swapHill() {
   var t = HILL; HILL = HILLN; HILLN = t;
   hillJob = null; hillDrawn = true;
   scSave('hill', HILL.cnv);
-  note('hill and pagoda: ' + Math.round(performance.now() - hillT0) + ' ms (in steps of about 8 ms a frame)');
+  note('hill and pagoda: ' + Math.round(performance.now() - hillT0) + ' ms (in steps of about ' + stepMs() + ' ms a frame)');
 }
-var STEP_MS = 8;                                         // the hill's and the hall's drawing work a frame (checks may raise it: winterLab.stepBudget)
+var STEP_MS = 0;                                         // (check scripts only: winterLab.stepBudget; 0 = the panel's value)
+/* How much drawing work the slow bakes (hill, snow ground, hall, pines) do a frame, in ms: the panel's "Loading: drawing
+   work a frame" (V.loadBudget, default 24; it was 8). More = they finish sooner, but while one is baking the sun,
+   clouds and water move less smoothly. */
+function stepMs() { return STEP_MS || V.loadBudget || 8; }
 function stepHill() {
-  var fin = hillJob.step(STEP_MS);
+  var fin = hillJob.step(stepMs());
   if (fin) swapHill();
 }
 function drawHill() {
@@ -1201,11 +1205,11 @@ var TRAIL_EDIT = {
   put: function (o) { for (var k in o) V[k] = o[k]; }
 };
 function stepHall() {
-  if (HALL.job.step(STEP_MS)) {
+  if (HALL.job.step(stepMs())) {
     HALL.cnv = HALL.job.canvas; HALL.x = HALL.job.x; HALL.y = HALL.job.y; HALL.info = HALL.job.info; HALL.times = HALL.job.times();
     HALL.job = null;
     scSave('hall', HALL.cnv, { x: HALL.x, y: HALL.y, info: HALL.info, times: HALL.times });
-    note('hall and the firs beside it: ' + Math.round(performance.now() - HALL.t0) + ' ms (in steps of about 8 ms a frame) · ' + HALL.info + ' · ' + HALL.times);
+    note('hall and the firs beside it: ' + Math.round(performance.now() - HALL.t0) + ' ms (in steps of about ' + stepMs() + ' ms a frame) · ' + HALL.info + ' · ' + HALL.times);
   }
 }
 function drawHall() {
@@ -2650,11 +2654,11 @@ function bakeField() {
 }
 function stepField(ms) {
   if (!FIELDJ) return;
-  if (!FIELDJ.step(ms === undefined ? 8 : ms)) return;
+  if (!FIELDJ.step(ms === undefined ? stepMs() : ms)) return;
   var info = FIELDJ.info(), q = FIELD; FIELD = FIELDN; FIELDN = q;
   FIELDJ = null;
   scSave('field', FIELD.cnv);
-  if (ms === undefined) note('snow ground: ' + Math.round(performance.now() - FIELDT0) + ' ms (in steps of about 8 ms a frame)' +
+  if (ms === undefined) note('snow ground: ' + Math.round(performance.now() - FIELDT0) + ' ms (in steps of about ' + stepMs() + ' ms a frame)' +
                              ' · drawing work ' + Math.round(info.cpu) + ' ms' + (V.trailShow && TRAIL.T ? ' · ' + TRAIL.info + ', ' + info.pathPixels + ' pixels on it' : ''));
 }
 function bakeLake() {
@@ -2841,26 +2845,35 @@ function ytFirPaint(c, x, y, h, seed, look) {
   // drawn a bough at a time: the caller steps it within its time a frame (so no frame waits for a whole fir)
   return { step: function (ms) { c.setTransform(M); var d = job.step(ms); if (!d) { c.setTransform(M); return false; } fin(); return true; } };
 }
-function startPines() {
+/* kept: the kept pictures of the trees (scRestore): each tree is built (cheap) and its baked pictures laid in, with no
+   bake; returns false when they do not fit (then they are baked as usual). */
+function startPines(kept) {
+  var trees = kept && kept.meta && kept.meta.trees, list = V.ytShow ? ytPlaces() : [];
+  if (kept && (!trees || !list.length || trees.length !== list.length || typeof Yukitsuri.unpack !== 'function')) return false;
   PINES.job = null; PINES.next = [];
   PINES.t0 = performance.now();
-  if (!V.ytShow) { finishPines(); return; }
-  var list = ytPlaces();
-  if (!list.length) { finishPines(); return; }
-  var q = 0;
-  list.forEach(function (P) {
+  if (!V.ytShow || !list.length) { finishPines(); return true; }
+  var at = 0;
+  list.forEach(function (P, i) {
     var T = Yukitsuri.build({ variant: P.variant, seed: Math.round(V.ytSeed) * 101 + P.i * 17, height: P.h, roped: P.roped, crown: P.crown,
                               width: P.wide * (P.variant === 1 ? V.ytFirWidth : 1), snow: V.ytSnow, cover: V.ytSnowCover, ropes: V.ytRopes, props: V.ytProps });
     var o = ytOptions(P);
-    PINES.next.push({ P: P, T: T, o: o, job: Yukitsuri.bakeJob(T, o), R: null, A: null, K: null });
+    if (kept) {
+      var d = trees[i], pics = kept.bmps.slice(at, at + 1 + d.loose.length), R = Yukitsuri.unpack(o, d, pics);
+      at += 1 + d.loose.length;
+      PINES.next.push({ P: P, T: T, o: o, job: null, R: R, A: Yukitsuri.anim(R), K: R.K });
+    } else PINES.next.push({ P: P, T: T, o: o, job: Yukitsuri.bakeJob(T, o), R: null, A: null, K: null });
   });
-  PINES.job = { k: 0 };
+  PINES.fresh = !kept;
+  if (kept) finishPines(); else PINES.job = { k: 0 };
+  return true;
 }
 function stepPines() {
   var N = PINES.next, t0 = performance.now();
-  while (PINES.job && PINES.job.k < N.length && performance.now() - t0 < 8) {
+  var lim = stepMs();
+  while (PINES.job && PINES.job.k < N.length && performance.now() - t0 < lim) {
     var E = N[PINES.job.k];
-    if (E.job.step(8 - (performance.now() - t0))) { E.R = E.job.result; E.A = Yukitsuri.anim(E.R); E.K = E.R.K; E.job = null; PINES.job.k++; }
+    if (E.job.step(lim - (performance.now() - t0))) { E.R = E.job.result; E.A = Yukitsuri.anim(E.R); E.K = E.R.K; E.job = null; PINES.job.k++; }
   }
   if (PINES.job && PINES.job.k >= N.length) finishPines();
 }
@@ -2872,7 +2885,12 @@ function finishPines() {
   PINES.drawn = true;
   PINES.info = PINES.list.length + ' trees, ' + PINES.list.reduce(function (n, E) { return n + E.R.loose.length; }, 0) + ' clumps of snow that can fall, wood: ' +
                (PINES.list.length ? PINES.list[0].R.wood : '-');
-  note('roped pines and firs: ' + Math.round(performance.now() - PINES.t0) + ' ms (in steps of about 8 ms a frame) · ' + PINES.info);
+  if (PINES.fresh) {
+    PINES.fresh = false;
+    var cnvs = [], trees = PINES.list.map(function (E) { var pk = Yukitsuri.pack(E.R); cnvs = cnvs.concat(pk.pics); return pk.data; });
+    scSaveAll('pines', cnvs, { trees: trees });
+    note('roped pines and firs: ' + Math.round(performance.now() - PINES.t0) + ' ms (in steps of about ' + stepMs() + ' ms a frame) · ' + PINES.info);
+  }
 }
 /* the soft puff of powder snow a falling clump throws up */
 function ytPowder() {
@@ -3004,7 +3022,7 @@ window.winterLab = {
     return 'New winter report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
            ' (drawn at ' + PR.toFixed(2) + ') · 2D pictures wiped ' + lost2d + '×\n' + REPORT.join('\n');
   },
-  layers: function () { return { field: FIELD.cnv, still: STILL.cnv, mirror: MIRROR.cnv, pineShadow: PINES.shadow.cnv, hill: HILL.cnv, hall: HALL.cnv }; },
+  layers: function () { return { field: FIELD.cnv, still: STILL.cnv, mirror: MIRROR.cnv, pineShadow: PINES.shadow.cnv, hill: HILL.cnv, hall: HALL.cnv, pines: PINES.list.map(function (E) { return E.R.body; }), pineLoose: PINES.list.map(function (E) { return E.R.loose.map(function (L) { return L.spr; }); }) }; },
   // (for checking the falling snow: every clump on tree k, the farthest 0, lets go now)
   shake: function (k) { var E = PINES.list[k || 0]; if (E) for (var j = 0; j < E.A.rest.length; j++) Yukitsuri.shed(E.A, j, j * 0.15); },
   pines: function () { return PINES; },   // (for checking each picture on its own)
@@ -3065,9 +3083,9 @@ function paintSkyTint() {
    once. Panel: Report, "Keep baked pictures".
    ============================================================ */
 var BAKE_VER = 1;                                   // (raise it to throw every kept picture away after a change no label sees)
-var SC_STAGES = ['hill', 'field', 'hall'];
-var SC = { db: null, ready: false, giveUp: performance.now() + 4000, rec: {}, pic: { hill: 0, field: 0, hall: 0 }, want: {}, deps: {}, files: null };
-var SC_ROOTS = { hill: ['startHill', 'ytFirPaint'], field: ['bakeField'], hall: ['startHall'] };
+var SC_STAGES = ['hill', 'field', 'hall', 'pines'];
+var SC = { db: null, ready: false, giveUp: performance.now() + 4000, rec: {}, pic: { hill: 0, field: 0, hall: 0, pines: 0 }, want: {}, deps: {}, files: null };
+var SC_ROOTS = { hill: ['startHill', 'ytFirPaint'], field: ['bakeField'], hall: ['startHall'], pines: ['startPines', 'stepPines'] };
 var SC_COMMON = ['sceneLight', 'shadeColour', 'lampLevel', 'sunPlace', 'light', 'isNight', 'nightLights', 'blkPlace', 'blkY'];
 /* What a stage's code reads: its functions and every function of this page they call (read from their own text), and in
    them every value of V (and MT, SUN) they read by name. blkPlace('g') brings g's across / up / size; V['trail' + …]
@@ -3138,10 +3156,10 @@ function scLoadAll() {
     SC_STAGES.forEach(function (st) {
       var g = os.get(st);
       g.onsuccess = function () {
-        var r = g.result;
-        if (!r || !r.blob || typeof createImageBitmap !== 'function') { one(); return; }
-        createImageBitmap(r.blob, { premultiplyAlpha: 'premultiply', colorSpaceConversion: 'none' })
-          .then(function (b) { r.bmp = b; SC.rec[st] = r; one(); }, one);
+        var r = g.result, blobs = r ? (r.blobs || (r.blob ? [r.blob] : [])) : [];
+        if (!r || !blobs.length || typeof createImageBitmap !== 'function') { one(); return; }
+        Promise.all(blobs.map(function (bl) { return createImageBitmap(bl, { premultiplyAlpha: 'premultiply', colorSpaceConversion: 'none' }); }))
+          .then(function (bs) { r.bmps = bs; r.bmp = bs[0]; SC.rec[st] = r; one(); }, one);
       };
       g.onerror = one;
     });
@@ -3154,17 +3172,19 @@ function scTake(st) {
   if (!r || !r.bmp) return null;
   return r.key === SC.want[st] ? r : null;
 }
-function scSave(st, cnv, meta) {
+function scSave(st, cnv, meta) { scSaveAll(st, [cnv], meta); }
+function scSaveAll(st, cnvs, meta) {                 // (several pictures under one label: the pines)
   var id = ++SC.pic[st], key = SC.want[st];
-  if (!V.keepPictures || !SC.db || !key || !cnv || !cnv.width || !cnv.height) return;
-  cnv.toBlob(function (blob) {
-    if (!blob || SC.pic[st] !== id) return;         // (a newer picture came meanwhile)
+  if (!V.keepPictures || !SC.db || !key || !cnvs.length) return;
+  if (cnvs.some(function (c) { return !c || !c.width || !c.height || typeof c.toBlob !== 'function'; })) return;
+  Promise.all(cnvs.map(function (c) { return new Promise(function (ok) { c.toBlob(ok, 'image/png'); }); })).then(function (blobs) {
+    if (SC.pic[st] !== id || blobs.some(function (b) { return !b; })) return;   // (a newer picture came meanwhile)
     try {
       var tx = SC.db.transaction('p', 'readwrite');
-      tx.objectStore('p').put({ key: key, blob: blob, meta: meta || {}, at: Date.now() }, st);
+      tx.objectStore('p').put({ key: key, blobs: blobs, meta: meta || {}, at: Date.now() }, st);
       tx.oncomplete = function () { if (SC.pic[st] === id) SC.rec[st] = { key: key, bmp: null, meta: meta || {} }; };
     } catch (e) { /* not kept */ }
-  }, 'image/png');
+  });
 }
 function scForget() {
   SC.rec = {};
@@ -3194,9 +3214,11 @@ function scRestore(st) {
     var c = document.createElement('canvas'); c.width = b.width; c.height = b.height;
     c.getContext('2d').drawImage(b, 0, 0);
     HALL.cnv = c; HALL.x = r.meta.x; HALL.y = r.meta.y; HALL.info = r.meta.info || ''; HALL.times = r.meta.times || '';
+  } else if (st === 'pines') {
+    if (!startPines(r)) return false;
   }
   SC.pic[st]++;
-  var names = { hill: 'hill and pagoda', field: 'snow ground', hall: 'hall and the firs beside it' };
+  var names = { hill: 'hill and pagoda', field: 'snow ground', hall: 'hall and the firs beside it', pines: 'roped pines and firs' };
   note(names[st] + ': the kept picture, ' + Math.round(performance.now() - t0) + ' ms');
   return true;
 }
@@ -3637,7 +3659,8 @@ var G = [
   { name: 'Report', note: 'What happened on this tablet. After a change, wait 10 s, then tap Copy report and paste it to Claude.', ctls: [
     { report: true },
     { chk: 'V', k: 'keepPictures', label: 'Keep baked pictures (fast reload)', re: 'live', note: 'The hill and pagoda, the snow ground and the hall are kept in this browser once baked; when the page opens with the same values, light, time and screen they are laid down at once instead of baked again. Off: everything is baked every time.' },
-    { btn: 'forgetPictures', label: 'Throw the kept pictures away' } ] },
+    { btn: 'forgetPictures', label: 'Throw the kept pictures away' },
+    { o: 'V', k: 'loadBudget', label: 'Loading: drawing work a frame (ms)', min: 8, max: 40, step: 1, re: 'live', note: 'How much of each frame the slow pictures (hill, snow ground, hall, pines) take while they bake. More = they are ready sooner, but the sun, clouds and water move less smoothly meanwhile. It was 8.' } ] },
   { name: 'Block-in (step 0)', note: 'Every element as a plain flat shape where it stands in the reference, to agree the layout before anything is painted. The reference picture can be laid over the scene to compare (its wind chime is painted out).', ctls: [
     { chk: 'V', k: 'blockIn', label: 'Show the block-in', re: 'block', note: 'Off: only what is built so far (the sky; Fuji, the plum branches and the snowfall as they came from winter2.html).' },
     { chk: 'V', k: 'blockLabels', label: 'Names on the shapes', re: 'live' },
