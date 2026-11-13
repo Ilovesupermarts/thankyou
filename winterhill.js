@@ -656,7 +656,7 @@ var NEEDLES = ['#2F4A3B', '#2B4440', '#35473A', '#283C37', '#3A4C3C', '#2E3F3E',
 function fir(c, x, y, h, seed, look) {
   // another painter can draw the tree in this one's place (the page's: the right bank's firs, yukitsuri.js); the hill's
   // own random numbers and places are untouched by it
-  if (look.painter) { look.painter(c, x, y, h, seed, look); return; }
+  if (look.painter) return look.painter(c, x, y, h, seed, look);   // (it may hand back a job to be stepped: { step(ms) })
   var r = rng(seed * 7919 + 13), L = look.light, hz = look.haze || 0;
   // this tree's own build: every tree is different (crown shape, fullness, lopsidedness, snow, colour)
   var wr = lerp(0.3, 0.62, r()) * (look.width || 1);            // width / height
@@ -926,9 +926,15 @@ function hillJob(c, o) {
         if (row >= rows) { if (o.before) o.before(c, 2); done = true; return true; }
         R = startRow();
       }
-      while (R.i < R.trees.length) {
-        var tr = R.trees[R.i++];
-        fir(R.lc, tr[0], tr[1], tr[2], tr[3], R.look);
+      while (R.pend || R.i < R.trees.length) {
+        if (!R.pend) {
+          var tr = R.trees[R.i++];
+          R.pend = fir(R.lc, tr[0], tr[1], tr[2], tr[3], R.look) || null;   // (a painter's job, finished a bough at a time)
+        }
+        if (R.pend) {
+          if (!R.pend.step(Math.max(0.5, lim - (performance.now() - t0)))) return false;
+          R.pend = null;
+        }
         if (performance.now() - t0 >= lim) return false;
       }
       endRow();

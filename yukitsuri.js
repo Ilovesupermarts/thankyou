@@ -947,7 +947,9 @@ function paintWood(c, T, P, o, K, box) {
         // (copied once into a picture of its own, so where the bark meets the snow can be found from it: the dark gap
         // between them is drawn only where there is bark, never across bare snow)
         var tmp = document.createElement('canvas'); tmp.width = g.w; tmp.height = g.h;
-        var tc = tmp.getContext('2d', CPU); tc.drawImage(g.cnv, 0, 0, g.w, g.h, 0, 0, g.w, g.h);
+        // (a graphics-chip canvas on purpose: copying the 3D picture into a main-processor canvas reads back the whole
+        // screen-sized picture from the chip; here only this small copy is read, by barkAlong)
+        var tc = tmp.getContext('2d'); tc.drawImage(g.cnv, 0, 0, g.w, g.h, 0, 0, g.w, g.h);
         J.bark = barkAlong(tc, g, J, o.PR);
         c.save(); clipAbove(c, J, J.x - J.half * 3, J.x + J.half * 3, box.by - 10);
         c.setTransform(1, 0, 0, 1, 0, 0);
@@ -1021,7 +1023,8 @@ function bakeJob(T, o) {
   var M0 = o.into ? o.into.getTransform() : null;
   // (work: drawn here, stroke by stroke; body: the finished tree the scene lays down every frame. There is no 'front'
   // picture any more: nothing was ever drawn on it, yet it was laid down for every tree every frame)
-  var work = o.into ? { cnv: null, c: o.into } : layer(true), body = o.into ? null : layer(false), c = work.c;
+  // (o.cpuBody: the finished tree goes onto another picture being built, not onto the screen: keep it on the main processor too)
+  var work = o.into ? { cnv: null, c: o.into } : layer(true), body = o.into ? null : layer(!!o.cpuBody), c = work.c;
   function setT() { if (M0) c.setTransform(M0); else c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); }
   // Everything in depth order (the farthest first), so whatever is nearer covers it: the foliage, the wood (trunk and
   // limbs, about the trunk's depth), and the ropes, the pole and the props piece by piece (each piece at its own depth).

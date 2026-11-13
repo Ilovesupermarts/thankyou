@@ -2825,14 +2825,17 @@ function ytFirPaint(c, x, y, h, seed, look) {
     // the hill softens each whole row once (look.direct); the shrine's firs are laid down soft one by one, as before
     soft: look.direct ? 0 : (0.3 + hz * 0.3) * sc * (look.soft === undefined ? 1 : look.soft),
     loose: 0, dof: 0, trunks: false, lod: true,      // (less detail where a pixel cannot show it: these are small and far)
-    into: look.direct ? c : null                     // (the hill: straight onto its row's layer)
+    into: look.direct ? c : null,                    // (the hill: straight onto its row's layer)
+    cpuBody: true                                    // (the shrine's firs: laid onto the hall's picture being built)
   };
-  var M = c.getTransform();
-  var job = Yukitsuri.bakeJob(T, o);
-  job.step(Infinity);
-  var R = job.result, b = R.box;
-  c.setTransform(M);                                 // (as the caller had it)
-  if (!o.into) c.drawImage(R.body, b.bx, b.by, b.w, b.h);
+  var M = c.getTransform(), job = Yukitsuri.bakeJob(T, o);
+  function fin() {
+    var R = job.result, b = R.box;
+    c.setTransform(M);                               // (as the caller had it)
+    if (!o.into) c.drawImage(R.body, b.bx, b.by, b.w, b.h);
+  }
+  // drawn a bough at a time: the caller steps it within its time a frame (so no frame waits for a whole fir)
+  return { step: function (ms) { c.setTransform(M); var d = job.step(ms); if (!d) { c.setTransform(M); return false; } fin(); return true; } };
 }
 function startPines() {
   PINES.job = null; PINES.next = [];
@@ -3050,6 +3053,14 @@ function paintSkyTint() {
    contexts away. The old pictures stay on the screen until their new
    ones are ready. */
 var stages = [], glRetry = {}, retryAt = 0, wipeAt = 0;
+/* How often to look for a wiped picture (as the app does, wipeWatch / wipeEvery): every 3 s for 20 s after the page comes
+   back (shown again, focus, a new size) or the graphics change state, otherwise every 30 s. (Every look reads a row back
+   from the graphics chip, which makes it wait: every 3 s all the time cost far more than it found.) */
+var wipeWatchUntil = 0;
+function wipeWatch() { wipeWatchUntil = performance.now() + 20000; wipeAt = 0; }
+function wipeEvery() { return performance.now() < wipeWatchUntil ? 3 : 30; }
+document.addEventListener('visibilitychange', wipeWatch);
+['pageshow', 'focus', 'blur', 'resize'].forEach(function (ev) { window.addEventListener(ev, wipeWatch); });
 /* True when one row of a kept picture has (almost) nothing in it. */
 function blankRow(P, y) {
   var w = P.cnv.width;
@@ -3089,7 +3100,7 @@ function glState(w) {
 /* Every change in the two WebGL contexts goes into the report. */
 function watchGL() {
   var k = glState('M') + ' / ' + glState('S');
-  if (k !== glSeen) { glSeen = k; note('WebGL mountains: ' + glState('M') + ' · snowfield: ' + glState('S')); }
+  if (k !== glSeen) { glSeen = k; note('WebGL mountains: ' + glState('M') + ' · snowfield: ' + glState('S')); wipeWatch(); }
 }
 function runStage(st) {
   LT = sceneLight();
@@ -3146,7 +3157,7 @@ function checkRetry(t) {
   }
   // every few seconds: has a kept picture been wiped (Chrome can drop them when memory runs short)?
   if (t < wipeAt) return;
-  wipeAt = t + 3;
+  wipeAt = t + wipeEvery();
   if (hillDrawn && !hillJob && V.hillShow && blankRow(HILL, (H * V.horizonLine - 4) * PR)) { note('the hill picture is empty: drawing it again'); stages.push('hill'); }
   if (mtn3d && V.showMountains && blankRow(MTN, (H * V.horizonLine - H * MT.rangeHeight * 0.25) * SR)) { note('the mountains picture is empty: drawing it again'); stages.push('mtn', 'lake'); }
 }

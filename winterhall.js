@@ -1340,7 +1340,7 @@ function job(o) {
   }
 
   /* ---------- the job: a few rows or a tree at a time ---------- */
-  var TT = [], tasks = [], ti = 0, row = 0, edges = null, ei = 0, firI = 0, done = false, t00 = 0, info = '';
+  var TT = [], tasks = [], ti = 0, row = 0, edges = null, ei = 0, firI = 0, firPend = null, done = false, t00 = 0, info = '';
   var ROWS = 4;
   tasks.push(function (lim) { while (row < LH) { rasterRows('g', row, Math.min(LH, row + ROWS)); row += ROWS; if (performance.now() > lim) return false; } row = 0; return true; });
   tasks.push(function (lim) { if (!edges) { edges = findEdges('g'); ei = 0; } while (ei < edges.length) { edgeOne('g', edges[ei++]); if ((ei & 63) === 0 && performance.now() > lim) return false; } edges = null; return true; });
@@ -1350,7 +1350,8 @@ function job(o) {
     if (typeof WinterHill === 'undefined') return true;
     bc.setTransform(PR, 0, 0, PR, -bx0 * PR, -by0 * PR);
     var order = firs.slice().sort(function (A, B) { return B.D - A.D; });
-    while (firI < order.length) {
+    while (firPend || firI < order.length) {
+      if (firPend) { if (!firPend.step(Math.max(0.5, lim - performance.now()))) return false; firPend = null; if (performance.now() > lim) return false; continue; }
       var T = order[firI++], look = {};
       for (var kk in (o.firLook || {})) look[kk] = o.firLook[kk];
       look.light = o.light; look.haze = T.f.haze === undefined ? 0.4 : T.f.haze;
@@ -1358,7 +1359,7 @@ function job(o) {
       // its own depth of field (by its own distance), added to how soft the painter lays it down
       var dF = dofAt(T.D);
       if (dF > 0.05) { var s0 = (0.3 + look.haze * 0.3) * PR * (look.soft === undefined ? 1 : look.soft); look.soft = Math.hypot(s0, dF) / ((0.3 + look.haze * 0.3) * PR); }
-      WinterHill.fir(bc, T.f.x, T.f.foot, T.f.h, T.f.seed, look);
+      firPend = WinterHill.fir(bc, T.f.x, T.f.foot, T.f.h, T.f.seed, look) || null;   // (a painter's job, finished a bough at a time)
       if (performance.now() > lim) return false;
     }
     return true;
