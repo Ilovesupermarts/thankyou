@@ -159,7 +159,7 @@ function build(spec) {
     // (the others a little apart, as the reference's: about one metre)
     var fd = Hm * lerp(0.06, 0.13, r()), foot = t === 0 ? [0, 0, 0] : [Math.cos(taz) * fd, 0, Math.sin(taz) * fd];
     var d0 = norm([Math.cos(taz) * Math.sin(lean), Math.cos(lean), Math.sin(taz) * Math.sin(lean)]);
-    var rT = Hm * (t === 0 ? 0.026 : 0.017) * lerp(0.9, 1.1, r()), fh = Ht * lerp(0.4, 0.52, r());
+    var rT = Hm * (t === 0 ? 0.023 : 0.016) * lerp(0.9, 1.1, r()), fh = Ht * lerp(0.4, 0.52, r());
     var T0 = run(foot, d0, fh, rT, rT * 0.78, -1, 0, 4, 0.0, 0.05);
     trunks.push({ first: T0.pieces[0], foot: foot, r: rT });
     // the scaffold limbs: steep, fanned round the trunk (the vase)
@@ -312,7 +312,7 @@ function bakeJob(T, o) {
     var hazeA = 1;
     if (painted && w > 0.25) {
       // the wood (where trunks.js does not draw it): dark, a hint of light on the sun's side
-      Bt.add(shadeC(K.barkRaw, nC, L, 1 - inside), Math.min(1, w / 0.6) * hazeA, Math.max(0.3, w), A[0], A[1], B[0], B[1]);
+      Bt.add(K.fin(shadeC(K.barkRaw, nC, L, 1 - inside)), Math.min(1, w / 0.6) * hazeA, Math.max(0.3, w), A[0], A[1], B[0], B[1]);
     }
     var cMid = rimeCol(K, nC, inside), cEa = rimeCol(K, nE, inside), cEb = rimeCol(K, [-nE[0], -nE[1], -nE[2]], inside);
     var big = !!wood[i];                                             // (wood drawn in 3D: the bark shows on its lee side)

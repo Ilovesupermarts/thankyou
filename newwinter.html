@@ -395,7 +395,7 @@ var V_DEFAULTS = {
   // low mist at its foot, the shadows it and the firs cast on the snow, its lamps after dusk and their light on the snow
   // the frosted trees (frosttree.js): bare trees white with rime, right of the hall (the reference's two, more by the seed)
   ftShow: true, ftCount: 2, ftSeed: 5, ftTrunks: 3, ftSpread: 1, ftTwigs: 0.35, ftRime: 1, ftFeather: 0.6, ftSnow: 1, ftBark3d: true,
-  ftHaze: 1, ftSoft: 1, ftShadow: 1, ftReflect: true, ftSway: 1, ftDust: 1,
+  ftHaze: 0.55, ftSoft: 1, ftShadow: 1, ftReflect: true, ftSway: 1, ftDust: 1,
   hallShow: true, hallTurn: 15, hallSnow: 1, hallEave: 1, hallRoof: 1, hallSori: 1, hallHaze: 0.12, hallFootMist: 0.8,
   hallShadow: 1, hallLamps: 1, hallSpill: 1, hallWeather: 1, hallRidge: true, hallRailing: true, hallRope: true,
   // the firs beside the hall (right of it, in the mist): shown, which trees (seed), their size and width (×), snow on
@@ -483,7 +483,7 @@ var V_DEFAULTS = {
     hallRed: '#A8432E',
     hallGreen: '#4E8A78',
     hallStone: '#9C978F',
-    frostBark: '#7A7472'
+    frostBark: '#625C5B'
   }
 };
 var MT_DEFAULTS = {
@@ -3174,6 +3174,7 @@ var dirty = {}, dirtyAt = 0;
 window.winterLab = {
   V: V, MT: MT, CLOUD: CLOUD, SUN: SUN, defaults: { V: V_DEFAULTS, MT: MT_DEFAULTS, CLOUD: CLOUD_DEFAULTS, SUN: SDEF },
   plums: function () { return WS.branches; },
+  frost: function () { return FT; },                      // the frosted trees (14e), for check scripts
   stepBudget: function (ms) { STEP_MS = ms; },             // (check scripts only: the headless browser draws a frame in about 1.5 s)                 // the plum branches (step 10), for check scripts
   ytFirPaint: function () { return ytFirPaint.apply(null, arguments); },   // the right bank's fir as the hill and shrine draw it (checks)
   changed: function (what) {
