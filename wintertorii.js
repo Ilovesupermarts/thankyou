@@ -1,0 +1,517 @@
+/* ============================================================
+   WINTER TORII — the vermilion torii gates for the new winter scene
+   (tested in torii.html; later newwinter.html, step 9). Everything is
+   drawn in code.
+
+   Each gate is a solid in METRES, standing on the snow, seen through the
+   scene's own camera (the eye `eye` m above the snow, on the horizon line
+   hy, lens F px; x right of the eye, y up from the snow, z away from it),
+   so its size, its perspective and which faces show all follow from
+   where it stands and how it is turned:
+   - two round pillars (柱), a little thinner at the top and leaning in
+     (転び), each with a black sleeve at its foot (根巻);
+   - the tie beam (貫) through both pillars, its ends sticking out, with a
+     wedge (楔) just outside each pillar; the short centre post (額束);
+   - the two upper beams curving up toward their ends (反り): the shimaki
+     (島木) and on it the kasagi (笠木), black as in the reference (or
+     vermilion with a black top), their ends cut slanting outward;
+   - optional: a capital ring at each pillar's top (台輪), a name plaque.
+   Every surface is lit by the scene's light from its own direction: the
+   sun, the sky, and the light thrown up from the sunlit snow (so the
+   beams' undersides are not dark holes); a round pillar is shaded across
+   from the normals actually facing the eye. Soft shade where the beams
+   meet the pillars. Hazed into the mist by distance, as the snow is.
+   Light weathering: grime above the sleeves, rain streaks running down
+   from the joints and the beams' ends, faded paint where the sun falls,
+   faint grain. Each gate its own (seeded).
+   No snow on the gates (the user: first get the gates right).
+
+   Use:
+     WinterTorii.build(o) → G (the gate's shape)
+       o: span (m between the pillars' centres at the foot), height (m, the snow to the kasagi's top in the middle),
+          dia (m, the pillars' diameter at the foot), lean (deg), sori (m: how far the beams' ends rise), overhang (m: the
+          kasagi beyond each pillar's top), nukiAt (share of the height), nemaki (share of the height), daiwa, kusabi,
+          plaque (true / false), seed
+     WinterTorii.draw(c, G, place, cam, light, look)   c: a 2D context set up for CSS px
+       place: { x, z (m, camera space: the middle of the gate on the snow), fx, fz (unit: the way the path runs through it) }
+       cam: { W, H, hy, F, eye }
+       light: { dir: toward the sun [x right, y up, z AWAY], sun: [r,g,b] 0…1+, sky: [r,g,b] 0…1, amb, vis,
+                snow: [r,g,b] 0…255 (the snow's colour, for the light it throws up), mist: [r,g,b] (the haze's colour) }
+       look: { red, black, stone: [r,g,b], kasagiBlack, vivid (0…1), weather (0…2), haze (0…2), hazeM (m), soft }
+       → { x0, y0, x1, y1 } the screen box it covers (CSS px)
+     WinterTorii.shadow(c, G, place, cam, light)   the shapes of its shadow on the snow, filled in c's current fillStyle
+   ============================================================ */
+var WinterTorii = (function () {
+'use strict';
+
+var PI = Math.PI, TAU = PI * 2;
+function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function smooth(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+function mix(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+function rgb(c, a) {
+  return 'rgba(' + Math.round(clamp(c[0], 0, 255)) + ',' + Math.round(clamp(c[1], 0, 255)) + ',' +
+         Math.round(clamp(c[2], 0, 255)) + ',' + (a === undefined ? 1 : clamp(a, 0, 1).toFixed(3)) + ')';
+}
+function rng(seed) {
+  var a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function norm(v) { var l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
+function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function d(o, k, v) { return o[k] === undefined ? v : o[k]; }
+/* convex hull of screen points (monotone chain) */
+function hull(P) {
+  P = P.slice().sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+  if (P.length < 3) return P;
+  function cr(o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }
+  var lo = [], up = [], i;
+  for (i = 0; i < P.length; i++) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], P[i]) <= 0) lo.pop(); lo.push(P[i]); }
+  for (i = P.length - 1; i >= 0; i--) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], P[i]) <= 0) up.pop(); up.push(P[i]); }
+  up.pop(); lo.pop();
+  return lo.concat(up);
+}
+function poly(c, P) { c.beginPath(); for (var i = 0; i < P.length; i++) { if (i) c.lineTo(P[i][0], P[i][1]); else c.moveTo(P[i][0], P[i][1]); } c.closePath(); }
+
+/* ---------------- the shape (local metres: a across, + to the right as you walk through; y up from the snow; b along the
+   path, + the way you walk; the face toward b < 0 greets you) ---------------- */
+function build(o) {
+  var S = d(o, 'span', 5.3), Ht = d(o, 'height', 7.6), r0 = d(o, 'dia', 0.58) / 2, r1 = r0 * 0.9;
+  var hs = S / 2, kT = 0.062 * Ht, sT = 0.042 * Ht, yP = Ht - kT - sT;
+  var lean = Math.tan(d(o, 'lean', 1.5) * PI / 180) * yP;
+  var nY = d(o, 'nukiAt', 0.73) * Ht, nT = 0.05 * Ht, nD = 1.3 * r0, nem = d(o, 'nemaki', 0.13) * Ht;
+  function axis(y) { return hs - lean * (y / yP); }               // the pillar's axis (|a|) at height y
+  function radius(y) { return lerp(r0, r1, y / yP); }
+  var G = { S: S, Ht: Ht, r0: r0, r1: r1, yP: yP, kT: kT, sT: sT, nY: nY, nT: nT, nD: nD, nem: nem, axis: axis, radius: radius,
+            seed: d(o, 'seed', 1), daiwa: !!o.daiwa, kusabi: o.kusabi !== false, plaque: !!o.plaque };
+  var over = d(o, 'overhang', 0.39 * S), sori = d(o, 'sori', 0.045 * Ht), aT = axis(yP);
+  G.kasagi = { half: aT + over, flare: 0.035 * S, y0: yP + sT, th: kT, dep: 2.7 * r0, sori: sori, lift: 1.08 };
+  G.shimaki = { half: aT + over * 0.84, flare: 0.012 * S, y0: yP, th: sT, dep: 2.2 * r0, sori: sori * 0.86, lift: 1.0 };
+  var aN = axis(nY), rN = radius(nY);
+  G.nuki = { aN: aN, rN: rN, over: 0.2 * S, y0: nY - nT / 2, y1: nY + nT / 2, dep: nD };
+  G.gaku = { w: 1.15 * r0 * 2 / 2, y0: nY + nT / 2, y1: yP, dep: nD * 0.95 };
+  return G;
+}
+// the upturn of a beam at u (−1 … 1 along it)
+function soriAt(B, u) { var a = Math.max(0, (Math.abs(u) - 0.12) / 0.88); return B.sori * Math.pow(a, 2.1); }
+
+/* ---------------- drawing ---------------- */
+function frame(place, cam) {
+  var fx = place.fx, fz = place.fz, rx = fz, rz = -fx, X = place.x, Z = place.z, eye = cam.eye, F = cam.F, cx = cam.W / 2, hy = cam.hy;
+  return {
+    // local (a, y, b) → camera [x, y (from the snow), z]
+    w: function (a, y, b) { return [X + a * rx + b * fx, y, Z + a * rz + b * fz]; },
+    n: function (na, ny, nb) { return [na * rx + nb * fx, ny, na * rz + nb * fz]; },
+    p: function (q) { var z = Math.max(0.2, q[2]); return [cx + F * q[0] / z, hy - F * (q[1] - eye) / z]; },
+    eye: [0, eye, 0], rx: rx, rz: rz, fx: fx, fz: fz
+  };
+}
+function painter(G, place, cam, Lt, look) {
+  var T = frame(place, cam), Ls = Lt.dir;
+  var zc = Math.max(1, place.z), hazeM = d(look, 'hazeM', 260);
+  var hz = clamp((1 - Math.exp(-Math.pow(zc / hazeM, 1.6))) * d(look, 'haze', 1), 0, 1);
+  var vivid = d(look, 'vivid', 0.5);
+  // the light the sunlit snow throws back up (an albedo of about 0.8: the snow's own colour lit by sun and sky)
+  var sn = Lt.snow || [250, 250, 252], bo = [], skyB = [];
+  for (var ch = 0; ch < 3; ch++) {
+    bo.push(sn[ch] / 255 * 0.8 * (Lt.sun[ch] * Math.max(0, Ls[1]) * (Lt.vis === undefined ? 1 : Lt.vis) + Lt.sky[ch] * Lt.amb * 0.9));
+    skyB.push(Lt.sky[ch]);
+  }
+  function vividPaint(out, base) {
+    if (vivid <= 0) return out;
+    var lo = 0.3 * out[0] + 0.59 * out[1] + 0.11 * out[2], lb = 0.3 * base[0] + 0.59 * base[1] + 0.11 * base[2] || 1;
+    var f = lo / lb, k = vivid;
+    return [lerp(out[0], Math.min(255, base[0] * f), k), lerp(out[1], Math.min(255, base[1] * f), k), lerp(out[2], Math.min(255, base[2] * f), k)];
+  }
+  /* a colour lit from the direction n (camera space), occ: how much of the sun and sky reach it (0 … 1) */
+  function shade(base, n, occ, spec) {
+    n = norm(n);
+    var k = occ === undefined ? 1 : occ;
+    var dl = Math.max(0, n[0] * Ls[0] + n[1] * Ls[1] + n[2] * Ls[2]) * k;
+    var sk = (0.62 + 0.38 * n[1]) * Lt.amb * lerp(0.6, 1, k);
+    var up = Math.max(0, 0.55 - 0.45 * n[1]) * 0.55;               // facing down and sideways: the snow's light from below
+    var out = [];
+    for (var ch = 0; ch < 3; ch++) out.push(base[ch] * (Lt.sun[ch] * dl + skyB[ch] * sk + bo[ch] * up));
+    out = vividPaint(out, base);
+    if (spec) {                                                      // a dull sheen (old lacquer), toward the sun's reflection
+      var v = norm(sub(T.eye, place.c || [place.x, 2, place.z])), hv = norm([Ls[0] + v[0], Ls[1] + v[1], Ls[2] + v[2]]);
+      var s = Math.pow(Math.max(0, n[0] * hv[0] + n[1] * hv[1] + n[2] * hv[2]), 18) * spec * k;
+      for (ch = 0; ch < 3; ch++) out[ch] += 255 * Lt.sun[ch] * s;
+    }
+    return mix(out, Lt.mist, hz);
+  }
+  function facing(n, q) { var v = sub(T.eye, q); return n[0] * v[0] + n[1] * v[1] + n[2] * v[2] > 0; }
+  return { T: T, shade: shade, facing: facing, hz: hz };
+}
+
+/* the parts as convex solids: each a list of local points (for the outline and the shadow) */
+function solids(G) {
+  var out = [], N = 20, i, k;
+  function cyl(a0, y0, a1, y1, r0, r1, tag) {
+    var pts = [];
+    for (i = 0; i < N; i++) { var t = i / N * TAU, ca = Math.cos(t), sa = Math.sin(t); pts.push([a0 + ca * r0, y0, sa * r0], [a1 + ca * r1, y1, sa * r1]); }
+    out.push({ tag: tag, pts: pts });
+  }
+  for (var s = -1; s <= 1; s += 2) {
+    cyl(s * G.axis(0), -0.1, s * G.axis(G.yP), G.yP, G.r0 * 1.06, G.r1, 'pillar');
+  }
+  var n = G.nuki;
+  out.push({ tag: 'nuki', pts: boxPts(-(n.aN + n.over), n.aN + n.over, n.y0, n.y1, -n.dep / 2, n.dep / 2) });
+  var g = G.gaku; out.push({ tag: 'gaku', pts: boxPts(-g.w, g.w, g.y0, g.y1, -g.dep / 2, g.dep / 2) });
+  [G.shimaki, G.kasagi].forEach(function (B) {
+    var M = 8;
+    for (k = 0; k < M; k++) {
+      var u0 = -1 + 2 * k / M, u1 = -1 + 2 * (k + 1) / M, P = [];
+      [u0, u1].forEach(function (u) {
+        var hb = B.half, ht = B.half + B.flare, sb = soriAt(B, u);
+        P.push([u * hb, B.y0 + sb, -B.dep / 2], [u * hb, B.y0 + sb, B.dep / 2], [u * ht, B.y0 + B.th + sb * B.lift, -B.dep / 2], [u * ht, B.y0 + B.th + sb * B.lift, B.dep / 2]);
+      });
+      out.push({ tag: 'beam', pts: P });
+    }
+  });
+  return out;
+}
+function boxPts(a0, a1, y0, y1, b0, b1) {
+  return [[a0, y0, b0], [a1, y0, b0], [a1, y1, b0], [a0, y1, b0], [a0, y0, b1], [a1, y0, b1], [a1, y1, b1], [a0, y1, b1]];
+}
+
+function draw(c, G, place, cam, Lt, look) {
+  look = look || {};
+  var PN = painter(G, place, cam, Lt, look), T = PN.T, shade = PN.shade, facing = PN.facing;
+  var RED = look.red || [216, 64, 30], BLACK = look.black || [38, 33, 31], STONE = look.stone || [150, 146, 140];
+  var wea = d(look, 'weather', 1), r = rng(G.seed * 7919 + 17);
+  var box = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 };
+  function grow(P) { for (var i = 0; i < P.length; i++) { box.x0 = Math.min(box.x0, P[i][0]); box.x1 = Math.max(box.x1, P[i][0]); box.y0 = Math.min(box.y0, P[i][1]); box.y1 = Math.max(box.y1, P[i][1]); } }
+  function P(a, y, b) { return T.p(T.w(a, y, b)); }
+  function pxPerM(a, y, b) { var q = T.w(a, y, b); return cam.F / Math.max(0.2, q[2]); }
+  function fillPoly(Q, col) {
+    poly(c, Q); c.fillStyle = col; c.fill();
+    c.lineJoin = 'round'; c.strokeStyle = col; c.lineWidth = 0.5; c.stroke();         // (closes the hairline gaps between faces)
+    grow(Q);
+  }
+
+  /* ---- a box: its faces toward the eye, each lit as it faces ---- */
+  function drawBox(a0, a1, y0, y1, b0, b1, base, occ, tag) {
+    var F6 = [
+      { n: [0, 0, -1], q: [[a0, y0, b0], [a1, y0, b0], [a1, y1, b0], [a0, y1, b0]] },
+      { n: [0, 0, 1], q: [[a1, y0, b1], [a0, y0, b1], [a0, y1, b1], [a1, y1, b1]] },
+      { n: [-1, 0, 0], q: [[a0, y0, b1], [a0, y0, b0], [a0, y1, b0], [a0, y1, b1]] },
+      { n: [1, 0, 0], q: [[a1, y0, b0], [a1, y0, b1], [a1, y1, b1], [a1, y1, b0]] },
+      { n: [0, 1, 0], q: [[a0, y1, b0], [a1, y1, b0], [a1, y1, b1], [a0, y1, b1]] },
+      { n: [0, -1, 0], q: [[a0, y0, b1], [a1, y0, b1], [a1, y0, b0], [a0, y0, b0]] }];
+    var shapes = [];
+    for (var i = 0; i < 6; i++) {
+      var f = F6[i], nw = T.n(f.n[0], f.n[1], f.n[2]), m = [0, 0, 0];
+      f.q.forEach(function (q) { m[0] += q[0] / 4; m[1] += q[1] / 4; m[2] += q[2] / 4; });
+      if (!facing(nw, T.w(m[0], m[1], m[2]))) continue;
+      var Q = f.q.map(function (q) { return P(q[0], q[1], q[2]); });
+      // a box face is lit flat, with a soft roll toward its edges (eased edges, as a planed beam has)
+      var col = shade(base, nw, occ);
+      fillPoly(Q, rgb(col));
+      shapes.push({ Q: Q, n: f.n, col: col });
+    }
+    return shapes;
+  }
+
+  /* ---- a round part (a pillar's length, a sleeve, a ring): its outline is the hull of its two end circles; shaded
+     across from the normals that really face the eye ---- */
+  function drawCyl(a0, y0, a1, y1, rA, rB, base, opt) {
+    opt = opt || {};
+    var N = 28, pts = [], i;
+    for (i = 0; i < N; i++) {
+      var t = i / N * TAU, ca = Math.cos(t), sa = Math.sin(t);
+      pts.push(P(a0 + ca * rA, y0, sa * rA), P(a1 + ca * rB, y1, sa * rB));
+    }
+    var Hh = hull(pts);
+    // across: the normals from the left outline to the right one, at mid height
+    var am = (a0 + a1) / 2, ym = (y0 + y1) / 2, rm = (rA + rB) / 2, ax = T.w(am, ym, 0);
+    var vd = norm([-ax[0], 0, -ax[2]]), pr = [-vd[2], 0, vd[0]];
+    var L = P(am, ym, 0), sR = pxPerM(am, ym, 0) * rm;
+    var g = c.createLinearGradient(L[0] - sR, L[1], L[0] + sR, L[1]);
+    for (i = 0; i <= 12; i++) {
+      var tt = i / 12, th = Math.asin(tt * 2 - 1), n = [vd[0] * Math.cos(th) + pr[0] * Math.sin(th), 0, vd[2] * Math.cos(th) + pr[2] * Math.sin(th)];
+      g.addColorStop(tt, rgb(shade(base, n, opt.occ, opt.spec)));
+    }
+    poly(c, Hh); c.fillStyle = g; c.fill(); grow(Hh);
+    return { H: Hh, L: L, sR: sR, ppm: pxPerM(am, ym, 0) };
+  }
+
+  /* ---- a beam that curves up toward its ends: its strips (under side, front, back, top) and its two end faces ---- */
+  function beamPts(B, M) {
+    var bf = [], bb = [], tf = [], tb = [];
+    for (var i = 0; i <= M; i++) {
+      var u = -1 + 2 * i / M, hb = B.half, ht = B.half + B.flare, sb = soriAt(B, u);
+      bf.push([u * hb, B.y0 + sb, -B.dep / 2]); bb.push([u * hb, B.y0 + sb, B.dep / 2]);
+      tf.push([u * ht, B.y0 + B.th + sb * B.lift, -B.dep / 2]); tb.push([u * ht, B.y0 + B.th + sb * B.lift, B.dep / 2]);
+    }
+    return { bf: bf, bb: bb, tf: tf, tb: tb, M: M };
+  }
+  function strip(A, Bq, n, base, occ, grad) {
+    var nw = T.n(n[0], n[1], n[2]), mid = A[Math.floor(A.length / 2)];
+    if (!facing(nw, T.w(mid[0], mid[1], mid[2]))) return null;
+    var Q = A.map(function (q) { return P(q[0], q[1], q[2]); }).concat(Bq.slice().reverse().map(function (q) { return P(q[0], q[1], q[2]); }));
+    var col = shade(base, nw, occ);
+    if (grad) {
+      // rounded off toward its long edges (the light of a face tilted a little up at its top edge, down at its bottom)
+      var mA = P(mid[0], mid[1], mid[2]), mB0 = Bq[Math.floor(Bq.length / 2)], mB = P(mB0[0], mB0[1], mB0[2]);
+      var g = c.createLinearGradient(mA[0], mA[1], mB[0], mB[1]);
+      var nA = T.n(n[0] + grad[0][0], n[1] + grad[0][1], n[2] + grad[0][2]), nB = T.n(n[0] + grad[1][0], n[1] + grad[1][1], n[2] + grad[1][2]);
+      g.addColorStop(0, rgb(shade(base, nA, occ))); g.addColorStop(0.18, rgb(col)); g.addColorStop(0.82, rgb(col)); g.addColorStop(1, rgb(shade(base, nB, occ)));
+      poly(c, Q); c.fillStyle = g; c.fill(); c.lineJoin = 'round'; c.strokeStyle = rgb(col); c.lineWidth = 0.4; c.stroke(); grow(Q);
+    } else fillPoly(Q, rgb(col));
+    return { Q: Q, col: col };
+  }
+  function ends(S, base, occ) {
+    var out = [];
+    [0, S.M].forEach(function (i) {
+      var q = [S.bf[i], S.bb[i], S.tb[i], S.tf[i]], nn = norm(cross(sub(q[1], q[0]), sub(q[3], q[0])));
+      if (i === 0) nn = [-nn[0], -nn[1], -nn[2]];
+      if (i === 0 ? nn[0] > 0 : nn[0] < 0) nn = [-nn[0], -nn[1], -nn[2]];
+      var nw = T.n(nn[0], nn[1], nn[2]), m = [(q[0][0] + q[2][0]) / 2, (q[0][1] + q[2][1]) / 2, 0];
+      if (!facing(nw, T.w(m[0], m[1], m[2]))) return;
+      var Q = q.map(function (p) { return P(p[0], p[1], p[2]); });
+      // end grain: a little darker and browner than the painted faces
+      var col = shade(mix(base, [base[0] * 0.8, base[1] * 0.7, base[2] * 0.65], 0.5), nw, occ);
+      fillPoly(Q, rgb(col));
+      out.push(Q);
+    });
+    return out;
+  }
+
+  /* ---- weathering, laid inside a part's outline ---- */
+  function inside(Q, fn) { c.save(); poly(c, Q); c.clip(); fn(); c.restore(); }
+  function streaks(Q, xa, xb, yTop, len, n, alpha, col) {     // rain streaks down from yTop (screen), across xa … xb
+    if (wea <= 0) return;
+    inside(Q, function () {
+      for (var i = 0; i < n; i++) {
+        var x = lerp(xa, xb, r()), L = len * lerp(0.35, 1, r()), w = Math.max(0.5, (xb - xa) * lerp(0.015, 0.06, r()));
+        var g = c.createLinearGradient(0, yTop, 0, yTop + L);
+        g.addColorStop(0, rgb(col, alpha * wea * lerp(0.5, 1, r()))); g.addColorStop(1, rgb(col, 0));
+        c.fillStyle = g; c.fillRect(x - w / 2, yTop, w, L);
+      }
+    });
+  }
+
+  /* the snow banked round a pillar's foot: the ground's own snow (not snow on the gate), a low uneven collar where the
+     wind has drifted it against the post, lit as the snow ground is (the sun's side brighter), its edge soft */
+  var fsK = d(look, 'footSnow', 1);
+  function footSnow(a0) {
+    if (fsK <= 0 || !look.snowLit) return;
+    var rr0 = G.r0 * 1.07, fc = T.w(a0, 0, 0), vd = norm([-fc[0], 0, -fc[2]]), pr = [-vd[2], 0, vd[0]];
+    var kn = [], q;
+    for (q = 0; q < 7; q++) kn.push(r());
+    function nz(t) { var x = (t + 1) / 2 * 6, i = Math.min(5, Math.floor(x)), f = x - i, u = f * f * (3 - 2 * f); return lerp(kn[i], kn[i + 1], u); }
+    var M = 22, inner = [], outer = [], A = PI / 2 * 1.06;
+    for (q = 0; q <= M; q++) {
+      var t = -1 + 2 * q / M, th = t * A, dx = vd[0] * Math.cos(th) + pr[0] * Math.sin(th), dz = vd[2] * Math.cos(th) + pr[2] * Math.sin(th);
+      var ht = (0.07 + 0.12 * nz(t)) * fsK * (1 - 0.3 * t * t), wd = rr0 * 0.3 + (0.25 + 0.3 * nz(-t)) * fsK;
+      inner.push(T.p([fc[0] + dx * rr0, ht, fc[2] + dz * rr0]));
+      outer.push(T.p([fc[0] + dx * (rr0 + wd), 0, fc[2] + dz * (rr0 + wd)]));
+    }
+    var Q = inner.concat(outer.reverse());
+    var sunRight = pr[0] * Lt.dir[0] + pr[2] * Lt.dir[2] > 0;
+    var lit = mix(look.snowLit, Lt.mist, PN.hz), dim = mix(mix(look.snowLit, look.snowShade, 0.55), Lt.mist, PN.hz);
+    var xl = Math.min.apply(null, Q.map(function (p) { return p[0]; })), xr = Math.max.apply(null, Q.map(function (p) { return p[0]; }));
+    var g = c.createLinearGradient(xl, 0, xr, 0);
+    g.addColorStop(0, rgb(sunRight ? dim : lit)); g.addColorStop(0.5, rgb(mix(lit, dim, 0.45))); g.addColorStop(1, rgb(sunRight ? lit : dim));
+    c.save(); c.filter = 'blur(1px)'; poly(c, Q); c.fillStyle = g; c.fill(); c.restore();
+    grow(Q);
+  }
+
+  // which pillar, end and so on is nearer: draw the farther first
+  function zOf(a, y, b) { return T.w(a, y, b)[2]; }
+
+  var nk = G.nuki, K = G.kasagi, Sm = G.shimaki;
+  var KB = beamPts(K, 24), SB = beamPts(Sm, 24);
+  var kBase = look.kasagiBlack === false ? RED : BLACK;
+  var occBeam = 0.92;
+
+  // 1. the undersides of the two upper beams (seen from below: drawn first, the rest lies over them)
+  strip(KB.bb, KB.bf, [0, -1, 0], kBase, 0.8);
+  var smU = strip(SB.bb, SB.bf, [0, -1, 0], RED, 0.75);
+
+  // 2. the tie beam: its middle and the ends that lie behind their pillar; soft shade where it goes into the pillars
+  function nukiPiece(a0, a1) { return drawBox(a0, a1, nk.y0, nk.y1, -nk.dep / 2, nk.dep / 2, RED, 0.95); }
+  function nukiShade(shapes) {
+    if (!shapes.length) return;
+    shapes.forEach(function (s) {
+      inside(s.Q, function () {
+        [-1, 1].forEach(function (sd) {
+          var p = P(sd * nk.aN, (nk.y0 + nk.y1) / 2, 0), rr = pxPerM(sd * nk.aN, nk.y0, 0) * nk.rN * 2.2;
+          var g = c.createRadialGradient(p[0], p[1], rr * 0.35, p[0], p[1], rr);
+          g.addColorStop(0, 'rgba(40,12,8,0.28)'); g.addColorStop(1, 'rgba(40,12,8,0)');
+          c.fillStyle = g; c.fillRect(p[0] - rr, p[1] - rr, rr * 2, rr * 2);
+        });
+        // a little grime along its lower edge (water runs along it and drips off)
+        var yb = Math.max.apply(null, s.Q.map(function (q) { return q[1]; })), yt = Math.min.apply(null, s.Q.map(function (q) { return q[1]; }));
+        var g2 = c.createLinearGradient(0, yt, 0, yb);
+        g2.addColorStop(0, 'rgba(255,240,220,' + (0.05 * wea).toFixed(3) + ')'); g2.addColorStop(0.5, 'rgba(0,0,0,0)'); g2.addColorStop(1, 'rgba(50,20,12,' + (0.16 * wea).toFixed(3) + ')');
+        c.fillStyle = g2; c.fillRect(-1e4, yt, 2e4, yb - yt);
+      });
+    });
+  }
+  var endA = nk.aN + nk.rN * 0.92, endB = nk.aN + nk.over;
+  var kw = Math.max(0.05, nk.rN * 0.38), kH = (nk.y1 - nk.y0) * 1.3, kD = nk.dep * 0.7;
+  var nearSide = zOf(-nk.aN, nk.y0, 0) < zOf(nk.aN, nk.y0, 0) ? -1 : 1;     // the pillar nearer the eye
+  function endPiece(sd) {
+    var sh = sd < 0 ? nukiPiece(-endB, -endA) : nukiPiece(endA, endB);
+    nukiShade(sh);
+    if (G.kusabi) {                                             // the wedge just outside the pillar
+      var ka = sd * (nk.aN + nk.rN + kw * 0.6);
+      drawBox(ka - kw / 2, ka + kw / 2, (nk.y0 + nk.y1) / 2 - kH / 2, (nk.y0 + nk.y1) / 2 + kH / 2, -kD / 2, kD / 2, mix(RED, BLACK, 0.35), 0.9);
+    }
+  }
+  nukiShade(nukiPiece(-nk.aN, nk.aN));
+  // an end lies behind its pillar when its tip is farther from the eye than the pillar's axis
+  var farEnds = [-1, 1].filter(function (sd) { return zOf(sd * endB, nk.y0, 0) >= zOf(sd * nk.aN, nk.y0, 0); });
+  var nearEnds = [-1, 1].filter(function (sd) { return farEnds.indexOf(sd) < 0; });
+  farEnds.forEach(endPiece);
+
+  // 3. the pillars and the centre post, farthest first
+  var items = [-1, 1].map(function (sd) { return { z: zOf(sd * G.axis(G.yP / 2), G.yP / 2, 0), sd: sd }; });
+  items.push({ z: zOf(0, (G.gaku.y0 + G.gaku.y1) / 2, 0), gaku: true });
+  items.sort(function (a, b) { return b.z - a.z; });
+  items.forEach(function (it) {
+    if (it.gaku) {
+      var g = G.gaku, gs = drawBox(-g.w, g.w, g.y0, g.y1, -g.dep / 2, g.dep / 2, RED, 0.9);
+      gs.forEach(function (s) {
+        inside(s.Q, function () {                                   // shade under the shimaki
+          var p0 = P(0, g.y1, 0), p1 = P(0, g.y1 - (g.y1 - g.y0) * 0.5, 0), gg = c.createLinearGradient(p0[0], p0[1], p1[0], p1[1]);
+          gg.addColorStop(0, 'rgba(30,10,6,0.35)'); gg.addColorStop(1, 'rgba(30,10,6,0)'); c.fillStyle = gg; c.fillRect(-1e4, -1e4, 2e4, 2e4);
+        });
+      });
+      if (G.plaque) {
+        var pw = g.w * 1.5, py0 = g.y0 + (g.y1 - g.y0) * 0.14, py1 = g.y1 - (g.y1 - g.y0) * 0.1;
+        drawBox(-pw, pw, py0, py1, -g.dep / 2 - 0.08, -g.dep / 2, BLACK, 0.9);
+        var fr = [P(-pw * 0.82, py0 + (py1 - py0) * 0.08, -g.dep / 2 - 0.081), P(pw * 0.82, py0 + (py1 - py0) * 0.08, -g.dep / 2 - 0.081),
+                  P(pw * 0.82, py1 - (py1 - py0) * 0.08, -g.dep / 2 - 0.081), P(-pw * 0.82, py1 - (py1 - py0) * 0.08, -g.dep / 2 - 0.081)];
+        poly(c, fr); c.strokeStyle = rgb(shade([200, 160, 70], T.n(0, 0, -1), 0.9)); c.lineWidth = Math.max(0.6, pxPerM(0, py1, 0) * 0.035); c.stroke();
+      }
+      return;
+    }
+    var sd = it.sd, a0 = sd * G.axis(0), aN = sd * G.axis(G.nem), aT = sd * G.axis(G.yP);
+    // the vermilion shaft
+    var shaft = drawCyl(aN, G.nem, aT, G.yP, G.radius(G.nem), G.r1, RED, { occ: 1 });
+    var top = P(aT, G.yP, 0), nem = P(aN, G.nem, 0), sw = shaft.sR;
+    inside(shaft.H, function () {
+      // shade under the beams (the sky cut off) and where the tie beam goes through
+      var gt = c.createLinearGradient(0, top[1], 0, top[1] + shaft.ppm * 0.6);
+      gt.addColorStop(0, 'rgba(30,8,4,0.42)'); gt.addColorStop(1, 'rgba(30,8,4,0)'); c.fillStyle = gt; c.fillRect(-1e4, top[1], 2e4, shaft.ppm * 0.6);
+      var pn = P(sd * nk.aN, nk.y0, 0), gn = c.createLinearGradient(0, pn[1], 0, pn[1] + shaft.ppm * 0.35);
+      gn.addColorStop(0, 'rgba(30,8,4,0.22)'); gn.addColorStop(1, 'rgba(30,8,4,0)'); c.fillStyle = gn; c.fillRect(-1e4, pn[1], 2e4, shaft.ppm * 0.35);
+      if (wea > 0) {
+        // faint grain (planed hinoki under the paint) and faded paint on the sun's side, toward the top
+        c.globalAlpha = 0.03 * wea;
+        for (var q = 0; q < 7; q++) {
+          var fx = lerp(-0.8, 0.8, r()), xa = lerp(nem[0], top[0], 0) + fx * sw;
+          c.strokeStyle = r() < 0.5 ? '#3a0f06' : '#ffd8b8'; c.lineWidth = Math.max(0.4, sw * 0.05);
+          c.beginPath(); c.moveTo(nem[0] + fx * sw, nem[1]); c.lineTo(top[0] + fx * sw * 0.9, top[1]); c.stroke();
+        }
+        c.globalAlpha = 1;
+        var sunSide = Lt.dir[0] * T.rx < 0 ? -1 : 1;
+        for (q = 0; q < 5; q++) {
+          var yy = lerp(top[1], nem[1], Math.pow(r(), 1.4)), xx = lerp(nem[0], top[0], 0.5) + sw * lerp(-0.8, 0.8, r()), rr2 = sw * lerp(0.4, 1.1, r());
+          var gf = c.createRadialGradient(xx, yy, 0, xx, yy, rr2);
+          gf.addColorStop(0, 'rgba(255,214,190,' + (0.06 * wea).toFixed(3) + ')'); gf.addColorStop(1, 'rgba(255,214,190,0)');
+          c.fillStyle = gf; c.fillRect(xx - rr2, yy - rr2 * 1.6, rr2 * 2, rr2 * 3.2);
+        }
+        // grime splashed up above the sleeve, and darkening toward it
+        var gg = c.createLinearGradient(0, nem[1], 0, nem[1] - shaft.ppm * 0.7);
+        gg.addColorStop(0, 'rgba(45,22,14,' + (0.32 * wea).toFixed(3) + ')'); gg.addColorStop(1, 'rgba(45,22,14,0)');
+        c.fillStyle = gg; c.fillRect(-1e4, nem[1] - shaft.ppm * 0.7, 2e4, shaft.ppm * 0.7);
+      }
+    });
+    // rain streaks running down from under the tie beam and from the top
+    var pn2 = P(sd * nk.aN, nk.y0, 0);
+    streaks(shaft.H, pn2[0] - sw * 0.85, pn2[0] + sw * 0.85, pn2[1], shaft.ppm * 2.2, 5, 0.16, [55, 18, 10]);
+    streaks(shaft.H, top[0] - sw * 0.85, top[0] + sw * 0.85, top[1] + shaft.ppm * 0.1, shaft.ppm * 1.4, 4, 0.12, [55, 18, 10]);
+    // the black sleeve at its foot (lacquer: a dull sheen) and its rim
+    var sl = drawCyl(a0, 0, aN, G.nem, G.r0 * 1.07, G.radius(G.nem) * 1.07, BLACK, { occ: 1, spec: 0.12 });
+    inside(sl.H, function () {
+      if (wea <= 0) return;
+      // dust and dried salt near the snow, scuffs
+      var b0 = P(a0, 0, 0), gb = c.createLinearGradient(0, b0[1], 0, b0[1] - sl.ppm * 0.45);
+      gb.addColorStop(0, 'rgba(170,165,160,' + (0.22 * wea).toFixed(3) + ')'); gb.addColorStop(1, 'rgba(170,165,160,0)');
+      c.fillStyle = gb; c.fillRect(-1e4, b0[1] - sl.ppm * 0.45, 2e4, sl.ppm * 0.45);
+      for (var q = 0; q < 2; q++) {
+        var yy = lerp(nem[1], b0[1], r()), xx = lerp(b0[0], nem[0], 0.5) + sl.sR * lerp(-0.7, 0.7, r());
+        c.fillStyle = 'rgba(160,150,140,' + (0.07 * wea).toFixed(3) + ')';
+        c.beginPath(); c.ellipse(xx, yy, sl.sR * lerp(0.08, 0.25, r()), sl.ppm * lerp(0.03, 0.08, r()), 0, 0, TAU); c.fill();
+      }
+    });
+    drawCyl(aN, G.nem - 0.035, aN, G.nem + 0.01, G.radius(G.nem) * 1.1, G.radius(G.nem) * 1.08, mix(BLACK, [120, 100, 80], 0.25), { occ: 1, spec: 0.25 });
+    if (G.daiwa) drawCyl(aT, G.yP - 0.045 * G.Ht, aT, G.yP, G.r1 * 1.28, G.r1 * 1.3, BLACK, { occ: 0.85, spec: 0.15 });
+    footSnow(a0);
+  });
+
+  // 4. the tie beam's ends that lie in front of their pillar
+  nearEnds.forEach(endPiece);
+
+  // 5. the shimaki: its faces, rounded toward their edges, grime along the bottom, streaks from its ends
+  var smF = strip(SB.bf, SB.tf, [0, 0, -1], RED, occBeam, [[0, -0.35, 0], [0, 0.35, 0]]);
+  strip(SB.tb, SB.bb, [0, 0, 1], RED, occBeam, [[0, 0.35, 0], [0, -0.35, 0]]);
+  var smE = ends(SB, RED, occBeam);
+  [smF].forEach(function (s) {
+    if (!s || wea <= 0) return;
+    inside(s.Q, function () {
+      var p0 = P(0, Sm.y0, -Sm.dep / 2), p1 = P(0, Sm.y0 + Sm.th, -Sm.dep / 2);
+      var g = c.createLinearGradient(0, p1[1], 0, p0[1]);
+      g.addColorStop(0, 'rgba(30,8,4,' + (0.28).toFixed(3) + ')'); g.addColorStop(0.35, 'rgba(30,8,4,0)');
+      g.addColorStop(0.75, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(50,20,12,' + (0.14 * wea).toFixed(3) + ')');
+      c.fillStyle = g; c.fillRect(-1e4, p1[1] - 50, 2e4, p0[1] - p1[1] + 100);
+    });
+    var pl = P(-Sm.half, Sm.y0 + Sm.sori, -Sm.dep / 2), prr = P(Sm.half, Sm.y0 + Sm.sori, -Sm.dep / 2);
+    streaks(s.Q, pl[0], prr[0], Math.min(pl[1], prr[1]) - 40, 80, 10, 0.08, [60, 20, 12]);
+  });
+
+  // 6. the kasagi (black: weathered lacquer or copper gone dark, chalky where the rain runs)
+  var kF = strip(KB.bf, KB.tf, [0, 0, -1], kBase, 0.97, [[0, -0.4, 0], [0, 0.45, 0]]);
+  strip(KB.tb, KB.bb, [0, 0, 1], kBase, 0.97, [[0, 0.45, 0], [0, -0.4, 0]]);
+  strip(KB.tf, KB.tb, [0, 1, 0], kBase, 1);
+  ends(KB, kBase, 0.97);
+  if (kF && look.kasagiBlack === false) {
+    // a vermilion kasagi: its top (a third of its height) black
+    var capQ = KB.tf.map(function (q) { return P(q[0], q[1], q[2]); });
+    var low = KB.tf.slice().reverse().map(function (q) { return P(q[0], q[1] - K.th * 0.35, q[2]); });
+    fillPoly(capQ.concat(low), rgb(shade(BLACK, T.n(0, 0.2, -1), 0.97)));
+  }
+  if (kF && wea > 0) {
+    var kl = P(-K.half, K.y0 + K.th, -K.dep / 2), kr = P(K.half, K.y0 + K.th, -K.dep / 2);
+    var ktop = Math.min(kl[1], kr[1]) - 30, kbot = Math.max.apply(null, kF.Q.map(function (q) { return q[1]; }));
+    streaks(kF.Q, kl[0], kr[0], ktop, kbot - ktop, 16, 0.07, [200, 196, 190]);
+    inside(kF.Q, function () {
+      var g = c.createLinearGradient(0, ktop + 30, 0, kbot);
+      g.addColorStop(0, 'rgba(210,205,198,' + (0.1 * wea).toFixed(3) + ')'); g.addColorStop(0.5, 'rgba(0,0,0,0)');
+      c.fillStyle = g; c.fillRect(-1e4, ktop, 2e4, kbot - ktop + 2);
+    });
+  }
+  return box;
+}
+
+/* ---------------- its shadow on the snow: each solid's points sent along the sun's direction down to the snow, their
+   outline filled (the outline of a solid's shadow is the hull of its points' shadows) ---------------- */
+function shadow(c, G, place, cam, Lt) {
+  var L = Lt.dir;
+  if (L[1] < 0.02) return;
+  var T = frame(place, cam), S = solids(G);
+  S.forEach(function (s) {
+    var Q = s.pts.map(function (p) {
+      var q = T.w(p[0], p[1], p[2]), t = q[1] / L[1];
+      return T.p([q[0] - L[0] * t, 0, q[2] - L[2] * t]);
+    });
+    poly(c, hull(Q)); c.fill();
+  });
+}
+/* where each pillar stands (camera space, m) and its radius: for the soft shade at its foot */
+function feet(G, place) {
+  var T = frame(place, { W: 0, H: 0, hy: 0, F: 1, eye: 0 });
+  return [-1, 1].map(function (sd) { var q = T.w(sd * G.axis(0), 0, 0); return { x: q[0], z: q[2], r: G.r0 * 1.07 }; });
+}
+
+return { build: build, draw: draw, shadow: shadow, feet: feet };
+})();

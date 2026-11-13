@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Torii lab</title>
+<!--
+  TORII LAB — the test bed for the winter scene's torii gates (step 9a), before they go into newwinter.html.
+  The trodden snow path and the snow ground round it are newwinter.html's own (winterpath.js, winterlake.js, the
+  same values and the same camera: the eye 3 m above the snow, the 22° lens), so what is tuned here fits there.
+  The gates are wintertorii.js. The sky here is only a plain stand-in.
+  Views: "Close-up" stands the same camera nearer the gates, turned to look up the path; "As in the winter scene" is
+  exactly newwinter.html's view (the path in the lower left, the horizon at 2/3).
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #d4dae6; font: 14px/1.35 system-ui, sans-serif; }
+  canvas#c { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; }
+  #sp { position: fixed; right: 10px; top: 10px; width: 330px; max-height: calc(100vh - 20px); overflow: auto; background: rgba(255,255,255,0.92);
+        border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.25); padding: 0 12px 12px; }
+  #sp.min { width: auto; } #sp.min .body { display: none; }
+  #sp .head { position: sticky; top: 0; background: rgba(255,255,255,0.97); padding: 10px 0 6px; display: flex; gap: 6px; align-items: center; }
+  #sp .head b { flex: 1; }
+  #sp button { font: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid #aab; background: #f4f5f9; }
+  #sp h4 { margin: 12px 0 4px; font-size: 13px; color: #534; border-top: 1px solid #ddd; padding-top: 8px; }
+  #sp label { display: block; margin: 6px 0 2px; font-size: 12.5px; color: #333; }
+  #sp label span { float: right; color: #666; font-variant-numeric: tabular-nums; }
+  #sp input[type=range] { width: 100%; height: 26px; }
+  #sp select { width: 100%; font: inherit; padding: 4px; }
+  #msg { position: fixed; left: 10px; bottom: 10px; background: rgba(255,255,255,0.85); padding: 4px 8px; border-radius: 6px; font-size: 12px; }
+</style>
+<script src="winterpath.js"></script>
+<script src="winterlake.js"></script>
+<script src="wintertorii.js"></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="msg"></div>
+<div id="sp"><div class="head"><b>Torii lab</b><button id="copy">Copy values</button><button id="reset">Reset</button><button id="fold">–</button></div><div class="body" id="body"></div></div>
+<script>
+'use strict';
+var PI = Math.PI;
+function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function mix(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+function scale(c, k) { return [c[0] * k, c[1] * k, c[2] * k]; }
+function hex(h) { h = h.replace('#', ''); return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)]; }
+function rgb(c, a) { return 'rgba(' + Math.round(clamp(c[0], 0, 255)) + ',' + Math.round(clamp(c[1], 0, 255)) + ',' + Math.round(clamp(c[2], 0, 255)) + ',' + (a === undefined ? 1 : a) + ')'; }
+
+/* ============================================================
+   1. VALUES. The scene's (light, snow ground, path) are newwinter.html's defaults; the gates' are new.
+   ============================================================ */
+var V_DEFAULTS = {
+  view: 'close', closeHorizon: 0.52, closeBack: 38, closeSide: 2.5,
+  // the light (newwinter.html's sceneLight values)
+  timeOfDay: 'day', condition: 'partly', sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9,
+  moonLight: 0.45, blueShade: 0.6,
+  // the camera and the snow ground (newwinter.html)
+  eyeHeight: 3, lens: 22, sceneHorizon: 0.667, seed: 7, fieldSwell: 1.75, fieldDrifts: 1.2, fieldGrain: 1, fieldSparkle: 1.35,
+  fieldHaze: 1, fieldHazeDist: 260, fieldGlow: 0.6,
+  // the path (newwinter.html's, the user's points)
+  trail1X: 0.1578, trail1Y: 0.9931, trail2X: 0.1036, trail2Y: 0.8862, trail3X: 0.1138, trail3Y: 0.7944, trail4X: 0.1678, trail4Y: 0.7387,
+  trail5X: 0.2329, trail5Y: 0.7187, trailWidth: 4, trailDepth: 0.3, trailWall: 0.22, trailBerm: 0.03, trailWobble: 0.45, trailTrod: 1,
+  trailGrey: 0.5, trailShadow: 1, trailBounce: 0.65,
+  // the gates
+  gates: 3, gateFirst: 29, gateGap: 28, gateClear: 0.25, gateHeight: 1.45, gateDia: 0.11, gateLean: 1.5, gateSori: 0.045,
+  gateOverhang: 0.39, gateNuki: 0.73, gateNemaki: 0.13, gateDaiwa: false, gateKusabi: true, gatePlaque: false, gateKasagiBlack: true,
+  gateWeather: 1, gateVivid: 0.5, gateSoft: 0.35, gateHaze: 1, gateShadow: 1, gateFootShade: 1, gateFootSnow: 1,
+  colours: { snow: '#FAFAFC', mist: '#ffffff', bankEarth: '#4D4038', toriiRed: '#D8401E', toriiBlack: '#2A2523' }
+};
+var V = JSON.parse(JSON.stringify(V_DEFAULTS));
+try { var sv = JSON.parse(localStorage.getItem('toriiLab-1') || 'null'); if (sv) for (var k in sv) if (k in V) { if (k === 'colours') Object.assign(V.colours, sv.colours); else V[k] = sv[k]; } } catch (e) {}
+function saveAll() { try { localStorage.setItem('toriiLab-1', JSON.stringify(V)); } catch (e) {} }
+
+/* ============================================================
+   2. THE LIGHT (newwinter.html's sceneLight and shadeColour)
+   ============================================================ */
+var COND_SUN = { clear: 1, partly: 0.85, thin: 0.7, cloudy: 0.3, mist: 0.5, snow: 0.22 };
+function isNight() { return V.timeOfDay === 'night'; }
+function light(c) {
+  if (V.timeOfDay === 'evening') return scale(mix(c, [255, 176, 85], 0.16), 0.97);
+  if (isNight()) return scale(mix(c, [60, 66, 112], 0.18), 0.8);
+  return c;
+}
+var LT = null, SHADE = null;
+function sceneLight() {
+  var tod = V.timeOfDay, el = V.sunElevation, sun = [255, 247, 236], sky = [178, 196, 226], sS = V.sunStrength, amb = V.ambient;
+  if (tod === 'evening') { sun = [255, 156, 96]; sky = [164, 152, 198]; el = V.eveningElevation; }
+  else if (tod === 'night') { sun = [150, 168, 225]; sky = [64, 76, 124]; el = 36; sS *= V.moonLight; amb *= 0.8; }
+  var cs = COND_SUN[V.condition]; if (cs === undefined) cs = 1;
+  sS *= cs; amb *= lerp(1.15, 1, cs);
+  sky = mix(sky, tod === 'night' ? [80, 84, 110] : [214, 214, 226], (1 - cs) * 0.6);
+  var a = V.sunAzimuth * PI / 180, e = el * PI / 180;
+  return { el: el, vis: cs * (tod === 'night' ? 0.45 : 1), dir: [Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e)],
+           sunRGB: sun, skyRGB: sky, sS: sS, amb: amb, sun: scale(sun, sS / 255), sky: scale(sky, 1 / 255) };
+}
+function shadeColour() {
+  var sk = LT.sky, L = (sk[0] + sk[1] + sk[2]) / 3, b = V.blueShade, sn = hex(V.colours.snow);
+  var c = [sk[0] + (L * 0.8 - sk[0]) * b, sk[1] + (L * 0.94 - sk[1]) * b, sk[2] + (L * 1.2 - sk[2]) * b];
+  return [clamp(sn[0] * c[0] * LT.amb * 0.92, 0, 255), clamp(sn[1] * c[1] * LT.amb * 0.92, 0, 255), clamp(sn[2] * c[2] * LT.amb * 0.92, 0, 255)];
+}
+function groundHaze() { return light(mix(hex(V.colours.mist), [214, 224, 242], 0.85)); }
+
+/* ============================================================
+   3. THE CAMERA, THE PATH AND WHERE THE GATES STAND
+   The path is newwinter.html's: its five points on that screen, put on the snow through that camera (m: x right of
+   the eye, z away from it), on 14 m back toward you, and on beyond the last point (where newwinter.html's runs on to
+   the hall). The close-up stands the same camera (same eye height, same lens) nearer the gates, turned up the path.
+   ============================================================ */
+var cv = document.getElementById('c'), ctx = cv.getContext('2d');
+var W = 0, H = 0, PR = 1;
+function lensF() { return H / (2 * Math.tan(V.lens * PI / 360)); }
+function sceneY(f) { var h = V.sceneHorizon, R = 0.655; return f <= R ? f * h / R : h + (f - R) * (1 - h) / (1 - R); }   // newwinter's blkY
+function pathWorld() {
+  var hy = H * V.sceneHorizon, F = lensF(), pts = [];
+  for (var n = 1; n <= 5; n++) {
+    var px = V['trail' + n + 'X'] * W, py = sceneY(V['trail' + n + 'Y']) * H, dd = Math.max(4, py - hy), z = V.eyeHeight * F / dd;
+    pts.push([(px - W / 2) * z / F, z]);
+  }
+  var dx = pts[0][0] - pts[1][0], dz = pts[0][1] - pts[1][1], dl = Math.hypot(dx, dz) || 1;
+  pts.unshift([pts[0][0] + dx / dl * 14, Math.max(2, pts[0][1] + dz / dl * 14)]);
+  var a = pts[pts.length - 2], b = pts[pts.length - 1], ex = b[0] - a[0], ez = b[1] - a[1], el = Math.hypot(ex, ez) || 1;
+  pts.push([b[0] + ex / el * 10, b[1] + ez / el * 10], [b[0] + ex / el * 24, b[1] + ez / el * 24]);
+  return pts;
+}
+function pathOpts(pts) {
+  return { pts: pts, width: V.trailWidth, depth: V.trailDepth, wall: V.trailWall, berm: V.trailBerm, wobble: V.trailWobble, trod: V.trailTrod, endHalf: 0, seed: V.seed * 13 + 5 };
+}
+var VIEW = null;
+function setupView() {
+  var ptsW = pathWorld(), TW = WinterPath.build(pathOpts(ptsW));
+  // the gates on the path (world): the first where the path is gateFirst m from the eye of the winter scene, then every gateGap m
+  var s0 = 0, best = 1e9;
+  for (var s = 0; s < TW.length; s += 0.25) { var p = TW.at(s), e = Math.abs(p[1] - V.gateFirst); if (e < best) { best = e; s0 = s; } }
+  var gates = [];
+  for (var i = 0; i < Math.round(V.gates); i++) {
+    var sg = s0 + i * V.gateGap; if (sg > TW.length - 3) break;
+    var q = TW.at(sg), q0 = TW.at(sg - 1.5), q1 = TW.at(sg + 1.5), tx = q1[0] - q0[0], tz = q1[1] - q0[1], tl = Math.hypot(tx, tz) || 1;
+    gates.push({ x: q[0], z: q[1], fx: tx / tl, fz: tz / tl, s: sg });
+  }
+  // the camera: as in the winter scene, or the same camera nearer, turned up the path
+  var cx = 0, cz = 0, dx = 0, dz = 1, hzn = V.sceneHorizon;
+  if (V.view === 'close' && gates.length) {
+    var g0 = gates[0], gL = gates[gates.length - 1];
+    dx = gL.x - g0.x; dz = gL.z - g0.z; var l = Math.hypot(dx, dz);
+    if (l < 1) { dx = g0.fx; dz = g0.fz; } else { dx /= l; dz /= l; }
+    cx = g0.x - dx * V.closeBack + dz * V.closeSide; cz = g0.z - dz * V.closeBack - dx * V.closeSide;
+    hzn = V.closeHorizon;
+  }
+  var rx = dz, rz = -dx;
+  function toCam(x, z) { var X = x - cx, Z = z - cz; return [X * rx + Z * rz, X * dx + Z * dz]; }
+  function dirCam(x, z) { return [x * rx + z * rz, x * dx + z * dz]; }
+  VIEW = { hy: H * hzn, F: lensF(), toCam: toCam, dirCam: dirCam, gatesW: gates,
+           pts: ptsW.map(function (p) { return toCam(p[0], p[1]); }) };
+  VIEW.gates = gates.map(function (g) { var p = toCam(g.x, g.z), f = dirCam(g.fx, g.fz); return { x: p[0], z: p[1], fx: f[0], fz: f[1], s: g.s }; });
+  // the light, turned with the camera (the sun stays where it is in the world)
+  var L = LT.dir, Lw = [L[0], L[1], -L[2]], Lh = dirCam(Lw[0], Lw[2]);
+  VIEW.Lc = [Lh[0], Lw[1], Lh[1]];                                   // toward the sun, camera space, z away
+}
+
+/* ============================================================
+   4. THE SNOW GROUND WITH THE PATH (winterlake.js, as newwinter.html bakes it), a few rows a frame
+   ============================================================ */
+function mk() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
+var FIELD = mk(), FIELDN = mk(), FJ = null, fieldOK = false, FT0 = 0, fieldMs = 0;
+function startField() {
+  var hy = VIEW.hy, F = VIEW.F;
+  var shore = WinterLake.shore([[W + 40, H + 40], [W + 90, H + 40], [W + 90, H + 90], [W + 40, H + 90]],
+                               { W: W, H: H, hy: hy, F: F, eye: V.eyeHeight, drop: 0.25, wobble: 0, seed: V.seed });   // (no lake: off the screen)
+  var Lc = VIEW.Lc, sunX = Lc[2] > 0.05 ? clamp(W / 2 + F * Lc[0] / Lc[2], -W, 2 * W) : (Lc[0] < 0 ? -W : 2 * W);
+  var T = WinterPath.build(pathOpts(VIEW.pts));
+  var o = { W: W, H: H, PR: PR, hy: hy, F: F, eye: V.eyeHeight, res: 0.6, shore: shore,
+    light: { dir: [Lc[0], Lc[1], -Lc[2]], sun: LT.sun, vis: LT.vis }, snow: hex(V.colours.snow), shade: SHADE, mist: light(hex(V.colours.mist)),
+    groundMist: groundHaze(), earth: light(hex(V.colours.bankEarth)), sunX: sunX, sunRGB: LT.sunRGB,
+    swell: V.fieldSwell, drifts: V.fieldDrifts, grain: V.fieldGrain, sparkle: V.fieldSparkle * (isNight() ? 0.15 : 1),
+    haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), seed: V.seed,
+    path: T, pathLook: { grey: V.trailGrey, shadow: V.trailShadow, bounce: V.trailBounce } };
+  if (FJ) FJ.cancel();
+  FIELDN.cnv.width = Math.round(W * PR); FIELDN.cnv.height = Math.round(H * PR);
+  FIELDN.c.setTransform(1, 0, 0, 1, 0, 0); FIELDN.c.clearRect(0, 0, FIELDN.cnv.width, FIELDN.cnv.height);
+  FIELDN.c.setTransform(PR, 0, 0, PR, 0, 0);
+  FJ = WinterLake.groundJob(FIELDN.c, o); FT0 = performance.now();
+}
+function stepField(ms) {
+  if (!FJ) return;
+  if (!FJ.step(ms)) return;
+  var q = FIELD; FIELD = FIELDN; FIELDN = q; FJ = null; fieldOK = true; fieldMs = performance.now() - FT0;
+  dirty = true;
+}
+
+/* ============================================================
+   5. THE GATES (wintertorii.js): built from their values, each its own; drawn on their own layer (laid down a
+   little soft), their shadows on a layer of their own laid over the snow (multiplied: the snow's grain shows through)
+   ============================================================ */
+var GL = mk(), SL = mk(), gateInfo = '';
+function gateShape(i) {
+  var D = V.gateDia, clear = V.gateClear;
+  // the pillars stand just outside the path: its half width, its wall's slope, a clear gap, the pillar's own radius
+  var span0 = 2 * (V.trailWidth / 2 + V.trailWall + clear), span = span0 / (1 - D);
+  return WinterTorii.build({ span: span, height: span * V.gateHeight, dia: span * D, lean: V.gateLean, sori: V.gateSori * span * V.gateHeight,
+    overhang: V.gateOverhang * span, nukiAt: V.gateNuki, nemaki: V.gateNemaki, daiwa: V.gateDaiwa, kusabi: V.gateKusabi,
+    plaque: V.gatePlaque, seed: V.seed * 31 + i * 7 + 3 });
+}
+function gateLight() {
+  return { dir: VIEW.Lc, sun: LT.sun, sky: LT.sky, amb: LT.amb, vis: LT.vis, snow: hex(V.colours.snow), mist: groundHaze() };
+}
+/* the snow's colour as the snow ground has it (winterlake.js: lit by the sun at a share k of its level-snow strength,
+   rolled off toward white), for the snow banked round the pillars' feet */
+function snowAt(k) {
+  var snow = hex(V.colours.snow), L = VIEW.Lc, dlF = Math.max(0, L[1]), out = [];
+  for (var ch = 0; ch < 3; ch++) {
+    var v = snow[ch] * LT.sun[ch] * dlF * k * 1.25 + SHADE[ch];
+    if (v > 226) v = 226 + (v - 226) * 26 / (v - 226 + 26);
+    if (v > 228) v = 228 + (v - 228) * 24 / (v - 228 + 24);
+    out.push(v);
+  }
+  return out;
+}
+function drawGates() {
+  var cam = { W: W, H: H, hy: VIEW.hy, F: VIEW.F, eye: V.eyeHeight }, Lt = gateLight();
+  [GL, SL].forEach(function (L) { L.cnv.width = Math.round(W * PR); L.cnv.height = Math.round(H * PR); L.c.setTransform(PR, 0, 0, PR, 0, 0); });
+  // shadows: white (no change) where there is none; where there is, the snow's own colour in shade over its colour in sun
+  var s = SL.c; s.fillStyle = '#fff'; s.fillRect(0, 0, W, H);
+  var snow = hex(V.colours.snow), L = Lt.dir, dlF = Math.max(0, L[1]), ratio = [];
+  for (var ch = 0; ch < 3; ch++) {
+    var lit = snow[ch] * LT.sun[ch] * dlF * 1.25 + SHADE[ch], sh = snow[ch] * LT.sun[ch] * dlF * 1.25 * 0.38 + SHADE[ch];
+    ratio.push(clamp(sh / Math.max(1, lit), 0, 1));
+  }
+  var look = { red: hex(V.colours.toriiRed), black: hex(V.colours.toriiBlack), kasagiBlack: V.gateKasagiBlack, vivid: V.gateVivid,
+               weather: V.gateWeather, haze: V.gateHaze * V.fieldHaze, hazeM: V.fieldHazeDist, footSnow: V.gateFootSnow,
+               snowLit: snowAt(1), snowShade: snowAt(0.25) };
+  var order = VIEW.gates.map(function (g, i) { return { g: g, i: i }; }).filter(function (o) { return o.g.z > 1; }).sort(function (a, b) { return b.g.z - a.g.z; });
+  var info = [];
+  order.forEach(function (o) {
+    var G = gateShape(o.i), hzv = clamp((1 - Math.exp(-Math.pow(o.g.z / V.fieldHazeDist, 1.6))) * V.fieldHaze, 0, 1);
+    if (V.gateShadow > 0 && L[1] > 0.02) {
+      var k = V.gateShadow * (1 - hzv) * LT.vis / Math.max(0.01, (COND_SUN[V.condition] || 1));
+      var kk = clamp(V.gateShadow * (1 - hzv) * Math.min(1, LT.vis * 1.1), 0, 1);
+      s.fillStyle = rgb(ratio.map(function (r) { return 255 * lerp(1, r, kk); }));
+      WinterTorii.shadow(s, G, o.g, cam, Lt);
+    }
+    if (V.gateFootShade > 0) {                       // the sky's light cut off right at each pillar's foot
+      WinterTorii.feet(G, o.g).forEach(function (f) {
+        var z = f.z; if (z < 1) return;
+        var x = W / 2 + VIEW.F * f.x / z, y = VIEW.hy + VIEW.F * V.eyeHeight / z, rx = VIEW.F * f.r * 2.4 / z, ry = rx * V.eyeHeight / z * 1.2 + 1;
+        var g = s.createRadialGradient(x, y, 0, x, y, rx), a = 0.32 * V.gateFootShade * (1 - hzv);
+        g.addColorStop(0, rgb(ratio.map(function (r) { return 255 * lerp(1, r * 0.85, a / 0.32 * 0.9); }))); g.addColorStop(1, 'rgba(255,255,255,0)');
+        s.save(); s.translate(x, y); s.scale(1, ry / rx); s.translate(-x, -y); s.fillStyle = g; s.fillRect(x - rx, y - rx, rx * 2, rx * 2); s.restore();
+      });
+    }
+    WinterTorii.draw(GL.c, G, o.g, cam, Lt, look);
+    info.push('gate ' + (o.i + 1) + ': ' + o.g.z.toFixed(0) + ' m, ' + G.Ht.toFixed(1) + ' m tall, ' + G.S.toFixed(1) + ' m between pillars');
+  });
+  gateInfo = info.reverse().join(' · ');
+  dirty = true;
+}
+
+/* ============================================================
+   6. THE FRAME
+   ============================================================ */
+var dirty = true;
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  // a plain sky (a stand-in: the winter scene has the app's own)
+  var hy = VIEW.hy, g = ctx.createLinearGradient(0, 0, 0, hy);
+  g.addColorStop(0, rgb(mix(LT.skyRGB, [255, 255, 255], isNight() ? 0 : 0.25))); g.addColorStop(1, rgb(groundHaze()));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, hy + 2);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (fieldOK) ctx.drawImage(FIELD.cnv, 0, 0);
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.filter = 'blur(' + (1.8 * PR).toFixed(2) + 'px)';
+  ctx.drawImage(SL.cnv, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.filter = V.gateSoft > 0 ? 'blur(' + (V.gateSoft * PR).toFixed(2) + 'px)' : 'none';
+  ctx.drawImage(GL.cnv, 0, 0);
+  ctx.filter = 'none';
+  document.getElementById('msg').textContent = (FJ ? 'drawing the snow ground… ' : 'snow ground ' + Math.round(fieldMs) + ' ms · ') + gateInfo;
+}
+function loop() {
+  if (FJ) stepField(30);
+  if (dirty) { dirty = false; render(); }
+  requestAnimationFrame(loop);
+}
+function resize() {
+  var w = innerWidth, h = innerHeight, pr = Math.min(2, devicePixelRatio || 1);
+  if (w === W && h === H && pr === PR) return;
+  W = w; H = h; PR = pr; cv.width = Math.round(W * PR); cv.height = Math.round(H * PR);
+  rebuild('field');
+}
+function rebuild(what) {
+  LT = sceneLight(); SHADE = shadeColour();
+  setupView();
+  if (what === 'field') { fieldOK = fieldOK && false; startField(); }
+  drawGates();
+}
+addEventListener('resize', resize);
+
+/* ============================================================
+   7. THE PANEL
+   ============================================================ */
+var G_PANEL = [
+  ['View', [
+    { k: 'view', sel: [['close', 'Close-up (same camera, nearer the gates)'], ['scene', 'As in the winter scene']], re: 'field' },
+    { k: 'closeBack', t: 'Close-up: how far before the first gate (m)', min: 8, max: 60, step: 0.5, re: 'field' },
+    { k: 'closeSide', t: 'Close-up: how far to the right of the path (m)', min: -10, max: 10, step: 0.25, re: 'field' },
+    { k: 'closeHorizon', t: 'Close-up: the horizon (share of the height)', min: 0.15, max: 0.67, step: 0.005, re: 'field' }]],
+  ['Light', [
+    { k: 'timeOfDay', sel: [['day', 'Day (low afternoon sun)'], ['evening', 'Dusk'], ['night', 'Night (moon)']], re: 'field' },
+    { k: 'condition', sel: [['clear', 'Clear'], ['partly', 'Sun and cloud'], ['thin', 'Thin cloud'], ['cloudy', 'Cloudy'], ['snow', 'Snowing']], re: 'field' },
+    { k: 'sunAzimuth', t: 'Sun: from which side (°, − left)', min: -150, max: 150, step: 1, re: 'field' },
+    { k: 'sunElevation', t: 'Sun: height by day (°)', min: 3, max: 60, step: 0.5, re: 'field' }]],
+  ['Torii: place and size', [
+    { k: 'gates', t: 'How many', min: 1, max: 6, step: 1 },
+    { k: 'gateFirst', t: 'First gate: its distance in the winter scene (m)', min: 18, max: 80, step: 0.5 },
+    { k: 'gateGap', t: 'Between the gates, along the path (m)', min: 8, max: 60, step: 0.5 },
+    { k: 'gateClear', t: 'Gap between the path\'s wall and a pillar (m)', min: 0, max: 1.5, step: 0.05 },
+    { k: 'gateHeight', t: 'Height (× the width between the pillars)', min: 0.9, max: 2, step: 0.01 }]],
+  ['Torii: shape', [
+    { k: 'gateDia', t: 'Pillars: thickness (× the width)', min: 0.06, max: 0.18, step: 0.002 },
+    { k: 'gateLean', t: 'Pillars lean in (°)', min: 0, max: 4, step: 0.1 },
+    { k: 'gateNemaki', t: 'Black sleeves: height (share)', min: 0, max: 0.3, step: 0.005 },
+    { k: 'gateNuki', t: 'Tie beam: height (share)', min: 0.55, max: 0.85, step: 0.005 },
+    { k: 'gateOverhang', t: 'Top beam: reach past the pillars (× the width)', min: 0.15, max: 0.6, step: 0.005 },
+    { k: 'gateSori', t: 'Top beams: rise at their ends (share of the height)', min: 0, max: 0.12, step: 0.002 },
+    { k: 'gateKasagiBlack', t: 'Top beam black (as the reference)', chk: 1 },
+    { k: 'gateKusabi', t: 'Wedges beside the pillars', chk: 1 },
+    { k: 'gateDaiwa', t: 'Rings at the pillars\' tops (台輪)', chk: 1 },
+    { k: 'gatePlaque', t: 'Name plaque', chk: 1 }]],
+  ['Torii: look', [
+    { k: 'toriiRed', t: 'Vermilion', col: 1 },
+    { k: 'toriiBlack', t: 'Black (sleeves, top beam)', col: 1 },
+    { k: 'gateVivid', t: 'Paint keeps its colour in the light', min: 0, max: 1, step: 0.01 },
+    { k: 'gateWeather', t: 'Grime and weathering', min: 0, max: 2, step: 0.01 },
+    { k: 'gateSoft', t: 'Softness of the edges (px)', min: 0, max: 1.5, step: 0.01 },
+    { k: 'gateHaze', t: 'Haze with distance', min: 0, max: 2, step: 0.01 },
+    { k: 'gateShadow', t: 'Shadows on the snow', min: 0, max: 1, step: 0.01 },
+    { k: 'gateFootShade', t: 'Shade round the pillars\' feet', min: 0, max: 2, step: 0.01 },
+    { k: 'gateFootSnow', t: 'Snow banked round the pillars\' feet (the ground\'s)', min: 0, max: 2, step: 0.01 }]],
+  ['The path (as in newwinter.html)', [
+    { k: 'trailWidth', t: 'Width (m)', min: 1.5, max: 6, step: 0.1, re: 'field' },
+    { k: 'trailDepth', t: 'Side walls: height (m)', min: 0, max: 0.5, step: 0.01, re: 'field' }]]
+];
+var body = document.getElementById('body'), timer = null;
+function changed(re) {
+  saveAll();
+  if (re === 'field') { clearTimeout(timer); timer = setTimeout(function () { rebuild('field'); }, 250); }
+  else { LT = sceneLight(); SHADE = shadeColour(); setupView(); drawGates(); }
+}
+function fmt(v, st) { var d = st < 0.01 ? 3 : st < 0.1 ? 2 : st < 1 ? 1 : 0; return (+v).toFixed(d); }
+G_PANEL.forEach(function (grp) {
+  var h = document.createElement('h4'); h.textContent = grp[0]; body.appendChild(h);
+  grp[1].forEach(function (ct) {
+    var lab = document.createElement('label'), inp;
+    if (ct.sel) {
+      inp = document.createElement('select');
+      ct.sel.forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; inp.appendChild(op); });
+      inp.value = V[ct.k]; inp.onchange = function () { V[ct.k] = inp.value; changed(ct.re); };
+      body.appendChild(inp); return;
+    }
+    if (ct.col) {
+      lab.textContent = ct.t + ' '; inp = document.createElement('input'); inp.type = 'color'; inp.value = V.colours[ct.k];
+      inp.oninput = function () { V.colours[ct.k] = inp.value; changed(ct.re); };
+      lab.appendChild(inp); body.appendChild(lab); return;
+    }
+    if (ct.chk) {
+      inp = document.createElement('input'); inp.type = 'checkbox'; inp.checked = !!V[ct.k];
+      inp.onchange = function () { V[ct.k] = inp.checked; changed(ct.re); };
+      lab.appendChild(inp); lab.appendChild(document.createTextNode(' ' + ct.t)); body.appendChild(lab); return;
+    }
+    var sp = document.createElement('span'); lab.textContent = ct.t; lab.appendChild(sp); sp.textContent = fmt(V[ct.k], ct.step);
+    inp = document.createElement('input'); inp.type = 'range'; inp.min = ct.min; inp.max = ct.max; inp.step = ct.step; inp.value = V[ct.k];
+    inp.oninput = function () { V[ct.k] = +inp.value; sp.textContent = fmt(V[ct.k], ct.step); changed(ct.re); };
+    body.appendChild(lab); body.appendChild(inp);
+  });
+});
+document.getElementById('fold').onclick = function () { document.getElementById('sp').classList.toggle('min'); };
+document.getElementById('reset').onclick = function () { if (confirm('Back to the default values?')) { try { localStorage.removeItem('toriiLab-1'); } catch (e) {} location.reload(); } };
+document.getElementById('copy').onclick = function () {
+  var t = JSON.stringify(V, null, 1);
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { alert('Copied'); }, function () { prompt('Copy:', t); }); else prompt('Copy:', t);
+};
+window.toriiLab = { layers: function () { return { field: FIELD.cnv.toDataURL(), gates: GL.cnv.toDataURL(), shadow: SL.cnv.toDataURL() }; }, V: V, changed: changed, rebuild: rebuild, busy: function () { return !!FJ; }, view: function () { return VIEW; }, info: function () { return gateInfo; } };
+
+resize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
