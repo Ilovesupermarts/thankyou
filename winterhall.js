@@ -36,7 +36,7 @@
       lit (0 … 1.5: its lamps), spill (0 … 2: their light on the snow), lampCol [r, g, b],
       light { sun: [x, y, z] toward the sun (x right, y up, z toward you), sunCol, skyCol, amb, haze: [r, g, b] mist },
       field { snow, sun, shade, groundMist, haze, hazeM, glow, sunX, sunRGB, vis } (as the snow ground is baked),
-      firs [{ x, foot, h, seed, haze }] (CSS px), firLook { … WinterHill.fir's look },
+      firs [{ x, foot, h, seed, haze, hm? }] (CSS px; hm: its height in metres, else worked out from h), firLook { … WinterHill.fir's look },
       riseFront (m: how long the rise's slope is in front of the hall, toward you; 14 if not given; its sides and back 14),
       path (a WinterPath, winterpath.js: the trodden path, carved into this snow where it climbs the rise to the steps;
       along it this snow is drawn whole down to the rise's foot, where the snow field's path takes over), pathLook
@@ -86,7 +86,15 @@ function shadeC(base, n, L, sunK) {
     var snowLit = 0.85 * (L.sunCol[ch] * Math.max(0, L.sunW[1]) + L.skyCol[ch] * L.amb * 0.8);   // the snow's own light (albedo 0.85)
     out[ch] = base[ch] * (L.sunCol[ch] * d + L.skyCol[ch] * s + snowLit * g * 0.55);
   }
-  return out;
+  return L.viv ? vividPaint(out, base, L.viv) : out;
+}
+/* (o.vivid, 0 … 1) The paint keeps its own hue and saturation through the light: the cool sky and the low sun dim and grey
+   a vermilion into a muddy brown, so the shaded colour is put back to the paint's own at its brightness, and the shade
+   is lifted so the paint reads bright in the shade too. 0 = as the light makes it. */
+function vividPaint(out, base, k) {
+  var lo = 0.3 * out[0] + 0.59 * out[1] + 0.11 * out[2], lb = 0.3 * base[0] + 0.59 * base[1] + 0.11 * base[2] || 1;
+  var f = lo / lb; f = lerp(f, 0.78 + 0.3 * f, k);              // (the shade is lifted to about nine tenths of the paint's own brightness)
+  return [lerp(out[0], Math.min(255, base[0] * f), k), lerp(out[1], Math.min(255, base[1] * f), k), lerp(out[2], Math.min(255, base[2] * f), k)];
 }
 
 var PAL_BASE = { plaster: hex('#E8DDC8'), post: hex('#4B2E22'), beam: hex('#553326'), floor: hex('#3A2620'), stone: hex('#9C978F'),
@@ -106,6 +114,7 @@ function job(o) {
   if (o.colours) {
     if (o.colours.plaster) PAL.plaster = hex(o.colours.plaster);
     if (o.colours.stone) PAL.stone = hex(o.colours.stone);
+    if (o.colours.soffit) PAL.soffit = hex(o.colours.soffit);           // (the undersides of the eaves)
     if (o.colours.red) PAL.red = hex(o.colours.red);
     if (o.colours.green) PAL.green = hex(o.colours.green);
     if (o.colours.timber) { var tm = hex(o.colours.timber); PAL.post = tm; PAL.beam = [0, 1, 2].map(function (i) { return clamp(tm[i] * PAL0.beam[i] / Math.max(1, PAL0.post[i]), 0, 255); }); }
@@ -222,7 +231,7 @@ function job(o) {
   var Lw = norm([o.light.sun[0], o.light.sun[1], -o.light.sun[2]]);          // toward the sun, in the camera's space (z away)
   var Ll = norm([Lw[0] * cs - Lw[2] * sn, Lw[1], Lw[0] * sn + Lw[2] * cs]);   // … and in the hall's own
   var Lsh = o.light.sun;                                    // (x right, y up, z toward you: the snow ground's way)
-  var LP = { sunW: Lw, sunCol: o.light.sunCol, skyCol: o.light.skyCol, amb: o.light.amb };
+  var LP = { sunW: Lw, sunCol: o.light.sunCol, skyCol: o.light.skyCol, amb: o.light.amb, viv: clamp(o.vivid || 0, 0, 1) };
   function toShadeN(n) { var w = [n[0] * cs + n[2] * sn, n[1], -n[0] * sn + n[2] * cs]; return [w[0], w[1], -w[2]]; }
   function toWorldN(n) { return [n[0] * cs + n[2] * sn, n[1], -n[0] * sn + n[2] * cs]; }
   var oL = [-X * cs + Z * sn, -Y0, -X * sn - Z * cs];       // the eye, in the hall's own space
@@ -235,7 +244,7 @@ function job(o) {
   var firsAll = (o.firs || []).map(function (f) {
     var d = f.foot - hy, D = d > 0.3 ? -Y0 * F / d : 1e4;
     var wx = (f.x - cx) * D / F, wz = D, lx = (wx - X) * cs - (wz - Z) * sn, lz = (wx - X) * sn + (wz - Z) * cs;
-    var hm = f.h * D / F;
+    var hm = f.hm !== undefined ? f.hm : f.h * D / F;     // (f.hm: its height in metres, when the page gives it)
     return { f: f, x: lx, z: lz, h: hm, r: hm * 0.3 * ((o.firLook && o.firLook.width) || 1), D: D };
   });
   // (o.firsHidden: other trees stand where the firs were (the page's frosted trees): the rise they stood on is kept (its
