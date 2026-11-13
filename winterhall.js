@@ -106,6 +106,7 @@ function job(o) {
   if (o.colours) {
     if (o.colours.plaster) PAL.plaster = hex(o.colours.plaster);
     if (o.colours.stone) PAL.stone = hex(o.colours.stone);
+    if (o.colours.soffit) PAL.soffit = hex(o.colours.soffit);           // (the undersides of the eaves)
     if (o.colours.red) PAL.red = hex(o.colours.red);
     if (o.colours.green) PAL.green = hex(o.colours.green);
     if (o.colours.timber) { var tm = hex(o.colours.timber); PAL.post = tm; PAL.beam = [0, 1, 2].map(function (i) { return clamp(tm[i] * PAL0.beam[i] / Math.max(1, PAL0.post[i]), 0, 255); }); }

@@ -103,8 +103,15 @@ function pagoda(c, cam, o) {
         Pc[m] = '#' + c3.map(function (v) { return ('0' + v.toString(16)).slice(-2); }).join('');
       });
     }
+    // (and, when given, its brackets and the undersides of its eaves)
+    if (o.colours.bracket) Pc.bracket = o.colours.bracket;
+    if (o.colours.soffit) Pc.soffit = o.colours.soffit;
     P = Pc;
   }
+  // its roof and its spire: given colours (o.colours.roof: the roofing; o.colours.spire: the spire's metal), else as before
+  // (dark tiles, a gilt spire)
+  var TILE_ = o.colours && o.colours.roof ? hex(o.colours.roof) : TILE, METAL = o.colours && o.colours.spire ? hex(o.colours.spire) : GOLD;
+  var METAL_HI = o.colours && o.colours.spire ? METAL.map(function (v) { return Math.min(255, v * 2 + 30); }) : [255, 226, 150];
   // the light, turned into the camera's space (there, toward you is -z)
   var L = { sun: [o.light.sun[0], o.light.sun[1], -o.light.sun[2]], sunCol: o.light.sunCol, skyCol: o.light.skyCol, amb: o.light.amb, haze: o.light.haze };
   var Lsun = norm(L.sun), litLeft = o.light.sun[0] < 0;
@@ -480,9 +487,9 @@ function pagoda(c, cam, o) {
     var gp = f.grp ? f.grp.map(function (q) { return proj(cam, q); }) : pts;   // the shape the shading runs across
     var m = f.mat, col;
     if (m === 'gold' || m === 'goldLit') {
-      col = shade(GOLD, n, L, 1);
-      col = mix(col, [255, 226, 150], m === 'goldLit' ? 0.5 : Math.max(0, dot(n, Lsun)) * 0.35);
-    } else if (m === 'tile') col = shade(TILE, n, L, 1);
+      col = shade(METAL, n, L, 1);
+      col = mix(col, METAL_HI, m === 'goldLit' ? 0.5 : Math.max(0, dot(n, Lsun)) * 0.35);
+    } else if (m === 'tile') col = shade(TILE_, n, L, 1);
     else if (m === 'fascia') col = shade(FASCIA, n, L, 1);
     else if (m === 'step') col = shade(STEP, n, L, 1);
     else col = shade(hex(P[m] || P.wall), n, L, 1);

@@ -493,13 +493,21 @@ var V_DEFAULTS = {
     lakeDeep: '#93A5C3',
     pineBark: '#3E3634',
     bamboo: '#A88E55',
-    pagodaWall: '#EDE3D2',
-    pagodaRed: '#C24A2E',
-    hallPlaster: '#E8DDC8',
-    hallTimber: '#4B2E22',
-    hallRed: '#A8432E',
-    hallGreen: '#4E8A78',
-    hallStone: '#9C978F',
+    // (the hall's and the pagoda's colours follow the user's two photos of a shrine hall and a five-storey pagoda: vermilion
+    // posts, beams and brackets, white walls, a grey-green roof on the hall, cypress-bark roofs and a dark bronze spire on
+    // the pagoda; measured on the photos, the lit middle of each part)
+    pagodaWall: '#EEEBD9',
+    pagodaRed: '#B1341E',
+    pagodaBracket: '#A83220',
+    pagodaSoffit: '#9C3020',
+    pagodaRoof: '#826350',
+    pagodaSpire: '#3A4650',
+    hallPlaster: '#EEEBD9',
+    hallTimber: '#B6441C',
+    hallRed: '#B6441C',
+    hallGreen: '#738387',
+    hallStone: '#92928A',
+    hallSoffit: '#A03A1E',
     frostBark: '#625C5B'
   }
 };
@@ -654,6 +662,7 @@ try {
     // (ver 6: the path's walls doubled to 0.24 m: a height saved before is not read)
     if (saved.V && !(saved.ver >= 6)) delete saved.V.trailDepth;
     // (ver 7: the ridges from winter2.html: the ranges' height, crests, tree line and the mountains' light saved before are not read)
+    if (saved.V && saved.V.colours && !(saved.ver >= 8)) ['pagodaWall', 'pagodaRed', 'hallPlaster', 'hallTimber', 'hallRed', 'hallGreen', 'hallStone'].forEach(function (k) { delete saved.V.colours[k]; });   // (the photos' colours, ver 8)
     if (saved.MT && !(saved.ver >= 7)) ['rangeHeight', 'sharpness', 'treeLine', 'sunStrength', 'ambient', 'shadows', 'haze', 'softness'].forEach(function (k) { delete saved.MT[k]; });
     merge(V, saved.V || {}, V_DEFAULTS);
     // the sun and the clouds saved before step 1, and the mountains saved before step 2, were winter2.html's: not read
@@ -661,7 +670,7 @@ try {
     if (saved.ver >= 3) merge(MT, saved.MT || {}, MT_DEFAULTS);
   }
 } catch (e) { /* a private window: the defaults */ }
-function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 7, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
+function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 8, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
 
 /* Toolbar date and time (Nagoya). */
 function tickClock() {
@@ -969,7 +978,7 @@ function startHill() {
   var px = pp.X(0.195), top = pp.Y(0.185), foot = pp.Y(0.505), placed = false, stairs = null, eave = null, cl = V.pagodaClear;
   var pagodaOpts = { x: px, top: top, foot: foot, yaw: V.pagodaTurn * PI / 180, style: V.pagodaTimber ? 'timber' : 'vermilion',
                      lit: lampLevel() * V.pagodaLamps, snow: V.pagodaSnow, light: L, haze: V.pagodaHaze,
-                     colours: { wall: V.colours.pagodaWall, red: V.colours.pagodaRed },
+                     colours: { wall: V.colours.pagodaWall, red: V.colours.pagodaRed, bracket: V.colours.pagodaBracket, soffit: V.colours.pagodaSoffit, roof: V.colours.pagodaRoof, spire: V.colours.pagodaSpire },
                      dof: { on: V.pagodaDof, focus: V.pagodaFocus, strength: V.pagodaDofStrength, max: V.pagodaDofMax } };
   var o = {
     profile: HILL_PROFILE.map(function (p) { return [ph.X(p[0]), ph.Y(p[1])]; }), foot: hy, rows: Math.round(V.hillRows), seed: Math.round(V.hillSeed),
@@ -1073,7 +1082,7 @@ function hallOpts() {
     yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, riseFront: V.hallRiseFront, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
     haze: V.hallHaze, footMist: V.hallFootMist, shadow: V.hallShadow, lit: lampLevel() * V.hallLamps, spill: V.hallSpill,
     lampCol: hex(V.colours.flame), light: L,
-    colours: { plaster: V.colours.hallPlaster, timber: V.colours.hallTimber, stone: V.colours.hallStone, red: V.colours.hallRed, green: V.colours.hallGreen },
+    colours: { plaster: V.colours.hallPlaster, timber: V.colours.hallTimber, stone: V.colours.hallStone, red: V.colours.hallRed, green: V.colours.hallGreen, soffit: V.colours.hallSoffit },
     weather: V.hallWeather, ridge: V.hallRidge, railing: V.hallRailing, rope: V.hallRope,
     dof: { on: V.hallDof, focus: V.hallFocus, strength: V.hallDofStrength, max: V.hallDofMax },
     field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: groundHaze(),
@@ -4359,7 +4368,7 @@ var G = [
     { o: 'V', k: 'pagodaLamps', label: 'Window light after dusk', min: 0, max: 1.5, step: 0.01, re: 'hill', note: 'They come on with the hall\'s, as the autumn pagoda\'s do: fading in from about 38 minutes before sunset to full about 6 minutes after.' },
     { o: 'V', k: 'pagodaRow', label: 'Stands among the rows (0 crest … 1 foot)', min: 0, max: 1, step: 0.01, re: 'hill', note: 'The rows below it stand in front of it and hide its foot.' },
     { o: 'V', k: 'pagodaClear', label: 'Open snow round it', min: 0, max: 2, step: 0.05, re: 'hill', note: 'How far the firs keep back from it and its steps.' },
-    { col: 'V', keys: [['pagodaWall', 'Pagoda walls (vermilion style)'], ['pagodaRed', 'Pagoda posts, beams, rails (vermilion style)']], re: 'hill' }
+    { col: 'V', keys: [['pagodaWall', 'Pagoda walls (vermilion style)'], ['pagodaRed', 'Pagoda posts, beams, rails (vermilion style)'], ['pagodaBracket', 'Pagoda brackets (vermilion style)'], ['pagodaSoffit', 'Pagoda eave undersides (vermilion style)'], ['pagodaRoof', 'Pagoda roofing (cypress bark)'], ['pagodaSpire', 'Pagoda spire (bronze)']], re: 'hill' }
   ]).concat(dofCtls('pagoda', 'hill', 'The pagoda stands about 470 m away at its default place and size (the Report gives the exact distance each time it is drawn).')) },
   { name: 'Shrine hall and the frosted trees beside it (step 5)', file: 'winterhall.js, frosttree.js', note: 'Where it stands (the trees beside it move with it), how big, its look and its depth of field; then the seven frosted trees beside it, each with its own across, foot and height.', ctls: placeCtls('hall', 'Hall', 'hall').concat([
     { chk: 'V', k: 'hallShow', label: 'Show the hall', re: 'hall block', note: 'Off: the flat block-in shape comes back.' },
@@ -4384,7 +4393,7 @@ var G = [
     { o: 'V', k: 'ftSSpread', label: 'Frosted trees beside it: crown width (×)', min: 0.5, max: 1.8, step: 0.01, re: 'frost' },
     { o: 'V', k: 'ftSSize', label: 'Frosted trees beside it: all heights (×)', min: 0.4, max: 2.5, step: 0.01, re: 'hall frost', note: 'Multiplies every tree\'s own height below.' }
   ]).concat(shrineTreeCtls()).concat([
-    { col: 'V', keys: [['hallPlaster', 'Hall plaster walls'], ['hallTimber', 'Hall posts (bare timber)'], ['hallStone', 'Hall stone base'], ['hallRed', 'Hall vermilion (beams, brackets, door frames, railing)'], ['hallGreen', 'Hall green (window lattices, copper)']], re: 'hall' }
+    { col: 'V', keys: [['hallPlaster', 'Hall plaster walls'], ['hallTimber', 'Hall posts'], ['hallStone', 'Hall stone base'], ['hallSoffit', 'Hall eave undersides'], ['hallRed', 'Hall vermilion (beams, brackets, door frames, railing)'], ['hallGreen', 'Hall green (window lattices, copper)']], re: 'hall' }
   ]).concat(dofCtls('hall', 'hall', 'The hall stands about 157 m away (the Report gives it).')) },
   { name: 'Plum branches (step 10)', note: 'From winter2.html, now in the scene (with the block-in too). Where they stand: "Layout: where each element stands", Plum branch left / right.', ctls: [
     { chk: 'V', k: 'plumShow', label: 'Show the plum branches in the scene', re: 'block', note: 'Off: the flat block-in shapes again.' },
