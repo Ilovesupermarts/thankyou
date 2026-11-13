@@ -3102,8 +3102,8 @@ function frostPlaces() {
   if (V.ftShrine && V.hallShow && typeof WinterHall !== 'undefined') {
     var hall = trailHall(), eyeR = hall ? -hall.Y0 : 0;
     if (eyeR > 0.2) shrineHallFirs(blkPlace('hall')).forEach(function (f) {
-      var d = f.foot - hy; if (d < 1) return;
-      out.push({ i: 49 + f.n, x: f.x, foot: f.foot, D: eyeR * F / d, h: f.hm, trunks: Math.max(1, Math.round(V.ftSTrunks)), eye: eyeR, shrine: true });
+      var d = Math.max(2, f.foot - hy);                  // (a foot at or above the horizon stays just below it: the farthest it can stand)
+      out.push({ i: 49 + f.n, x: f.x, foot: hy + d, D: eyeR * F / d, h: f.hm, trunks: Math.max(1, Math.round(V.ftSTrunks)), eye: eyeR, shrine: true });
     });
   }
   return out.sort(function (a, b) { return a.foot - b.foot; });
@@ -4176,7 +4176,7 @@ function shrineTreeCtls() {
     var t = 'Tree ' + n + ' beside the hall: ';
     out.push({ chk: 'V', k: 'ftS' + n + 'Show', label: t + 'shown', re: 'hall trail frost' },
              { o: 'V', k: 'ftS' + n + 'X', label: t + 'across', min: 0.3, max: 0.6, step: 0.0005, re: 'hall trail frost', note: 'Across the picture (a share of the reference\'s width, moved with the hall). + = right.' },
-             { o: 'V', k: 'ftS' + n + 'Foot', label: t + 'its foot, how far down', min: 0.64, max: 0.70, step: 0.0002, re: 'hall trail frost', note: 'Its foot on the snow the hall stands on: lower = nearer you (so larger on the screen), higher = farther back (smaller).' },
+             { o: 'V', k: 'ftS' + n + 'Foot', label: t + 'its foot, how far down', min: 0.657, max: 0.70, step: 0.0002, re: 'hall trail frost', note: 'Its foot on the snow the hall stands on: lower = nearer you (so larger on the screen), higher = farther back (smaller).' },
              { o: 'V', k: 'ftS' + n + 'H', label: t + 'height (m)', min: 1, max: 14, step: 0.05, re: 'hall trail frost' });
   }
   return out;
