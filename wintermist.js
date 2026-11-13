@@ -78,7 +78,7 @@ var FS = '#version 300 es\n' +
 // ground fog: dense on the floor, thinning upward; each layer lies a little higher the nearer it is
 '  float top = uRise * mix(0.75, 1.15, k / 2.0);\n' +
 '  float prof = exp(-max(q.y, 0.0) / max(0.003, top * 0.42)) * smoothstep(-uBelow, 0.0, q.y);\n' +
-'  float d = clamp((n * (0.55 + 0.75 * prof) - (1.0 - prof) * 0.55 - 0.22) * 2.4, 0.0, 1.0);\n' +
+'  float d = smoothstep(0.40, 0.78, n * 0.75 + prof * 0.42 - 0.04);\n' +      // banks with gaps: the noise decides where it is thick and where the far hill shows through\n' +
 '  return d * prof * uDensity;\n' +
 '}\n' +
 'void main(){\n' +
