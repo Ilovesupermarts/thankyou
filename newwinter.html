@@ -1039,7 +1039,7 @@ function startHall() {
     colours: { plaster: V.colours.hallPlaster, timber: V.colours.hallTimber, stone: V.colours.hallStone, red: V.colours.hallRed, green: V.colours.hallGreen },
     weather: V.hallWeather, ridge: V.hallRidge, railing: V.hallRailing, rope: V.hallRope,
     dof: { on: V.hallDof, focus: V.hallFocus, strength: V.hallDofStrength, max: V.hallDofMax },
-    field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: light(mix(hex(V.colours.mist), [222, 210, 204], 0.45)),
+    field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: groundHaze(),
              haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis,
              grain: V.fieldGrain, res: 0.6, swell: V.fieldSwell, drifts: V.fieldDrifts, seed: V.seed },
     firs: firs,
@@ -1292,7 +1292,8 @@ function bakeScenery(result) {
       var y0 = hy - H * 0.07, y1 = hy + 6;
       m.setTransform(SR, 0, 0, SR, 0, 0);
       var g = m.createLinearGradient(0, y0, 0, y1);
-      g.addColorStop(0, rgb(mistC, 0)); g.addColorStop(0.7, rgb(mistC, MT.footMist * 0.55)); g.addColorStop(1, rgb(mistC, MT.footMist * 0.85));
+      var fmC = groundHaze();
+      g.addColorStop(0, rgb(fmC, 0)); g.addColorStop(0.7, rgb(fmC, MT.footMist * 0.55)); g.addColorStop(1, rgb(fmC, MT.footMist * 0.85));
       m.fillStyle = g; m.fillRect(-20, y0, W + 40, y1 - y0);
     }
     mtnMs = performance.now() - t0;
@@ -2647,6 +2648,9 @@ function lakeSkyAt(y) {
   return c;
 }
 /* The front of the snow on the banks (it faces you, the sun is behind it): the sky's light on white, a little warmed. */
+/* The colour the far snow fades into toward the horizon (and the mist along the mountains' foot just above it, so the two
+   meet without a line): a cold pale blue-white. (It was the scene's warm mist colour, which gave the far snow a yellow band.) */
+function groundHaze() { return light(mix(hex(V.colours.mist), [214, 224, 242], 0.85)); }
 function lakeSnowLit() { return mix(mix(SHADE, hex(V.colours.snow), 0.45), scale(LT.sunRGB, LT.sS), 0.08); }
 function bakeField() {
   var hy = H * V.horizonLine, F = lakeLens();
@@ -2660,7 +2664,7 @@ function bakeField() {
   FIELDJ = WinterLake.groundJob(FIELDN.c, {
     W: W, H: H, PR: PR, hy: hy, F: F, eye: V.eyeHeight, res: 0.6, shore: LAKEW.shore,
     light: { dir: LT.dir, sun: LT.sun, vis: LT.vis }, snow: hex(V.colours.snow), shade: SHADE, mist: light(hex(V.colours.mist)),
-    groundMist: light(mix(hex(V.colours.mist), [222, 210, 204], 0.45)),
+    groundMist: groundHaze(),
     earth: light(hex(V.colours.bankEarth)), sunX: sunPlace().x, sunRGB: LT.sunRGB,
     swell: V.fieldSwell, drifts: V.fieldDrifts, grain: V.fieldGrain, sparkle: V.fieldSparkle * (isNight() ? 0.15 : 1),
     haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), seed: V.seed,
