@@ -95,6 +95,10 @@ function build(o) {
   var aN = axis(nY), rN = radius(nY);
   G.nuki = { aN: aN, rN: rN, over: 0.2 * S, y0: nY - nT / 2, y1: nY + nT / 2, dep: nD };
   G.gaku = { w: 1.15 * r0 * 2 / 2, y0: nY + nT / 2, y1: yP, dep: nD * 0.95 };
+  // the shimaki's underside at a (it curves up toward its ends, so over the pillars it is higher than in the middle:
+  // each pillar runs up to it, its top following the curve across its own width)
+  G.underAt = function (a) { return yP + soriAt(G.shimaki, a / G.shimaki.half); };
+  G.topMax = G.underAt(aT + r1) + 0.02;
   return G;
 }
 // the upturn of a beam at u (−1 … 1 along it)
@@ -158,7 +162,7 @@ function solids(G) {
     out.push({ tag: tag, pts: pts });
   }
   for (var s = -1; s <= 1; s += 2) {
-    cyl(s * G.axis(0), -0.1, s * G.axis(G.yP), G.yP, G.r0 * 1.06, G.r1, 'pillar');
+    cyl(s * G.axis(0), -0.1, s * G.axis(G.topMax), G.topMax, G.r0 * 1.06, G.r1, 'pillar');
   }
   var n = G.nuki;
   out.push({ tag: 'nuki', pts: boxPts(-(n.aN + n.over), n.aN + n.over, n.y0, n.y1, -n.dep / 2, n.dep / 2) });
@@ -396,8 +400,18 @@ function draw(c, G, place, cam, Lt, look) {
     }
     var sd = it.sd, a0 = sd * G.axis(0), aN = sd * G.axis(G.nem), aT = sd * G.axis(G.yP);
     // the vermilion shaft
-    var shaft = drawCyl(aN, G.nem, aT, G.yP, G.radius(G.nem), G.r1, RED, { occ: 1 });
-    var top = P(aT, G.yP, 0), nem = P(aN, G.nem, 0), sw = shaft.sR;
+    var aTop = sd * G.axis(G.topMax);
+    // where the pillar meets the shimaki's curved underside, on the side of the pillar facing the eye: the clip's top edge
+    var fb = zOf(aT, G.yP, -1) < zOf(aT, G.yP, 1) ? -1 : 1, clipQ = [], nq = 16;
+    for (var qi = 0; qi <= nq; qi++) {
+      var da = (-1.15 + 2.3 * qi / nq) * G.r1, bb = fb * Math.sqrt(Math.max(0, G.r1 * G.r1 - da * da));
+      clipQ.push(P(aT + da, G.underAt(aT + da), bb));
+    }
+    var cL = clipQ[0], cR = clipQ[nq];
+    clipQ.push([cR[0] + 2000, cR[1]], [cR[0] + 2000, cR[1] + 4000], [cL[0] - 2000, cL[1] + 4000], [cL[0] - 2000, cL[1]]);
+    c.save(); poly(c, clipQ); c.clip();
+    var shaft = drawCyl(aN, G.nem, aTop, G.topMax, G.radius(G.nem), G.r1, RED, { occ: 1 });
+    var top = P(aT, G.underAt(aT), 0), nem = P(aN, G.nem, 0), sw = shaft.sR;
     inside(shaft.H, function () {
       // shade under the beams (the sky cut off) and where the tie beam goes through
       var gt = c.createLinearGradient(0, top[1], 0, top[1] + shaft.ppm * 0.6);
@@ -430,6 +444,7 @@ function draw(c, G, place, cam, Lt, look) {
     var pn2 = P(sd * nk.aN, nk.y0, 0);
     streaks(shaft.H, pn2[0] - sw * 0.85, pn2[0] + sw * 0.85, pn2[1], shaft.ppm * 2.2, 5, 0.16, [55, 18, 10]);
     streaks(shaft.H, top[0] - sw * 0.85, top[0] + sw * 0.85, top[1] + shaft.ppm * 0.1, shaft.ppm * 1.4, 4, 0.12, [55, 18, 10]);
+    c.restore();
     // the black sleeve at its foot (lacquer: a dull sheen) and its rim
     var sl = drawCyl(a0, 0, aN, G.nem, G.r0 * 1.07, G.radius(G.nem) * 1.07, BLACK, { occ: 1, spec: 0.12 });
     inside(sl.H, function () {
@@ -445,7 +460,7 @@ function draw(c, G, place, cam, Lt, look) {
       }
     });
     drawCyl(aN, G.nem - 0.035, aN, G.nem + 0.01, G.radius(G.nem) * 1.1, G.radius(G.nem) * 1.08, mix(BLACK, [120, 100, 80], 0.25), { occ: 1, spec: 0.25 });
-    if (G.daiwa) drawCyl(aT, G.yP - 0.045 * G.Ht, aT, G.yP, G.r1 * 1.28, G.r1 * 1.3, BLACK, { occ: 0.85, spec: 0.15 });
+    if (G.daiwa) drawCyl(aT, G.underAt(aT) - 0.045 * G.Ht, aT, G.underAt(aT), G.r1 * 1.28, G.r1 * 1.3, BLACK, { occ: 0.85, spec: 0.15 });
     footSnow(a0);
   });
 
