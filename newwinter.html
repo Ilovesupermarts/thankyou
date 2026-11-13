@@ -24,6 +24,7 @@
 <script src="winterpath.js"></script>
 <script src="trunks.js"></script>
 <script src="yukitsuri.js"></script>
+<script src="frosttree.js"></script>
 
 <style>
   /* ============================================================
@@ -392,6 +393,9 @@ var V_DEFAULTS = {
   // step 5, the shrine hall (winterhall.js): shown, turned (degrees; + turns its right end toward you), the snow on its
   // roof (×), how far its eaves stand out (×), its roof's height (×), how much its corners turn up (×), mist on it, the
   // low mist at its foot, the shadows it and the firs cast on the snow, its lamps after dusk and their light on the snow
+  // the frosted trees (frosttree.js): bare trees white with rime, right of the hall (the reference's two, more by the seed)
+  ftShow: true, ftCount: 2, ftSeed: 5, ftTrunks: 3, ftSpread: 1, ftTwigs: 0.35, ftRime: 1, ftFeather: 0.6, ftSnow: 1, ftBark3d: true,
+  ftHaze: 0.55, ftSoft: 1, ftShadow: 1, ftReflect: true, ftSway: 1, ftDust: 1,
   hallShow: true, hallTurn: 15, hallSnow: 1, hallEave: 1, hallRoof: 1, hallSori: 1, hallHaze: 0.12, hallFootMist: 0.8,
   hallShadow: 1, hallLamps: 1, hallSpill: 1, hallWeather: 1, hallRidge: true, hallRailing: true, hallRope: true,
   // the firs beside the hall (right of it, in the mist): shown, which trees (seed), their size and width (×), snow on
@@ -478,7 +482,8 @@ var V_DEFAULTS = {
     hallTimber: '#4B2E22',
     hallRed: '#A8432E',
     hallGreen: '#4E8A78',
-    hallStone: '#9C978F'
+    hallStone: '#9C978F',
+    frostBark: '#625C5B'
   }
 };
 var MT_DEFAULTS = {
@@ -2463,6 +2468,7 @@ function drawBlockIn(c, part) {
   rect(Hl.x0, Hl.eaves - 0.004, Hl.x1, Hl.eaves + 0.002, K.snowShade);
   label('5  Hall', (Hl.x0 + Hl.x1) / 2, Hl.ridge - 0.012);
   }
+  if (!V.ftShow) {
   grp('frost');
   BLK.frost.forEach(function (F) {
     c.fillStyle = K.frost;
@@ -2470,6 +2476,7 @@ function drawBlockIn(c, part) {
     rect(F.x - 0.002, (F.top + F.foot) / 2, F.x + 0.002, F.foot, '#8E8A90');
   });
   label('5  Frosted trees', BLK.frost[0].x, BLK.frost[0].top - 0.01);
+  }
 
   // 7. the right bank's trees and the ropes of the roped pines (the real ones now, step 7, section 14d, unless switched off)
   if (!V.ytShow) {
@@ -2670,7 +2677,7 @@ function bakeLake() {
   WinterLake.bakeMirror(MIRROR.c, {
     W: W, H: H, hy: hy, top: top, pad: pad, res: res, mtn: V.showMountains && mtn3d ? MTN.cnv : null, mtnAlpha: MT.strength,
     skyAt: lakeSkyAt, shore: Sh, earth: light(hex(V.colours.bankEarth)), snowLit: lakeSnowLit(), mist: light(hex(V.colours.mist)),
-    haze: V.fieldHaze, eye: V.eyeHeight, F: F, hazeM: V.fieldHazeDist, before: pinesMirror
+    haze: V.fieldHaze, eye: V.eyeHeight, F: F, hazeM: V.fieldHazeDist, before: function (c) { pinesMirror(c); frostMirror(c); }
   });
   if (typeof Water !== 'undefined') Water.setMirror(MIRROR.cnv);
   STILL.cnv.width = cv.width; STILL.cnv.height = cv.height;
@@ -2972,6 +2979,191 @@ function drawPines(t, dt) {
 }
 
 /* ============================================================
+   14e. THE FROSTED TREES (樹氷) — frosttree.js: bare trees white with
+   rime, right of the hall, where the reference has them (BLK.frost,
+   moved and sized by the layout's "Frosted trees" values; more by the
+   seed). Each is built in 3D (metres) and seen through the scene's
+   camera, so its height in metres follows from its place on the screen.
+   Its trunks and limbs are drawn by trunks.js (bark), its twigs and rime
+   painted. Baked in steps after the hall, each tree into a picture of
+   its own (kept, as the other slow pictures); its shadow into one
+   picture on the land. Each frame: the shadows, then the trees, each
+   leaning a little with the breeze and the gusts (a shear about its
+   foot), and the rime dust a gust shakes off.
+   ============================================================ */
+var FT = { list: [], next: null, job: null, t0: 0, shadow: mk(), drawn: false, info: '', dust: [], fresh: false };
+/* the trees: the reference's two (the big one right of the hall, the small one far off in the mist), then more on the
+   land right of the hall by the seed (never on or near the water, never on top of another tree); the farthest first */
+function frostPlaces() {
+  var pl = blkPlace('frost'), hy = H * V.horizonLine, F = lakeLens(), out = [], count = Math.round(V.ftCount), eye = V.eyeHeight;
+  var r = rngFrom(Math.round(V.ftSeed) * 6151 + 9);
+  BLK.frost.forEach(function (B, i) {
+    var tr = r();
+    if (i >= count) return;
+    var x = pl.X(B.x), foot = pl.Y(B.foot), top = pl.Y(B.top);
+    if (foot <= hy + 1) return;                                    // (a foot on the horizon cannot stand on the ground)
+    var D = eye * F / (foot - hy);
+    out.push({ i: i, x: x, foot: foot, D: D, h: Math.max(2, (foot - top) * D / F), trunks: i === 0 ? V.ftTrunks : 1 + Math.floor(tr * V.ftTrunks) });
+  });
+  if (count > BLK.frost.length) {
+    var water = lakeOutline(), hp = blkPlace('hall'), hx1 = hp.X(BLK.hall.x1), hFoot = hp.Y(BLK.hall.foot), tries = 0, extra = 0;
+    while (extra < count - BLK.frost.length && tries++ < 4000) {
+      var ex = lerp(0.37, 0.64, r()) * W, ey = (V.horizonLine + lerp(0.006, 0.11, Math.pow(r(), 0.9))) * H;
+      var hh = lerp(8, 14, r()), tk = 1 + Math.floor(r() * V.ftTrunks);
+      if (ptInPoly(ex, ey, water) || ptInPoly(ex, ey + 0.02 * H, water) || ptInPoly(ex - 0.02 * W, ey + 0.012 * H, water) || ptInPoly(ex + 0.02 * W, ey + 0.012 * H, water)) continue;
+      if (ex < hx1 + 0.01 * W && ey < hFoot + 0.02 * H) continue;   // (not behind or in the hall)
+      var De = eye * F / Math.max(1, ey - hy), clash = false;
+      for (var k = 0; k < out.length; k++) {
+        var gx = (ex - W / 2) * De / F - (out[k].x - W / 2) * out[k].D / F;
+        if (Math.hypot(gx, De - out[k].D) < 7) { clash = true; break; }
+      }
+      if (clash) continue;
+      out.push({ i: BLK.frost.length + extra, x: ex, foot: ey, D: De, h: hh, trunks: tk });
+      extra++;
+    }
+  }
+  return out.sort(function (a, b) { return a.foot - b.foot; });
+}
+function ftOptions(P) {
+  var hy = H * V.horizonLine, F = lakeLens(), D = V.eyeHeight * F / Math.max(1, P.foot - hy);
+  var hz = clamp((1 - Math.exp(-Math.pow(D / Math.max(10, V.fieldHazeDist), 1.6))) * V.fieldHaze * V.ftHaze, 0, 0.92);
+  var bark = hex(V.colours.frostBark), sn = hex(V.colours.snow);
+  return {
+    cam: { F: F, cx: W / 2, hy: hy }, eye: V.eyeHeight, footX: P.x, footY: P.foot, PR: PR, W: W, H: H, D: D,
+    light: { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, vis: LT.vis }, shade: SHADE, snow: sn, rime: mix(sn, [236, 242, 252], 0.45),
+    bark: { bark: bark, dark: scale(bark, 0.42), light: mix(bark, [200, 196, 192], 0.5), lichen: [168, 172, 160], moss: [78, 90, 48] },
+    rimeK: V.ftRime, snowK: V.ftSnow, feather: V.ftFeather, trunks: V.ftBark3d,
+    haze: hz, hazeCol: light(hex(V.colours.mist)), soft: V.ftSoft * 0.35 * PR
+  };
+}
+function ftBuild(P) {
+  return FrostTree.build({ seed: Math.round(V.ftSeed) * 101 + P.i * 17, height: P.h, trunks: P.trunks, spread: V.ftSpread, twigs: V.ftTwigs });
+}
+/* kept: the kept pictures (scRestore): each tree built again (cheap) and its picture laid in, with no bake; false when they
+   do not fit (then they are baked as usual) */
+function startFrost(kept) {
+  var trees = kept && kept.meta && kept.meta.trees, list = V.ftShow && typeof FrostTree !== 'undefined' ? frostPlaces() : [];
+  if (kept && (!trees || !list.length || trees.length !== list.length)) return false;
+  FT.job = null; FT.next = [];
+  FT.t0 = performance.now();
+  list.forEach(function (P, i) {
+    var T = ftBuild(P), o = ftOptions(P);
+    if (kept) FT.next.push({ P: P, T: T, o: o, job: null, R: { body: kept.bmps[i], box: trees[i].box, wood: trees[i].wood, D: trees[i].D }, sw: { a: 0, v: 0 } });
+    else FT.next.push({ P: P, T: T, o: o, job: FrostTree.bakeJob(T, o), R: null, sw: { a: 0, v: 0 } });
+  });
+  FT.fresh = !kept;
+  if (kept || !list.length) finishFrost(); else FT.job = { k: 0 };
+  return true;
+}
+function stepFrost() {
+  var N = FT.next, t0 = performance.now(), lim = stepMs();
+  while (FT.job && FT.job.k < N.length && performance.now() - t0 < lim) {
+    var E = N[FT.job.k];
+    if (E.job.step(lim - (performance.now() - t0))) { E.R = E.job.result; E.job = null; FT.job.k++; }
+  }
+  if (FT.job && FT.job.k >= N.length) finishFrost();
+}
+function finishFrost() {
+  FT.job = null;
+  FT.list = FT.next || []; FT.next = null;
+  bakeFrostShadows();
+  FT.drawn = true;
+  FT.info = FT.list.length + ' trees (' + FT.list.map(function (E) { return Math.round(E.P.h) + ' m tall, ' + Math.round(E.o.D) + ' m away'; }).join('; ') + '), wood: ' +
+            (FT.list.length ? FT.list[0].R.wood : '-') + ', ' + FT.list.reduce(function (n, E) { return n + E.T.segs.length; }, 0) + ' pieces of wood';
+  if (FT.fresh) {
+    FT.fresh = false;
+    if (FT.list.length) scSaveAll('frost', FT.list.map(function (E) { return E.R.body; }), { trees: FT.list.map(function (E) { return { box: E.R.box, wood: E.R.wood, D: E.R.D }; }) });
+    note('frosted trees: ' + Math.round(performance.now() - FT.t0) + ' ms (in steps of about ' + stepMs() + ' ms a frame) · ' + FT.info);
+  }
+}
+/* their shadows: cast along the sun onto the ground (yukitsuri.js's shadow, the wood only), softened, coloured as snow in
+   shade, and kept only on the land (the snow ground's picture) */
+function bakeFrostShadows() {
+  var S = FT.shadow, k = 0.5, w = Math.max(1, Math.round(cv.width * k)), h = Math.max(1, Math.round(cv.height * k));
+  S.cnv.width = w; S.cnv.height = h;
+  var c = S.c;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, w, h);
+  var a = V.ftShadow * LT.vis * (isNight() ? 0.5 : 1) * 0.6;
+  if (!FT.list.length || a <= 0 || typeof Yukitsuri === 'undefined') return;
+  var tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
+  var tc = tmp.getContext('2d');
+  tc.setTransform(PR * k, 0, 0, PR * k, 0, 0);
+  FT.list.forEach(function (E) { Yukitsuri.shadow(tc, FrostTree.shadowTree(E.T), E.o, 'cast'); });
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = clamp(a, 0, 1); c.filter = 'blur(' + Math.max(0.5, 1.4 * PR * k).toFixed(2) + 'px)';
+  c.drawImage(tmp, 0, 0); c.restore();
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'source-in'; c.fillStyle = rgb(mix(SHADE, [96, 104, 150], 0.25)); c.fillRect(0, 0, w, h);
+  if (FIELD.cnv.width > 2) { c.globalCompositeOperation = 'destination-in'; c.drawImage(FIELD.cnv, 0, 0, w, h); }
+  c.restore();
+}
+/* in the lake's mirror: each tree turned over about the water's level under it (as the pines) */
+function frostMirror(c) {
+  if (!V.ftShow || !V.ftReflect || !FT.list.length) return;
+  var hy = H * V.horizonLine, F = lakeLens(), res = LAKEW.res, pad = LAKEW.pad, top = LAKEW.top;
+  FT.list.forEach(function (E) {
+    var yw = hy + (V.eyeHeight + V.bankDrop) * F / E.o.D, b = E.R.box;
+    c.setTransform(res, 0, 0, -res, pad * res, (2 * yw - top) * res);
+    c.drawImage(E.R.body, b.bx, b.by, b.w, b.h);
+  });
+}
+/* each frame: the shadows, then each tree leaning with the wind (a stiff tree heavy with rime: a slow, small sway; a gust
+   passing gives it a push), and the rime dust a gust shakes off its crown */
+function drawFrost(t, dt) {
+  if (!V.ftShow || !FT.drawn || !FT.list.length) return;
+  var L = FT.list;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  if (FT.shadow.cnv.width > 2) ctx.drawImage(FT.shadow.cnv, 0, 0, cv.width, cv.height);
+  var i;
+  for (var g = 0; g < WS.gusts.length; g++) {
+    var G = WS.gusts[g]; G.ft = G.ft || {};
+    for (i = 0; i < L.length; i++) {
+      if (G.ft[i] || (G.x - L[i].P.x) * G.dir < 0) continue;
+      G.ft[i] = 1;
+      L[i].sw.v += G.dir * G.str * 0.07 * V.ftSway * clamp(60 / L[i].o.D, 0.3, 1.5);
+      ftDust(L[i], G);
+    }
+  }
+  for (i = 0; i < L.length; i++) {
+    var E = L[i], b = E.R.box, sw = E.sw;
+    // a spring: the breeze leans it a little (its ripples pass), it swings back slowly and settles
+    var want = (fieldAt(E.P.x) - V.wind * 0.12) * 0.012 * V.ftSway;
+    sw.v += (-14 * (sw.a - want) - 1.6 * sw.v) * dt;
+    sw.a += sw.v * dt;
+    var sh = clamp(sw.a, -0.04, 0.04);
+    ctx.setTransform(PR, 0, 0, PR, 0, 0);
+    ctx.transform(1, 0, -sh, 1, sh * E.P.foot, 0);                 // (a shear about the foot: x moves by sh × the height above it)
+    ctx.drawImage(E.R.body, b.bx, b.by, b.w, b.h);
+  }
+  // the rime dust: fine glittering specks drifting down and away with the wind
+  var D = FT.dust;
+  if (D.length) {
+    ctx.setTransform(PR, 0, 0, PR, 0, 0);
+    for (i = D.length - 1; i >= 0; i--) {
+      var p = D[i];
+      p.age += dt;
+      if (p.age > p.life) { D.splice(i, 1); continue; }
+      if (p.age < 0) continue;                                      // (each lets go a moment after the gust arrives)
+      p.vx += ((fieldAt(p.x) - V.wind * 0.12) * 40 - p.vx) * dt * 0.8;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      var a2 = Math.min(1, p.age * 3) * (1 - p.age / p.life) * (0.55 + 0.45 * Math.sin(t * p.f + p.ph));
+      ctx.fillStyle = rgb(p.col, a2 * 0.85);
+      ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
+    }
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+}
+function ftDust(E, G) {
+  if (V.ftDust <= 0 || FT.dust.length > 600) return;
+  var b = E.R.box, n = Math.round(40 * V.ftDust * G.str * clamp(b.w / 80, 0.3, 2.5)), col = mix(hex(V.colours.snow), [255, 252, 244], 0.3);
+  for (var k = 0; k < n; k++) {
+    FT.dust.push({ x: b.bx + b.w * lerp(0.15, 0.85, Math.random()), y: b.by + b.h * lerp(0.05, 0.55, Math.random()), vx: G.dir * lerp(8, 30, Math.random()),
+                   vy: lerp(5, 16, Math.random()), age: -Math.random() * 1.2, life: lerp(2.5, 5, Math.random()), s: lerp(0.6, 1.4, Math.random()),
+                   f: lerp(3, 9, Math.random()), ph: Math.random() * TAU, col: col });
+  }
+}
+
+/* ============================================================
    15. THE PANEL'S HOOK — what a change on the panel bakes again: the
    mountains ('mtn'), the branches ('branches'), the light-dependent
    sprites ('sprites'), the sun ('sun'), everything ('all'), the
@@ -2982,13 +3174,15 @@ var dirty = {}, dirtyAt = 0;
 window.winterLab = {
   V: V, MT: MT, CLOUD: CLOUD, SUN: SUN, defaults: { V: V_DEFAULTS, MT: MT_DEFAULTS, CLOUD: CLOUD_DEFAULTS, SUN: SDEF },
   plums: function () { return WS.branches; },
+  frost: function () { return FT; },                      // the frosted trees (14e), for check scripts
+  gustAt: function (x, str) { WS.gusts.push({ dir: 1, x: x, v: 300, str: str || 0.6, hit: {} }); },   // (checks: a gust front starting at x, CSS px)
   stepBudget: function (ms) { STEP_MS = ms; },             // (check scripts only: the headless browser draws a frame in about 1.5 s)                 // the plum branches (step 10), for check scripts
   ytFirPaint: function () { return ytFirPaint.apply(null, arguments); },   // the right bank's fir as the hill and shrine draw it (checks)
   changed: function (what) {
     saveAll();
     if (!what || what === 'live') return;
     if (what === 'time') { this.setHour(); return; }
-    (what === 'all' ? ['mtn', 'hill', 'hall', 'branches', 'sprites', 'sun', 'lake', 'pines'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
+    (what === 'all' ? ['mtn', 'hill', 'hall', 'branches', 'sprites', 'sun', 'lake', 'pines', 'frost'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
     dirtyAt = nowT;
   },
   phaseNames: PHASE_NAMES,
@@ -3026,7 +3220,7 @@ window.winterLab = {
     return 'New winter report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
            ' (drawn at ' + PR.toFixed(2) + ') · 2D pictures wiped ' + lost2d + '×\n' + REPORT.join('\n');
   },
-  layers: function () { return { field: FIELD.cnv, still: STILL.cnv, mirror: MIRROR.cnv, pineShadow: PINES.shadow.cnv, hill: HILL.cnv, hall: HALL.cnv, pines: PINES.list.map(function (E) { return E.R.body; }), pineLoose: PINES.list.map(function (E) { return E.R.loose.map(function (L) { return L.spr; }); }) }; },
+  layers: function () { return { field: FIELD.cnv, still: STILL.cnv, mirror: MIRROR.cnv, pineShadow: PINES.shadow.cnv, hill: HILL.cnv, hall: HALL.cnv, frost: FT.list.map(function (E) { return E.R.body; }), frostShadow: FT.shadow.cnv, pines: PINES.list.map(function (E) { return E.R.body; }), pineLoose: PINES.list.map(function (E) { return E.R.loose.map(function (L) { return L.spr; }); }) }; },
   // (for checking the falling snow: every clump on tree k, the farthest 0, lets go now)
   shake: function (k) { var E = PINES.list[k || 0]; if (E) for (var j = 0; j < E.A.rest.length; j++) Yukitsuri.shed(E.A, j, j * 0.15); },
   pines: function () { return PINES; },   // (for checking each picture on its own)
@@ -3035,7 +3229,7 @@ window.winterLab = {
   fieldProbe: function (x, y) { return FIELDLAST ? FIELDLAST.probe(x, y) : null; },
   trailEdit: TRAIL_EDIT,   // (the path, for checking)     // (the hall's picture, for checking it on its own)
   lamps: function () { return { level: lampLevel(), dark: CLK.Lt.dark, set: CLK.sun.set, tod: V.timeOfDay }; },   // (the lamps' timing, for checking)
-  busy: function () { return !!mtnJob || !!hillJob || !!HALL.job || !!FIELDJ || !!PINES.job || stages.length > 0 || Object.keys(dirty).length > 0; },
+  busy: function () { return !!mtnJob || !!hillJob || !!HALL.job || !!FIELDJ || !!PINES.job || !!FT.job || stages.length > 0 || Object.keys(dirty).length > 0; },
   info: function () {
     return (mtn3d ? '3D mountains ' + Math.round(mtnMs) + ' ms' : 'painted ridges (no WebGL 2)') +
            ' · ' + sunInfo + ' · lake: ' + lakeInfo;
@@ -3087,9 +3281,9 @@ function paintSkyTint() {
    once. Panel: Report, "Keep baked pictures".
    ============================================================ */
 var BAKE_VER = 1;                                   // (raise it to throw every kept picture away after a change no label sees)
-var SC_STAGES = ['hill', 'field', 'hall', 'pines'];
-var SC = { db: null, ready: false, giveUp: performance.now() + 4000, rec: {}, pic: { hill: 0, field: 0, hall: 0, pines: 0 }, want: {}, deps: {}, files: null };
-var SC_ROOTS = { hill: ['startHill', 'ytFirPaint'], field: ['bakeField'], hall: ['startHall'], pines: ['startPines', 'stepPines'] };
+var SC_STAGES = ['hill', 'field', 'hall', 'frost', 'pines'];
+var SC = { db: null, ready: false, giveUp: performance.now() + 4000, rec: {}, pic: { hill: 0, field: 0, hall: 0, frost: 0, pines: 0 }, want: {}, deps: {}, files: null };
+var SC_ROOTS = { hill: ['startHill', 'ytFirPaint'], field: ['bakeField'], hall: ['startHall'], pines: ['startPines', 'stepPines'], frost: ['startFrost', 'stepFrost'] };
 var SC_SKIP = ['note', 'stepMs', 'scSave', 'scSaveAll', 'scKey', 'scDeps', 'scFiles', 'scRestore', 'scTake'];
 var SC_COMMON = ['sceneLight', 'shadeColour', 'lampLevel', 'sunPlace', 'light', 'isNight', 'nightLights', 'blkPlace', 'blkY'];
 /* What a stage's code reads: its functions and every function of this page they call (read from their own text), and in
@@ -3127,6 +3321,20 @@ function scDeps(st, roots) {
   if (roots) return { seen: Object.keys(seen).filter(function (k) { try { return typeof eval(k) === 'function'; } catch (e) { return false; } }).map(function (k) { return k + '<' + from[k]; }) };
   return (SC.deps[st] = { keys: all ? null : Object.keys(keys).sort(), mt: Object.keys(mt).sort(), sun: Object.keys(sun).sort(), code: h, n: Object.keys(seen).length });
 }
+/* The kept pictures are used once both the store is read and the drawing files are measured. */
+var SC_WAIT = { db: false, files: false };
+function scReady(w) { SC_WAIT[w] = true; if (SC_WAIT.db && SC_WAIT.files) SC.ready = true; }
+/* Each drawing file's own length, read once when the page opens (from the browser's cache: the copy the page runs). The
+   browser's own report of a file's size (below) is 0 when it served the file from its cache, which made every label
+   change and every picture bake again on such a reload. */
+function scMeasureFiles() {
+  var names = [];
+  Array.prototype.forEach.call(document.scripts, function (sc) { var n = (sc.getAttribute('src') || '').split('?')[0]; if (/\.js$/.test(n)) names.push(n); });
+  if (!names.length || typeof fetch !== 'function') { scReady('files'); return; }
+  Promise.all(names.map(function (n) {
+    return fetch(n, { cache: 'force-cache' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) { return n.split('/').pop() + ':' + t.length; }, function () { return n.split('/').pop() + ':?'; });
+  })).then(function (list) { SC.files = list.sort().join(','); scReady('files'); }, function () { scReady('files'); });
+}
 function scFiles() {                                 // the drawing files' sizes as loaded (a change to one changes its size)
   if (SC.files) return SC.files;
   var f = {};
@@ -3151,12 +3359,12 @@ function scOpen() {
     var rq = indexedDB.open('newWinter-pictures', 1);
     rq.onupgradeneeded = function () { rq.result.createObjectStore('p'); };
     rq.onsuccess = function () { SC.db = rq.result; scLoadAll(); };
-    rq.onerror = rq.onblocked = function () { SC.ready = true; };
-  } catch (e) { SC.ready = true; }
+    rq.onerror = rq.onblocked = function () { scReady('db'); };
+  } catch (e) { scReady('db'); }
 }
 function scLoadAll() {
   var left = SC_STAGES.length;
-  function one() { if (--left <= 0) SC.ready = true; }
+  function one() { if (--left <= 0) scReady('db'); }
   try {
     var os = SC.db.transaction('p', 'readonly').objectStore('p');
     SC_STAGES.forEach(function (st) {
@@ -3169,7 +3377,7 @@ function scLoadAll() {
       };
       g.onerror = one;
     });
-  } catch (e) { SC.ready = true; }
+  } catch (e) { scReady('db'); }
 }
 /* The kept picture for stage st, when its label matches what would make it now. */
 function scTake(st) {
@@ -3222,13 +3430,16 @@ function scRestore(st) {
     HALL.cnv = c; HALL.x = r.meta.x; HALL.y = r.meta.y; HALL.info = r.meta.info || ''; HALL.times = r.meta.times || '';
   } else if (st === 'pines') {
     if (!startPines(r)) return false;
+  } else if (st === 'frost') {
+    if (!startFrost(r)) return false;
   }
   SC.pic[st]++;
-  var names = { hill: 'hill and pagoda', field: 'snow ground', hall: 'hall and the firs beside it', pines: 'roped pines and firs' };
+  var names = { hill: 'hill and pagoda', field: 'snow ground', hall: 'hall and the firs beside it', pines: 'roped pines and firs', frost: 'frosted trees' };
   note(names[st] + ': the kept picture, ' + Math.round(performance.now() - t0) + ' ms');
   return true;
 }
 scOpen();
+scMeasureFiles();
 
 /* Everything is baked again in steps, one heavy step a frame (the
    mountains, the snowdrift, the snowfield, the sprites), so the graphics
@@ -3262,7 +3473,7 @@ function rebuildAll() {
   buildSky();
   dirty = {};
   // (the plum branches and the flakes' sprites, 'sprites', are cheap and nearest: they come straight after the mountains)
-  stages = V.blockIn && !V.plumShow ? ['mtn', 'hill', 'field', 'hall', 'pines', 'lake'] : ['mtn', 'sprites', 'hill', 'field', 'hall', 'pines', 'lake'];   // (step 10: the plum branches show with the block-in too)   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
+  stages = V.blockIn && !V.plumShow ? ['mtn', 'hill', 'field', 'hall', 'frost', 'pines', 'lake'] : ['mtn', 'sprites', 'hill', 'field', 'hall', 'frost', 'pines', 'lake'];   // (step 10: the plum branches show with the block-in too)   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -3298,6 +3509,7 @@ function runStage(st) {
   else if (st === 'field') bakeField();
   else if (st === 'lake') bakeLake();
   else if (st === 'pines') startPines();
+  else if (st === 'frost') startFrost();
   else if (st === 'hall') startHall();
   else if (st === 'sprites') {
     umeBakeBlooms(); bakeFlakes();
@@ -3313,8 +3525,9 @@ function rebake() {
   if (dirty.hall) stages.push('hall');
   if (dirty.trail && !dirty.hall) stages.push('hall');   // the path (step 8) climbs the hall's rise …
   if (dirty.lake || dirty.trail) stages.push('field');   // … and is carved into the snow field
+  if (dirty.frost || dirty.lake || dirty.trail) stages.push('frost');   // (the frosted trees: their shadows lie on the snow ground too)
   if (dirty.lake || dirty.pines) stages.push('pines');   // (their shadows lie on the snow ground)
-  if (dirty.mtn || dirty.lake || dirty.pines) stages.push('lake');      // (the mirror shows the mountains and the trees)
+  if (dirty.mtn || dirty.lake || dirty.pines || dirty.frost) stages.push('lake');      // (the mirror shows the mountains and the trees)
   if (!V.blockIn || V.plumShow) {
     if (dirty.branches) umeBuildAll();
     if (dirty.sprites || dirty.branches) stages.push('sprites');
@@ -3377,6 +3590,7 @@ function frame(now) {
   else if (hillJob) { try { stepHill(); } catch (e) { hillJob = null; note('ERROR in the hill: ' + e.message); } }
   else if (HALL.job) { try { stepHall(); } catch (e) { HALL.job = null; note('ERROR in the hall: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
   else if (FIELDJ) { try { stepField(); } catch (e) { FIELDJ = null; note('ERROR in the snow ground: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
+  else if (FT.job) { try { stepFrost(); } catch (e) { FT.job = null; note('ERROR in the frosted trees: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
   else if (PINES.job) { try { stepPines(); } catch (e) { PINES.job = null; note('ERROR in the pines: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
   else if (stages.length) { if (!SC.ready && SC_STAGES.indexOf(stages[0]) >= 0 && performance.now() < SC.giveUp) { /* (the kept pictures are still being read) */ } else if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
   else { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
@@ -3408,6 +3622,7 @@ function frame(now) {
     drawBlockIn(ctx, 'back');
     drawLake(t, dt);                                   // step 6: the snow ground, the banks and the water (14c)
     drawHall();                                        // step 5: the shrine hall and the firs beside it (7c)
+    drawFrost(t, dt);                                  // the frosted trees right of the hall (14e)
     drawPines(t, dt);                                  // step 7: the right bank's roped pines and firs (14d)
     drawBlockIn(ctx, 'front');
     if (V.plumShow) { drawBack(ctx, t, true); ctx.setTransform(1, 0, 0, 1, 0, 0); }   // step 10: the plum branches, the snow they shed and their petals (the snowfall is step 11)
@@ -3576,7 +3791,7 @@ if (!lab) return;
 var OBJ = { V: lab.V, MT: lab.MT, CLOUD: lab.CLOUD, SUN: lab.SUN };
 /* o: which values, k: the value, re: what it bakes again (see section 15) */
 // (the pagoda's and the hall's place and size are in their own groups)
-var MOVE = [['hill', 'Hill of firs'], ['frost', 'Frosted trees'],
+var MOVE = [['hill', 'Hill of firs'],
             ['lake', 'Lake and its banks'], ['pines', 'Roped pines and firs (right bank)'], ['path', 'Snow path'], ['gates', 'Torii'],
             ['lanterns', 'Stone lanterns'], ['plumL', 'Plum branch, left'], ['plumR', 'Plum branch, right']];
 function placeCtls(g, name, re, lo, hi) {
@@ -3707,6 +3922,25 @@ var G = [
     { o: 'V', k: 'steam', label: 'Cold: steam rising off the water', min: 0, max: 2, step: 0.05, re: 'live' },
     { o: 'V', k: 'steamRise', label: 'Cold: how high the steam rises', min: 0, max: 3, step: 0.05, re: 'live' },
     { col: 'V', keys: [['bankEarth', 'Banks: earth'], ['lakeDeep', 'Water: its own colour']], re: 'lake' } ] },
+  { name: 'Frosted trees', file: 'frosttree.js, trunks.js', note: 'Bare trees white with rime (樹氷), where the reference has them: the big one right of the hall (a clump of trunks) and the small one far off in the mist; more by the seed. Each is built in 3D and seen through the scene\'s camera, so its height in metres follows from its place on the screen.', ctls: placeCtls('frost', 'Frosted trees', 'frost').concat([
+    { chk: 'V', k: 'ftShow', label: 'Show the frosted trees', re: 'frost block', note: 'Off: the flat block-in shapes come back.' },
+    { o: 'V', k: 'ftCount', label: 'How many trees', min: 0, max: 8, step: 1, re: 'frost', note: 'The first two stand where the reference has them; more are placed on the land right of the hall by the seed (never on or near the water). Each adds to the time the trees take to appear.' },
+    { o: 'V', k: 'ftSeed', label: 'Which trees (seed)', min: 1, max: 99, step: 1, re: 'frost', note: 'Every tree is its own from this: its trunks, limbs and twigs.' },
+    { o: 'V', k: 'ftTrunks', label: 'Trunks from one foot (the big tree; the others up to this)', min: 1, max: 3, step: 1, re: 'frost' },
+    { o: 'V', k: 'ftSpread', label: 'Crown: how wide it fans out', min: 0.5, max: 1.6, step: 0.05, re: 'frost' },
+    { o: 'V', k: 'ftTwigs', label: 'How finely it divides into twigs', min: 0, max: 1, step: 0.05, re: 'frost', note: 'More = a denser lace of rimed twigs (and longer to draw).' },
+    { o: 'V', k: 'ftRime', label: 'Rime: how thick on the twigs', min: 0, max: 2.5, step: 0.05, re: 'frost', note: 'It grows into the wind (from the left): thickest on that side of every twig; on the trunks, snow plastered on that side.' },
+    { o: 'V', k: 'ftFeather', label: 'Rime: its feathery edge', min: 0, max: 2.5, step: 0.05, re: 'frost', note: 'The frost crystals, too fine to see one by one: a soft pale lace where the twigs are dense.' },
+    { o: 'V', k: 'ftSnow', label: 'Snow lying on the near-level limbs', min: 0, max: 2.5, step: 0.05, re: 'frost' },
+    { chk: 'V', k: 'ftBark3d', label: 'Trunks and limbs in 3D (trunks.js bark)', re: 'frost', note: 'Off: painted, faster.' },
+    { o: 'V', k: 'ftHaze', label: 'Mist with distance (× the snow\'s)', min: 0, max: 3, step: 0.05, re: 'frost' },
+    { o: 'V', k: 'ftSoft', label: 'Softness of the edges', min: 0, max: 3, step: 0.05, re: 'frost' },
+    { o: 'V', k: 'ftShadow', label: 'Shadow: the sun\'s, cast on the snow', min: 0, max: 1.5, step: 0.05, re: 'frost' },
+    { chk: 'V', k: 'ftReflect', label: 'Mirrored in the lake', re: 'frost' },
+    { o: 'V', k: 'ftSway', label: 'Sway in the wind and gusts', min: 0, max: 3, step: 0.05, re: 'live', note: '0 = still. A stiff tree heavy with rime: a slow, small sway; a gust passing gives it a push.' },
+    { o: 'V', k: 'ftDust', label: 'Rime dust a gust shakes off', min: 0, max: 3, step: 0.05, re: 'live', note: '0 = none.' },
+    { col: 'V', keys: [['frostBark', 'Bark']], re: 'frost' }
+  ]) },
   { name: 'Snow path (step 8)', file: 'winterpath.js', note: 'The trodden path, carved into the snow in 3D: a curve through five points (1 at the bottom of the screen … 5 the farthest), then on up the rise to the hall\'s steps. Move or size the whole path with "Snow path" in the layout group.', ctls: trailCtls() },
   { name: 'Roped pines and firs (step 7)', file: 'yukitsuri.js, trunks.js', note: 'The right bank\'s trees, after your sheet of five variants: 1 tall and slender, 2 old and sprawling, 3 leaning and bent, 4 compact and dense, 5 twin trunk. Each is built in 3D and seen through the scene\'s camera, so its size on the screen follows from where its foot stands and its height in metres. Move and size them all with "Roped pines and firs" in the layout group.', ctls: ytCtls() },
   { name: 'Colours of the new scene', note: 'The brief\'s colours: snow, water, vermilion torii, stone, pine needles, straw ropes, lamplight.', ctls: [

@@ -28,3 +28,11 @@ Added in the plum-branches / time-phase / hill-firs / optimisation session (run 
 - `load-profile.js` (pines off) and `load-profile-plain.js` (everything at the defaults) — a full load with a CPU profile: the Report's timing lines, then self time by file and by function. `winterLab.stepBudget(5000)` makes the headless browser's one-frame-at-a-time baking finish in minutes (it draws a frame in about 1.5 s). Use these before any speed work: measure first.
 - `fir-profile.js` — where the time goes in one small hill fir; `fir-canvas-truth.js` — the same trees drawn on a graphics-chip canvas, a main-processor canvas, and 8x larger then shrunk (the true look), with the mean differences: how the 2x-and-shrink rule was found.
 - `phase.js` — the Time phase drop-down: each choice lands on its own phase and the slider follows. `plum-pieces.js` — the plum branches' pieces and their snow pictures (positions, sizes) by `winterLab.plums()`.
+
+Added in the kept-pictures / loading session (`NODE_PATH=$(npm root -g) node <script>`; each script's first line says how; ONE at a time, long ones `run_in_background`):
+- `kept-pictures.js` — a full bake, then a reload: every layer of both loads saved as PNGs, the Report lines printed; the two sets must be pixel-identical (the check that a kept picture is the same as the baked one).
+- `kept-changes.js` — change one plum value, then one hill value: which kept pictures are laid down and which are baked again.
+- `kept-labels.js` — what each kept picture's label is made of (the functions its code reaches, the values it reads).
+- `old-yukitsuri.js` — the page with an old `yukitsuri.js` (no `pack`): no error, the pines not kept.
+Added in the frosted-trees session:
+- `frost-tree.html` + `frost-tree.js` — one frosted tree (frosttree.js) large on a plain background, lit as the scene at 15:30, with its shadow: `node frost-tree.js OUT.png 2 'seed=5&D=145&h=9&twigs=0.35&feather=0.6'` (D: metres away; `bark3d=0` painted wood). Under a second per tree: the quick place to tune the tree's look.

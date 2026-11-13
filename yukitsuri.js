@@ -1364,5 +1364,7 @@ function unpack(o, d, pics) {
 function busy(A) { if (A.bits.length || A.puffs.length) return true; for (var i = 0; i < A.rest.length; i++) if (A.rest[i].state === 'wait' || A.rest[i].state === 'slip') return true; return false; }
 
 return { build: build, project: project, bakeJob: bakeJob, shadow: shadow, anim: anim, shed: shed, update: update,
-         drawRest: drawRest, drawFalling: drawFalling, busy: busy, palette: palette, pack: pack, unpack: unpack };
+         drawRest: drawRest, drawFalling: drawFalling, busy: busy, palette: palette, pack: pack, unpack: unpack,
+         // (the snow's line at a trunk's foot, shared with frosttree.js: one painter for where wood meets snow)
+         snowJoin: snowJoin, clipAbove: clipAbove, paintJoin: paintJoin };
 })();
