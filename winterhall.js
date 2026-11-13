@@ -1348,6 +1348,7 @@ function job(o) {
       var T = order[firI++], look = {};
       for (var kk in (o.firLook || {})) look[kk] = o.firLook[kk];
       look.light = o.light; look.haze = T.f.haze === undefined ? 0.4 : T.f.haze;
+      look.D = T.D; look.Hm = T.h;                       // (its distance and height in metres, for a painter that builds it in 3D)
       // its own depth of field (by its own distance), added to how soft the painter lays it down
       var dF = dofAt(T.D);
       if (dF > 0.05) { var s0 = (0.3 + look.haze * 0.3) * PR * (look.soft === undefined ? 1 : look.soft); look.soft = Math.hypot(s0, dF) / ((0.3 + look.haze * 0.3) * PR); }
