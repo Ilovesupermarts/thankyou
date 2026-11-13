@@ -34,3 +34,5 @@ Added in the kept-pictures / loading session (`NODE_PATH=$(npm root -g) node <sc
 - `kept-changes.js` — change one plum value, then one hill value: which kept pictures are laid down and which are baked again.
 - `kept-labels.js` — what each kept picture's label is made of (the functions its code reaches, the values it reads).
 - `old-yukitsuri.js` — the page with an old `yukitsuri.js` (no `pack`): no error, the pines not kept.
+Added in the frosted-trees session:
+- `frost-tree.html` + `frost-tree.js` — one frosted tree (frosttree.js) large on a plain background, lit as the scene at 15:30, with its shadow: `node frost-tree.js OUT.png 2 'seed=5&D=145&h=9&twigs=0.35&feather=0.6'` (D: metres away; `bark3d=0` painted wood). Under a second per tree: the quick place to tune the tree's look.
