@@ -996,11 +996,27 @@ function startHill() {
   }
   hillJob = WinterHill.hillJob(c, o);
 }
+/* The Report's breakdown of the hill's bake (timing only; no pixel depends on it). Per row: how many firs, the JS time spent
+   placing the row + drawing the pagoda ("pagoda" when it stands there), drawing the trees, softening the row, and the wall
+   time the row took from start to end (the rest of the wall time is other frames' work and waiting for the graphics chip). */
+function hillReport(st) {
+  if (!st) return;
+  var tot = st.body, nT = 0, tT = 0, tS = 0, tB = 0, tP = 0;
+  st.rows.forEach(function (r) { nT += r.n; tT += r.trees; tS += r.soften; tB += r.before; tP += r.place; });
+  note('hill breakdown (JS time while baking): snow body ' + Math.round(st.body) + ' ms, ' + nT + ' firs ' + Math.round(tT) + ' ms, rows softened ' + Math.round(tS) +
+       ' ms, pagoda + row set-up ' + Math.round(tB + tP) + ' ms; in all ' + Math.round(st.work) + ' ms of drawing work in ' + st.steps + ' frame slices');
+  st.rows.forEach(function (r, i) {
+    note('  row ' + (i + 1) + ' (fir ' + Math.round(r.h) + ' px): ' + r.n + ' firs, trees ' + Math.round(r.trees) + ' ms (' + (r.n ? Math.round(r.trees / r.n) : 0) + ' each), softening ' + Math.round(r.soften) +
+         ' ms' + (r.before > 5 ? ', pagoda ' + Math.round(r.before) + ' ms' : '') + ', row took ' + Math.round(r.wall) + ' ms from start to end');
+  });
+}
 function swapHill() {
   var t = HILL; HILL = HILLN; HILLN = t;
+  var hst = hillJob && hillJob.stats;
   hillJob = null; hillDrawn = true;
   scSave('hill', HILL.cnv);
   note('hill and pagoda: ' + Math.round(performance.now() - hillT0) + ' ms (in steps of about ' + stepMs() + ' ms a frame)');
+  hillReport(hst);
 }
 var STEP_MS = 0;                                         // (check scripts only: winterLab.stepBudget; 0 = the panel's value)
 /* How much drawing work the slow bakes (hill, snow ground, hall, pines) do a frame, in ms: the panel's "Loading: drawing
@@ -3427,7 +3443,7 @@ var BAKE_VER = 1;                                   // (raise it to throw every 
 var SC_STAGES = ['hill', 'field', 'hall', 'frost', 'pines'];
 var SC = { db: null, ready: false, giveUp: performance.now() + 4000, rec: {}, pic: { hill: 0, field: 0, hall: 0, frost: 0, pines: 0 }, want: {}, deps: {}, files: null };
 var SC_ROOTS = { hill: ['startHill', 'ytFirPaint'], field: ['bakeField'], hall: ['startHall'], pines: ['startPines', 'stepPines'], frost: ['startFrost', 'stepFrost'] };
-var SC_SKIP = ['note', 'stepMs', 'scSave', 'scSaveAll', 'scKey', 'scDeps', 'scFiles', 'scRestore', 'scTake'];
+var SC_SKIP = ['note', 'stepMs', 'hillReport', 'scSave', 'scSaveAll', 'scKey', 'scDeps', 'scFiles', 'scRestore', 'scTake'];
 var SC_COMMON = ['sceneLight', 'shadeColour', 'lampLevel', 'sunPlace', 'light', 'isNight', 'nightLights', 'blkPlace', 'blkY'];
 /* What a stage's code reads: its functions and every function of this page they call (read from their own text), and in
    them every value of V (and MT, SUN) they read by name. blkPlace('g') brings g's across / up / size; V['trail' + …]

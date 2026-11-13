@@ -864,6 +864,8 @@ function hillJob(c, o) {
   }
   var x0 = prof[0][0], x1 = prof[prof.length - 1][0], foot = o.foot;
   var rows = o.rows, k = 0, row = -1, R = null, done = false;
+  // timing only (the Report): the JS time spent on the hill's snow, and on each row (placing + the pagoda, the trees, the softening)
+  var ST = { body: 0, rows: [], steps: 0, work: 0 };
   var look0 = o.look || {};
   function body() {
     // the hill's snow, lit from the side of the sun, blue in the hollows
@@ -880,8 +882,9 @@ function hillJob(c, o) {
   // a row: o.before first (the pagoda may stand here), then where each of its trees stands (the same random
   // numbers, in the same order, as drawing them one after another)
   function startRow() {
-    var u = rows > 1 ? row / (rows - 1) : 1;
+    var u = rows > 1 ? row / (rows - 1) : 1, tp = performance.now();
     if (o.before) o.before(c, u);
+    var beforeMs = performance.now() - tp;
     var hgt = lerp(o.treeFar, o.treeNear, Math.pow(u, 1.25));        // nearer rows: larger (perspective)
     var haze = lerp(o.hazeFar, o.hazeNear, u);
     var gap = hgt * lerp(0.28, 0.42, o.density === undefined ? 0.5 : 1 - o.density);
@@ -910,42 +913,48 @@ function hillJob(c, o) {
     var lc = lay.getContext('2d', ss > 1 ? CPU : undefined); lc.setTransform(sc * ss, 0, 0, sc * ss, -rx0 * sc * ss, -ry0 * sc * ss);
     var look = { light: L, haze: haze, snow: o.snow, width: o.treeWidth, direct: true };
     for (var lk in look0) look[lk] = look0[lk];
-    return { trees: trees, i: 0, lay: lay, lc: lc, look: look, haze: haze, T0: T0, sc: sc, rx0: rx0, ry0: ry0, ss: ss };
+    return { trees: trees, i: 0, lay: lay, lc: lc, look: look, haze: haze, T0: T0, sc: sc, rx0: rx0, ry0: ry0, ss: ss,
+             st: { u: u, n: trees.length, h: hgt, before: beforeMs, place: performance.now() - tp - beforeMs, trees: 0, soften: 0, w0: tp } };
   }
   function endRow() {
+    var te = performance.now();
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
     c.filter = 'blur(' + (firSoft(R.haze, R.sc) * (o.soft === undefined ? 1 : o.soft)).toFixed(2) + 'px)';
     c.imageSmoothingQuality = 'high';
     c.drawImage(R.lay, R.rx0 * R.T0.a + R.T0.e, R.ry0 * R.T0.d + R.T0.f, R.lay.width / R.ss, R.lay.height / R.ss); c.restore();
+    R.st.soften = performance.now() - te; R.st.wall = performance.now() - R.st.w0; ST.rows.push(R.st);
     R = null;
   }
   var started = false;
   function step(ms) {
     if (done) return true;
     var t0 = performance.now(), lim = ms === undefined ? Infinity : ms;
-    if (!started) { started = true; body(); if (performance.now() - t0 >= lim) return false; }
+    ST.steps++;
+    if (!started) { started = true; var tb = performance.now(); body(); ST.body = performance.now() - tb; if (performance.now() - t0 >= lim) { ST.work += performance.now() - t0; return false; } }
     while (true) {
       if (!R) {
         row++;
-        if (row >= rows) { if (o.before) o.before(c, 2); done = true; return true; }
+        if (row >= rows) { if (o.before) o.before(c, 2); done = true; ST.work += performance.now() - t0; return true; }
         R = startRow();
       }
       while (R.pend || R.i < R.trees.length) {
+        var tt = performance.now();                                        // (timing only)
         if (!R.pend) {
           var tr = R.trees[R.i++];
           R.pend = fir(R.lc, tr[0], tr[1], tr[2], tr[3], R.look) || null;   // (a painter's job, finished a bough at a time)
         }
         if (R.pend) {
-          if (!R.pend.step(Math.max(0.5, lim - (performance.now() - t0)))) return false;
+          if (!R.pend.step(Math.max(0.5, lim - (performance.now() - t0)))) { R.st.trees += performance.now() - tt; ST.work += performance.now() - t0; return false; }
           R.pend = null;
         }
-        if (performance.now() - t0 >= lim) return false;
+        R.st.trees += performance.now() - tt;
+        if (performance.now() - t0 >= lim) { ST.work += performance.now() - t0; return false; }
       }
       endRow();
-      if (performance.now() - t0 >= lim) return false;
+      if (performance.now() - t0 >= lim) { ST.work += performance.now() - t0; return false; }
     }
   }
-  return { step: step, cancel: function () { done = true; } };
+  return { step: step, stats: ST, cancel: function () { done = true; } };
 }
 function hill(c, o) { hillJob(c, o).step(); }
 
