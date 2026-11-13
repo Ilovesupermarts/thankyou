@@ -3066,7 +3066,8 @@ function rebuildAll() {
   if (HALL.job) { HALL.job.cancel(); HALL.job = null; }
   buildSky();
   dirty = {};
-  stages = V.blockIn && !V.plumShow ? ['mtn', 'hill', 'field', 'hall', 'pines', 'lake'] : ['mtn', 'hill', 'field', 'hall', 'pines', 'lake', 'sprites'];   // (step 10: the plum branches show with the block-in too)   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
+  // (the plum branches and the flakes' sprites, 'sprites', are cheap and nearest: they come straight after the mountains)
+  stages = V.blockIn && !V.plumShow ? ['mtn', 'hill', 'field', 'hall', 'pines', 'lake'] : ['mtn', 'sprites', 'hill', 'field', 'hall', 'pines', 'lake'];   // (step 10: the plum branches show with the block-in too)   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -3167,7 +3168,7 @@ function drawMountains(dt) {
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
-var last = 0, barTimer = 0;
+var last = 0, barTimer = 0, sideDirty = true;
 function frame(now) {
   var t = now / 1000, dt = last ? Math.min(0.05, t - last) : 0.016;
   last = t; nowT = t;
@@ -3187,7 +3188,7 @@ function frame(now) {
   for (var i = 0; i < WS.branches.length; i++) umeSway(WS.branches[i], t, dt);
   umeUpdatePuffs(dt);
   umeUpdatePetals(t, dt);
-  updateFlakes(t, dt);
+  if (!V.blockIn) updateFlakes(t, dt);                 // (the snowfall is not drawn while the block-in shows: step 11)
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
@@ -3211,8 +3212,8 @@ function frame(now) {
     drawPines(t, dt);                                  // step 7: the right bank's roped pines and firs (14d)
     drawBlockIn(ctx, 'front');
     if (V.plumShow) { drawBack(ctx, t, true); ctx.setTransform(1, 0, 0, 1, 0, 0); }   // step 10: the plum branches, the snow they shed and their petals (the snowfall is step 11)
-    nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height);
-    gctx.setTransform(1, 0, 0, 1, 0, 0); gctx.clearRect(0, 0, cvG.width, cvG.height);
+    // (nothing is drawn on the two side canvases while the block-in shows: they are cleared once, not every frame)
+    if (sideDirty) { sideDirty = false; nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height); }
     requestAnimationFrame(frame);
     return;
   }
@@ -3231,9 +3232,8 @@ function frame(now) {
   nctx.setTransform(1, 0, 0, 1, 0, 0);
   nctx.clearRect(0, 0, cvN.width, cvN.height);
   drawNear(nctx);
-  // #dynGround: empty for now
-  gctx.setTransform(1, 0, 0, 1, 0, 0);
-  gctx.clearRect(0, 0, cvG.width, cvG.height);
+  // (#dynGround: nothing is drawn on it, so it is not cleared every frame any more)
+  sideDirty = true;                                    // (#dynNear was drawn on: clear it if the block-in comes back)
   requestAnimationFrame(frame);
 }
 
