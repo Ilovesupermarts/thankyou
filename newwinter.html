@@ -3069,16 +3069,6 @@ function frostPlaces() {
     var D = eye * F / (foot - hy);
     out.push({ i: i, x: x, foot: foot, D: D, h: Math.max(2, (foot - top) * D / F), trunks: i === 0 ? V.ftTrunks : 1 + Math.floor(tr * V.ftTrunks) });
   });
-  // V.ftShrine: seven frosted trees where the shrine's seven firs stood (they stand on the rise the hall stands on: the eye is
-  // only a little above that snow, so their size and distance follow from where their feet are on it, as the hall's)
-  if (V.ftShrine && V.hallShow && V.hfShow && typeof WinterHall !== 'undefined') {
-    var hall = trailHall(), eyeR = hall ? -hall.Y0 : 0;
-    if (eyeR > 0.2) hallFirList(blkPlace('hall')).forEach(function (f, k) {
-      var d = f.foot - hy; if (d < 1) return;
-      var D = eyeR * F / d;
-      out.push({ i: 50 + k, x: f.x, foot: f.foot, D: D, h: f.h * D / F, trunks: 1, eye: eyeR, shrine: true });
-    });
-  }
   if (count > BLK.frost.length) {
     var water = lakeOutline(), hp = blkPlace('hall'), hx1 = hp.X(BLK.hall.x1), hFoot = hp.Y(BLK.hall.foot), tries = 0, extra = 0;
     while (extra < count - BLK.frost.length && tries++ < 4000) {
@@ -3095,6 +3085,17 @@ function frostPlaces() {
       out.push({ i: BLK.frost.length + extra, x: ex, foot: ey, D: De, h: hh, trunks: tk });
       extra++;
     }
+  }
+  // (after the others are placed, so none of them moves: they were placed without these trees)
+  // V.ftShrine: seven frosted trees where the shrine's seven firs stood (they stand on the rise the hall stands on: the eye is
+  // only a little above that snow, so their size and distance follow from where their feet are on it, as the hall's)
+  if (V.ftShrine && V.hallShow && V.hfShow && typeof WinterHall !== 'undefined') {
+    var hall = trailHall(), eyeR = hall ? -hall.Y0 : 0;
+    if (eyeR > 0.2) hallFirList(blkPlace('hall')).forEach(function (f, k) {
+      var d = f.foot - hy; if (d < 1) return;
+      var D = eyeR * F / d;
+      out.push({ i: 50 + k, x: f.x, foot: f.foot, D: D, h: f.h * D / F, trunks: 1, eye: eyeR, shrine: true });
+    });
   }
   return out.sort(function (a, b) { return a.foot - b.foot; });
 }
