@@ -397,6 +397,7 @@ var V_DEFAULTS = {
   // the frosted trees (frosttree.js): bare trees white with rime, right of the hall (the reference's two, more by the seed)
   ftShow: true, ftShrine: true, ftCount: 2, ftSeed: 5, ftTrunks: 3, ftSpread: 1, ftTwigs: 0.35, ftRime: 1, ftFeather: 0.6, ftSnow: 1, ftBark3d: true,
   ftHaze: 0.55, ftSoft: 1, ftShadow: 1, ftReflect: true, ftSway: 1, ftDust: 1,
+  hallVivid: 0.85, pagodaVivid: 0.85,
   hallShow: true, hallTurn: 15, hallSnow: 1, hallEave: 1, hallRoof: 1, hallSori: 1, hallHaze: 0.12, hallFootMist: 0.8,
   hallShadow: 1, hallLamps: 1, hallSpill: 1, hallWeather: 1, hallRidge: true, hallRailing: true, hallRope: true,
   // the seven frosted trees beside the hall (right of it): which trees (seed), trunks, crown width (×), all heights (×); then
@@ -978,7 +979,7 @@ function startHill() {
   var px = pp.X(0.195), top = pp.Y(0.185), foot = pp.Y(0.505), placed = false, stairs = null, eave = null, cl = V.pagodaClear;
   var pagodaOpts = { x: px, top: top, foot: foot, yaw: V.pagodaTurn * PI / 180, style: V.pagodaTimber ? 'timber' : 'vermilion',
                      lit: lampLevel() * V.pagodaLamps, snow: V.pagodaSnow, light: L, haze: V.pagodaHaze,
-                     colours: { wall: V.colours.pagodaWall, red: V.colours.pagodaRed, bracket: V.colours.pagodaBracket, soffit: V.colours.pagodaSoffit, roof: V.colours.pagodaRoof, spire: V.colours.pagodaSpire },
+                     vivid: V.pagodaVivid, colours: { wall: V.colours.pagodaWall, red: V.colours.pagodaRed, bracket: V.colours.pagodaBracket, soffit: V.colours.pagodaSoffit, roof: V.colours.pagodaRoof, spire: V.colours.pagodaSpire },
                      dof: { on: V.pagodaDof, focus: V.pagodaFocus, strength: V.pagodaDofStrength, max: V.pagodaDofMax } };
   var o = {
     profile: HILL_PROFILE.map(function (p) { return [ph.X(p[0]), ph.Y(p[1])]; }), foot: hy, rows: Math.round(V.hillRows), seed: Math.round(V.hillSeed),
@@ -1083,7 +1084,7 @@ function hallOpts() {
     haze: V.hallHaze, footMist: V.hallFootMist, shadow: V.hallShadow, lit: lampLevel() * V.hallLamps, spill: V.hallSpill,
     lampCol: hex(V.colours.flame), light: L,
     colours: { plaster: V.colours.hallPlaster, timber: V.colours.hallTimber, stone: V.colours.hallStone, red: V.colours.hallRed, green: V.colours.hallGreen, soffit: V.colours.hallSoffit },
-    weather: V.hallWeather, ridge: V.hallRidge, railing: V.hallRailing, rope: V.hallRope,
+    vivid: V.hallVivid, weather: V.hallWeather, ridge: V.hallRidge, railing: V.hallRailing, rope: V.hallRope,
     dof: { on: V.hallDof, focus: V.hallFocus, strength: V.hallDofStrength, max: V.hallDofMax },
     field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: groundHaze(),
              haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis,
@@ -4364,6 +4365,7 @@ var G = [
     { chk: 'V', k: 'pagodaTimber', label: 'Dark timber (off: vermilion and white)', re: 'hill' },
     { o: 'V', k: 'pagodaTurn', label: 'Turned (°)', min: -90, max: 90, step: 1, re: 'hill', note: '0 = facing you, 45 = seen corner-on.' },
     { o: 'V', k: 'pagodaSnow', label: 'Snow on it', min: 0, max: 1.5, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'pagodaVivid', label: 'Paint: stays bright and saturated in the shade', min: 0, max: 1, step: 0.01, re: 'hill', note: '0 = as the cool winter light makes it; 1 = the paint keeps its own hue and saturation, and the shade is lifted a little. (The vermilion style.)' },
     { o: 'V', k: 'pagodaHaze', label: 'Mist on it', min: 0, max: 1, step: 0.01, re: 'hill' },
     { o: 'V', k: 'pagodaLamps', label: 'Window light after dusk', min: 0, max: 1.5, step: 0.01, re: 'hill', note: 'They come on with the hall\'s, as the autumn pagoda\'s do: fading in from about 38 minutes before sunset to full about 6 minutes after.' },
     { o: 'V', k: 'pagodaRow', label: 'Stands among the rows (0 crest … 1 foot)', min: 0, max: 1, step: 0.01, re: 'hill', note: 'The rows below it stand in front of it and hide its foot.' },
@@ -4377,6 +4379,7 @@ var G = [
     { o: 'V', k: 'hallEave', label: 'How far the eaves stand out (×)', min: 0.5, max: 1.6, step: 0.01, re: 'hall', note: '1 = 3 m past the walls.' },
     { o: 'V', k: 'hallRoof', label: 'Roof height (×)', min: 0.6, max: 1.5, step: 0.01, re: 'hall', note: '1 = 4.3 m from the eaves to the ridge.' },
     { o: 'V', k: 'hallSori', label: 'Corners turned up (×)', min: 0, max: 2.5, step: 0.05, re: 'hall' },
+    { o: 'V', k: 'hallVivid', label: 'Paint: stays bright and saturated in the shade', min: 0, max: 1, step: 0.01, re: 'hall', note: '0 = as the cool winter light makes it (the vermilion goes muddy); 1 = the paint keeps its own hue and saturation, and the shade is lifted a little.' },
     { o: 'V', k: 'hallHaze', label: 'Mist on it', min: 0, max: 1, step: 0.01, re: 'hall' },
     { o: 'V', k: 'hallFootMist', label: 'Low mist at its foot', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'The mist lying on the snow field, thicker near the ground.' },
     { o: 'V', k: 'hallShadow', label: 'Shadows on the snow', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'The hall\'s and the firs\' shadows, cast along the sun\'s direction (they follow the time of day).' },

@@ -86,7 +86,15 @@ function shadeC(base, n, L, sunK) {
     var snowLit = 0.85 * (L.sunCol[ch] * Math.max(0, L.sunW[1]) + L.skyCol[ch] * L.amb * 0.8);   // the snow's own light (albedo 0.85)
     out[ch] = base[ch] * (L.sunCol[ch] * d + L.skyCol[ch] * s + snowLit * g * 0.55);
   }
-  return out;
+  return L.viv ? vividPaint(out, base, L.viv) : out;
+}
+/* (o.vivid, 0 … 1) The paint keeps its own hue and saturation through the light: the cool sky and the low sun dim and grey
+   a vermilion into a muddy brown, so the shaded colour is put back to the paint's own at its brightness, and the shade
+   is lifted a little so the paint reads bright in the shade too. 0 = as the light makes it. */
+function vividPaint(out, base, k) {
+  var lo = 0.3 * out[0] + 0.59 * out[1] + 0.11 * out[2], lb = 0.3 * base[0] + 0.59 * base[1] + 0.11 * base[2] || 1;
+  var f = lo / lb; f = lerp(f, 0.5 + 0.6 * f, k);
+  return [lerp(out[0], Math.min(255, base[0] * f), k), lerp(out[1], Math.min(255, base[1] * f), k), lerp(out[2], Math.min(255, base[2] * f), k)];
 }
 
 var PAL_BASE = { plaster: hex('#E8DDC8'), post: hex('#4B2E22'), beam: hex('#553326'), floor: hex('#3A2620'), stone: hex('#9C978F'),
@@ -223,7 +231,7 @@ function job(o) {
   var Lw = norm([o.light.sun[0], o.light.sun[1], -o.light.sun[2]]);          // toward the sun, in the camera's space (z away)
   var Ll = norm([Lw[0] * cs - Lw[2] * sn, Lw[1], Lw[0] * sn + Lw[2] * cs]);   // … and in the hall's own
   var Lsh = o.light.sun;                                    // (x right, y up, z toward you: the snow ground's way)
-  var LP = { sunW: Lw, sunCol: o.light.sunCol, skyCol: o.light.skyCol, amb: o.light.amb };
+  var LP = { sunW: Lw, sunCol: o.light.sunCol, skyCol: o.light.skyCol, amb: o.light.amb, viv: clamp(o.vivid || 0, 0, 1) };
   function toShadeN(n) { var w = [n[0] * cs + n[2] * sn, n[1], -n[0] * sn + n[2] * cs]; return [w[0], w[1], -w[2]]; }
   function toWorldN(n) { return [n[0] * cs + n[2] * sn, n[1], -n[0] * sn + n[2] * cs]; }
   var oL = [-X * cs + Z * sn, -Y0, -X * sn - Z * cs];       // the eye, in the hall's own space

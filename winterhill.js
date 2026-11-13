@@ -81,6 +81,14 @@ var PAL = {
 var STEP = hex('#CFC7BA'), TILE = hex('#3B3A43'), FASCIA = hex('#2C2A30'), SNOW = hex('#F6F6FA'), GOLD = hex('#D2A24A');
 var GLOW = hex('#FFB65C'), PANE_DAY = hex('#2C2422');
 
+/* (o.vivid) the paint keeps its own hue and saturation through the light: the cool sky and the low sun dim and grey a
+   vermilion into a muddy brown; the shaded colour is put back to the paint's own at its brightness, the shade lifted a
+   little. 0 = as the light makes it. */
+function vividPaint(out, base, k) {
+  var lo = 0.3 * out[0] + 0.59 * out[1] + 0.11 * out[2], lb = 0.3 * base[0] + 0.59 * base[1] + 0.11 * base[2] || 1;
+  var f = lo / lb; f = lerp(f, 0.5 + 0.6 * f, k);
+  return [lerp(out[0], Math.min(255, base[0] * f), k), lerp(out[1], Math.min(255, base[1] * f), k), lerp(out[2], Math.min(255, base[2] * f), k)];
+}
 function pagoda(c, cam, o) {
   var hgt = o.foot - o.top;                       // its height on the screen (px)
   // where it stands: from its place and size on the screen, through the camera
@@ -110,6 +118,7 @@ function pagoda(c, cam, o) {
   }
   // its roof and its spire: given colours (o.colours.roof: the roofing; o.colours.spire: the spire's metal), else as before
   // (dark tiles, a gilt spire)
+  var VIV = Math.max(0, Math.min(1, o.vivid || 0));            // (0 … 1: the paint keeps its own hue and saturation through the light; see vividPaint)
   var TILE_ = o.colours && o.colours.roof ? hex(o.colours.roof) : TILE, METAL = o.colours && o.colours.spire ? hex(o.colours.spire) : GOLD;
   var METAL_HI = o.colours && o.colours.spire ? METAL.map(function (v) { return Math.min(255, v * 2 + 30); }) : [255, 226, 150];
   // the light, turned into the camera's space (there, toward you is -z)
@@ -488,11 +497,16 @@ function pagoda(c, cam, o) {
     var m = f.mat, col;
     if (m === 'gold' || m === 'goldLit') {
       col = shade(METAL, n, L, 1);
+      if (VIV > 0) col = vividPaint(col, METAL, VIV);
       col = mix(col, METAL_HI, m === 'goldLit' ? 0.5 : Math.max(0, dot(n, Lsun)) * 0.35);
     } else if (m === 'tile') col = shade(TILE_, n, L, 1);
     else if (m === 'fascia') col = shade(FASCIA, n, L, 1);
     else if (m === 'step') col = shade(STEP, n, L, 1);
-    else col = shade(hex(P[m] || P.wall), n, L, 1);
+    else {
+      var base0 = hex(P[m] || P.wall);
+      col = shade(base0, n, L, 1);
+      if (VIV > 0) col = vividPaint(col, base0, VIV);
+    }
     // the lamps inside light the undersides of the eaves and the brackets warm
     if (lit > 0 && (m === 'soffit' || m === 'bracket')) col = mix(col, [255, 170, 90], clamp(0.35 * lit, 0, 0.6));
     var ramp = RAMP[m] || [1, 1];
