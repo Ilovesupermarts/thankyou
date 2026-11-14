@@ -211,12 +211,21 @@ function section(hd, q) {
 }
 
 /* ---------------- drawing ---------------- */
+/* place: { x, z (m, camera space: where the gate's middle stands on the snow), fx, fz (the way it faces: along the path),
+   tilt (radians, optional: the whole gate leaned about the line between its feet, + its top toward the face that greets
+   you, b < 0) }. Turning a gate is only a different fx, fz. */
 function frame(place, cam) {
   var fx = place.fx, fz = place.fz, rx = fz, rz = -fx, X = place.x, Z = place.z, eye = cam.eye, F = cam.F, cx = cam.W / 2, hy = cam.hy;
+  var tl = place.tilt || 0, ct = Math.cos(tl), st = Math.sin(tl);
+  function tw(a, y, b, x0, z0) { var y2 = ct * y + st * b, b2 = ct * b - st * y; return [x0 + a * rx + b2 * fx, y2, z0 + a * rz + b2 * fz]; }
+  // a direction in camera space → the gate's own (a, y, b)
+  function loc(vx, vy, vz) { var a = vx * rx + vz * rz, bw = vx * fx + vz * fz; return [a, ct * vy - st * bw, st * vy + ct * bw]; }
   return {
     // local (a, y, b) → camera [x, y (from the snow), z]
-    w: function (a, y, b) { return [X + a * rx + b * fx, y, Z + a * rz + b * fz]; },
-    n: function (na, ny, nb) { return [na * rx + nb * fx, ny, na * rz + nb * fz]; },
+    w: function (a, y, b) { return tw(a, y, b, X, Z); },
+    n: function (na, ny, nb) { return tw(na, ny, nb, 0, 0); },
+    loc: loc,
+    locP: function (q) { return loc(q[0] - X, q[1], q[2] - Z); },
     p: function (q) { var z = Math.max(0.2, q[2]); return [cx + F * q[0] / z, hy - F * (q[1] - eye) / z]; },
     eye: [0, eye, 0], rx: rx, rz: rz, fx: fx, fz: fz
   };
@@ -514,7 +523,7 @@ function draw(c, G, place, cam, Lt, look) {
   function bodyOfRim(sd) {
     var crev = d(look, 'crevice', 1); if (!G.snow || crev <= 0) return null;
     var yR = G.nem + 0.012, ax = sd * G.axis(yR), rIn = G.radius(G.nem), rOut = rIn * 1.1;
-    var axw = T.w(ax, yR, 0), ex = -axw[0], ez = -axw[2], ea = ex * T.rx + ez * T.rz, eb = ex * T.fx + ez * T.fz;
+    var axw = T.w(ax, yR, 0), evl = T.loc(-axw[0], 0, -axw[2]), ea = evl[0], eb = evl[2];
     var rp = rng(G.seed * 41 + (sd + 3) * 7), k1 = rp() * 6.3, k2 = rp() * 6.3, H0 = 0.05 * crev * G.snow.amt;
     var rc = (rIn + rOut) / 2 + 0.012, Bw = (rOut - rIn) / 2 + 0.03;
     function shape(a, y, b) {
@@ -536,7 +545,7 @@ function draw(c, G, place, cam, Lt, look) {
   }
   /* ---- what of the sun and the sky a point of snow sees: the gate's own parts stand in the way (the pillars, the centre
      post, the wedges, the beams), so snow tucked against a post or under a beam lies in their shade ---- */
-  var LsA = Ls[0] * T.rx + Ls[2] * T.rz, LsB = Ls[0] * T.fx + Ls[2] * T.fz, LsY = Ls[1];
+  var LsL = T.loc(Ls[0], Ls[1], Ls[2]), LsA = LsL[0], LsB = LsL[2], LsY = LsL[1];
   var nkS = G.nuki, gkS = G.gaku, KS = G.kasagi, SS2 = G.shimaki, ksS = G.kus;
   var BOX = [
     [-gkS.w, gkS.w, gkS.y0, gkS.y1, -gkS.dep / 2, gkS.dep / 2],
@@ -596,14 +605,14 @@ function draw(c, G, place, cam, Lt, look) {
     if (w * h > 4e6) return null;
     var imF = new ImageData(w, h), imB = new ImageData(w, h), DF = imF.data, DB = imB.data, nF = 0, nB = 0;
     // the eye in the gate's own (a, y, b)
-    var ox = -place.x, oz = -place.z, aO = ox * T.rx + oz * T.rz, bO = ox * T.fx + oz * T.fz, yO = cam.eye;
+    var EL = T.locP([0, cam.eye, 0]), aO = EL[0], yO = EL[1], bO = EL[2];
     var lo = [bx[0], bx[2], bx[4]], hi = [bx[1], bx[3], bx[5]], eps = 0.006;
     for (var j = 0; j < h; j++) {
-      var sy = Y0 + (j + 0.5) / PRD, dY = -(sy - cam.hy) / cam.F;
+      var sy = Y0 + (j + 0.5) / PRD, dY0 = -(sy - cam.hy) / cam.F;
       for (var i = 0; i < w; i++) {
         var sx = X0 + (i + 0.5) / PRD, dxc = (sx - cam.W / 2) / cam.F;
         // (the line of sight (dxc, dY, 1) in the gate's own a and b)
-        var dAa = dxc * T.rx + T.rz, dBb = dxc * T.fx + T.fz;
+        var DL = T.loc(dxc, dY0, 1), dAa = DL[0], dY = DL[1], dBb = DL[2];
         var O = [aO, yO, bO], Dd = [dAa, dY, dBb], t0 = 0, t1 = 1e9;
         for (var ax3 = 0; ax3 < 3; ax3++) {
           if (Math.abs(Dd[ax3]) < 1e-9) { if (O[ax3] < lo[ax3] || O[ax3] > hi[ax3]) { t0 = 1; t1 = 0; break; } continue; }
@@ -656,14 +665,14 @@ function draw(c, G, place, cam, Lt, look) {
      on the black sleeve's rim (a crevice) */
   function plaster(sd, aShaftH) {
     if (!G.snow || !(G.snow.plaster > 0)) return;
-    var wf = look.windFrom || [-1, 0], wa = wf[0] * T.rx + wf[1] * T.rz, wb = wf[0] * T.fx + wf[1] * T.fz, phW = Math.atan2(wb, wa);
+    var wf = look.windFrom || [-1, 0], WL = T.loc(wf[0], 0, wf[1]), phW = Math.atan2(WL[2], WL[0]);
     var rp = rng(G.seed * 71 + (sd + 3) * 19 + G.snow.seed), n = Math.round(lerp(3, 6, rp()) * Math.min(2, G.snow.plaster));
     for (var i = 0; i < n; i++) {
       var y0 = lerp(G.nem + 0.15, G.yP - 0.3, Math.pow(rp(), 0.8)), dh = lerp(0.06, 0.24, rp()) * Math.min(1.5, G.snow.plaster), y1 = Math.min(G.yP - 0.1, y0 + dh);
       var phc = phW + (rp() - 0.5) * 1.1, dph = lerp(0.12, 0.42, rp()), M = 7, Lp = [], Rp = [];
       // the side of the pillar facing the eye, in the gate's own angle: a patch is cut to it
       var axw = T.w(sd * G.axis((y0 + y1) / 2), (y0 + y1) / 2, 0), ex = -axw[0], ez = -axw[2];
-      var phV = Math.atan2(ex * T.fx + ez * T.fz, ex * T.rx + ez * T.rz);
+      var EV = T.loc(ex, 0, ez), phV = Math.atan2(EV[2], EV[0]);
       function wrap(x) { while (x > PI) x -= TAU; while (x < -PI) x += TAU; return x; }
       var lo = phc - dph, hi = phc + dph, dc = wrap(phc - phV);
       lo = phV + Math.max(wrap(lo - phV), -PI / 2 * 0.98); hi = phV + Math.min(wrap(hi - phV), PI / 2 * 0.98);
