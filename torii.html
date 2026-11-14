@@ -98,6 +98,7 @@ var V_DEFAULTS = {
   lantSides: 6, lantPillar: 0.07, lantBox: 0.1, lantRoof: 0.28, lantCurls: true, lantMossAmt: 0.53, lantVariety: 0.78,
   lantLight: 1.3, lantWindowGlow: 0.43, lantHalo: 0.7, lantHaloSize: 2.05, lantPool: 1.1, lantPoolSize: 1.25,
   lantFlicker: 0.77, lantFlickerEvery: 1, lantFlickerLength: 1.2, lantWobble: 0.58,
+  lantSnowShow: true, lantSnow: 1, lantSnowRoof: 1, lantSnowBase: 1, lantWeather: 1,
   lant1Show: true, lant1Along: 0, lant1Across: 0, lant1Size: 1, lant2Show: true, lant2Along: 0, lant2Across: 0, lant2Size: 1,
   lant3Show: true, lant3Along: 0, lant3Across: 0, lant3Size: 1, lant4Show: true, lant4Along: 0, lant4Across: 0, lant4Size: 1,
   lant5Show: true, lant5Along: 0, lant5Across: 0, lant5Size: 1, lant6Show: true, lant6Along: 0, lant6Across: 0, lant6Size: 1,
@@ -590,7 +591,13 @@ function drawGates() {
    "right" side (as a walker coming toward you sees it) is the left of the screen. Each lantern n has its own Shown / Along /
    Across / Size (n = 1, 2 in the nearest gap: 1 left, 2 right; 3, 4 in the next …).
    ============================================================ */
-var LANTS = [], lantInfo = '';
+var LANTS = [], lantInfo = '', LCACHE = {};
+/* everything a lantern's picture depends on (not the gates' own values: tuning a gate does not draw the lanterns again) */
+function lantKeyBase() {
+  var o = {};
+  for (var k in V) if (k.indexOf('gate') !== 0 || k === 'gateHaze' || k === 'gateSoft' || k === 'gateShadow') o[k] = V[k];
+  return JSON.stringify([o, LT, SHADE, PR, W, H]);
+}
 function lantHash(n) { var x = Math.sin(n * 127.1 + V.seed * 311.7) * 43758.5453; return x - Math.floor(x); }
 function lanternPlaces() {
   var out = [], gw = VIEW.gatesW.slice().sort(function (a, b) { return a.s - b.s; }), TW = VIEW.TW;
@@ -618,7 +625,7 @@ function drawLanterns(cam, Lt, s, ratio) {
   LANTS = [];
   var P = lanternPlaces(), gf = groundFn(), lit = lampLevel() > 0 ? 1 : 0, info = [];
   var C = { stone: hex(V.colours.lantStone), moss: hex(V.colours.lantMoss), paper: hex(V.colours.lantPaper), flame: hex(V.colours.lantFlame), glow: hex(V.colours.lantGlow) };
-  var tmp = layer(), wtmp = layer();
+  var tmp = layer(), wtmp = layer(), kb = lantKeyBase();
   P.forEach(function (Lp) {
     var pl = Lp.place;
     if (pl.z < 2) return;
@@ -638,11 +645,16 @@ function drawLanterns(cam, Lt, s, ratio) {
       g.addColorStop(0, rgb(ratio.map(function (q) { return 255 * lerp(1, q * 0.85, a * 0.6); }))); g.addColorStop(1, 'rgba(255,255,255,0)');
       s.save(); s.translate(x, yy); s.scale(1, ry / rx); s.translate(-x, -yy); s.fillStyle = g; s.fillRect(x - rx, yy - rx, rx * 2, rx * 2); s.restore();
     }
+    var key = kb + JSON.stringify([pl, Lp.h, Lp.n]);
+    if (LCACHE[key]) { var o0 = LCACHE[key]; o0.used = 1; LANTS.push(o0.item); info.push(o0.info); return; }
     [tmp, wtmp].forEach(function (L) { L.c.setTransform(1, 0, 0, 1, 0, 0); L.c.clearRect(0, 0, L.cnv.width, L.cnv.height); L.c.setTransform(PR, 0, 0, PR, 0, 0); });
     var vr = V.lantVariety, h1 = lantHash(Lp.n), h2 = lantHash(Lp.n + 50);
-    var bx = WinterTorii.lantern(tmp.c, wtmp.c, pl, cam, Lt, {
+    var tL0 = performance.now();
+    var bx = WinterTorii.lanternLit(tmp.c, wtmp.c, pl, cam, Lt, {
       h: Lp.h, L: lantLook(), tone: 1 + (h1 - 0.5) * 0.2 * vr, moss: V.lantMossAmt * clamp(1 + (h2 - 0.5) * 1.2 * vr, 0, 2), lit: lit * V.lantLight * 0.5,
-      colours: C, haze: V.gateHaze * V.fieldHaze, hazeM: V.fieldHazeDist, windowGlow: V.lantWindowGlow });
+      colours: C, haze: V.gateHaze * V.fieldHaze, hazeM: V.fieldHazeDist, windowGlow: V.lantWindowGlow,
+      pr: PR, ground: gf, seed: Lp.n * 7 + V.seed, weather: V.lantWeather,
+      snowLit: V.lantSnowShow ? snowAt(1) : null, snow: V.lantSnow, roofSnow: V.lantSnowRoof, baseSnow: V.lantSnowBase });
     // only its own box is kept (a full-screen picture for each lantern would cost a lot of memory)
     var x0 = Math.max(0, Math.floor((bx.x0 - 3) * PR)), y0 = Math.max(0, Math.floor((bx.y0 - 3) * PR));
     var x1 = Math.min(tmp.cnv.width, Math.ceil((bx.x1 + 3) * PR)), y1 = Math.min(tmp.cnv.height, Math.ceil((bx.y1 + 3) * PR));
@@ -652,10 +664,13 @@ function drawLanterns(cam, Lt, s, ratio) {
       var g = c.getContext('2d'); g.filter = soft > 0 ? 'blur(' + (soft * PR).toFixed(2) + 'px)' : 'none';
       g.drawImage(src, x0, y0, c.width, c.height, 0, 0, c.width, c.height); return c;
     }
-    LANTS.push({ n: Lp.n, z: pl.z, x: x0, y: y0, pic: crop(tmp.cnv, V.gateSoft), win: lit ? crop(wtmp.cnv, 0) : null,
-                 lx: bx.lx, ly: bx.ly, fx: bx.fx, fy: bx.fy, px: bx.px, hz: hzv, seed: h1 * 1000 });
-    info.push('lantern ' + Lp.n + ' (' + Lp.side + '): ' + pl.z.toFixed(0) + ' m, ' + Lp.h.toFixed(2) + ' m tall' + (y > 0.05 || y < -0.05 ? ', on snow ' + y.toFixed(2) + ' m' : ''));
+    var item = { n: Lp.n, z: pl.z, x: x0, y: y0, pic: crop(tmp.cnv, V.gateSoft), win: lit ? crop(wtmp.cnv, 0) : null,
+                 lx: bx.lx, ly: bx.ly, fx: bx.fx, fy: bx.fy, px: bx.px, hz: hzv, seed: h1 * 1000 };
+    LANTS.push(item);
+    var inf = 'lantern ' + Lp.n + ' (' + Lp.side + '): ' + pl.z.toFixed(0) + ' m, ' + Lp.h.toFixed(2) + ' m tall, ' + Math.round(performance.now() - tL0) + ' ms' + (y > 0.05 || y < -0.05 ? ', on snow ' + y.toFixed(2) + ' m' : '');
+    info.push(inf); LCACHE[key] = { item: item, info: inf.replace(/, \d+ ms$/, ', kept'), used: 1 };
   });
+  for (var kk in LCACHE) { if (!LCACHE[kk].used) delete LCACHE[kk]; else LCACHE[kk].used = 0; }   // (only the lanterns now shown are kept)
   lantInfo = info.join(' · ');
 }
 /* the flame's flicker (as the autumn's torFlameAt, without the wind's gusts): a slow wobble, and now and then a dip */
@@ -947,7 +962,13 @@ var G_PANEL = [
     { k: 'lantMoss', t: 'Moss', col: 1 },
     { k: 'lantMossAmt', t: 'How much moss', min: 0, max: 1.5, step: 0.01 },
     { k: 'lantVariety', t: 'How different each lantern is', min: 0, max: 1, step: 0.01 },
-    { k: 'lantPaper', t: 'Paper windows', col: 1 }]],
+    { k: 'lantPaper', t: 'Paper windows', col: 1 },
+    { k: 'lantWeather', t: 'Weathering (grain, damp, rain streaks)', min: 0, max: 2, step: 0.01 }]],
+  ['Stone lanterns: snow', [
+    { k: 'lantSnowShow', t: 'Snow on the lanterns', chk: 1 },
+    { k: 'lantSnow', t: 'On the ledges (platform, base, plinth)', min: 0, max: 2.5, step: 0.01 },
+    { k: 'lantSnowRoof', t: 'Cap on the roof and the jewel', min: 0, max: 2, step: 0.01 },
+    { k: 'lantSnowBase', t: 'Drift banked round the base', min: 0, max: 2.5, step: 0.01 }]],
   ['Stone lanterns: their light (dusk and night)', [
     { k: 'lantLight', t: 'How bright the windows', min: 0, max: 2.5, step: 0.01 },
     { k: 'lantFlame', t: 'Flame', col: 1 },

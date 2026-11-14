@@ -1313,6 +1313,354 @@ function drawLantern(c, w, place, cam, Lt, look) {
   var lb = T.p(T.w(0, 0.67 * h, 0)), ft = T.p(T.w(0, 0, 0));
   return { x0: X0, y0: Y0, x1: X1, y1: Y1, lx: lb[0], ly: lb[1], fx: ft[0], fy: ft[1], px: px };
 }
+/* ============================================================
+   THE STONE LANTERN SEEN PIXEL BY PIXEL, with its snow (the torii's way of drawing snow, here for the whole lantern):
+   each pixel's line of sight is followed (sphere tracing) into a solid model of the lantern made of rounded pieces
+   (the same pieces and sizes as lanternPieces), the snow lying on it (a pillow-shaped cap on the roof with a lip hanging
+   over the eaves, a snowball on the jewel, snow on every ledge: the platform under the light box, the base's top and its
+   sloping face, the plinth's top) and a drift banked round the plinth on the snow ground (a height field on the ground's
+   own height, look.ground). The stone is weathered granite: mottled grain and flecks, damp and darker toward the ground,
+   rain streaks under the ledges, lichen; lit by the scene's sun (with the lantern's own shadows) and sky, darker in its
+   hollows (ambient occlusion). The snow is lit as the drifts at the gates' feet (the reference's light and colours).
+   look: as drawLantern, and: pr (device pixels per CSS px), ground(x, z) → { h } (camera space), snowLit, seed,
+         snow (0 … 2: on the ledges), roofSnow, baseSnow, weather
+   ============================================================ */
+function hs3(x, y, z) { var v = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return v - Math.floor(v); }
+function vn3(x, y, z) {
+  var i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), f = x - i, g = y - j, e = z - k;
+  f = f * f * (3 - 2 * f); g = g * g * (3 - 2 * g); e = e * e * (3 - 2 * e);
+  var a = lerp(lerp(hs3(i, j, k), hs3(i + 1, j, k), f), lerp(hs3(i, j + 1, k), hs3(i + 1, j + 1, k), f), g);
+  var b = lerp(lerp(hs3(i, j, k + 1), hs3(i + 1, j, k + 1), f), lerp(hs3(i, j + 1, k + 1), hs3(i + 1, j + 1, k + 1), f), g);
+  return lerp(a, b, e) * 2 - 1;
+}
+function fbm3(x, y, z, o) { var s = 0, a = 0.5, t = 0; for (var i = 0; i < o; i++) { s += a * vn3(x, y, z); t += a; x *= 2.03; y *= 2.03; z *= 2.03; a *= 0.5; } return s / t; }
+function drawLanternLit(c, wc, place, cam, Lt, look) {
+  var h = look.h, L = look.L || {}, PRD = look.pr || 1, seed = look.seed || 1;
+  var PN = painter(null, place, cam, Lt, { haze: look.haze, hazeM: look.hazeM, vivid: 0 }), T = PN.T;
+  var C = look.colours, tone = look.tone || 1, moss = look.moss || 0, lit = look.lit || 0, wk = d(look, 'weather', 1);
+  var n = Math.round(L.sides || 6), off = PI / n, P = (L.pillar || 0.07) * h, B = (L.box || 0.1) * h, R = (L.roof || 0.28) * h;
+  var COS = Math.cos(PI / n), HL = Math.sin(PI / n), CK = [], SK = [];
+  for (var k = 0; k < n; k++) { var an = off + (k + 0.5) * TAU / n; CK.push(Math.cos(an)); SK.push(Math.sin(an)); }
+  var sK = d(look, 'snow', 1), rK = d(look, 'roofSnow', 1) * sK, bK = d(look, 'baseSnow', 1) * sK;
+  if (!look.snowLit) { sK = rK = bK = 0; }
+  var yPl = 0.035 * h, yBa = 0.085 * h, yNk = 0.105 * h, yR1 = 0.27 * h, yR2 = 0.3 * h, rH = 0.014 * h, yPt = 0.5 * h;
+  var yLo = 0.565 * h, yLb = 0.595 * h, yBx = 0.745 * h, yEv = 0.77 * h, yRf = 0.875 * h;
+  var yWa = yLb + (yBx - yLb) * 0.14, yWb = yBx - (yBx - yLb) * 0.12, rec = 0.012 * h;
+  // each lantern its own random numbers: the snow's unevenness round it (a smooth function of the angle)
+  var rs = rng(seed * 97 + 13), KN = [];
+  for (k = 0; k < 6 * 12; k++) KN.push(rs());
+  function nth(th, row) { var x = ((th / TAU) % 1 + 1) % 1 * 12, i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return lerp(KN[row * 12 + i], KN[row * 12 + (i + 1) % 12], u); }
+  var FK = 0;
+  function rad(a, b) { var m = -1e9; for (var q = 0; q < n; q++) { var v = a * CK[q] + b * SK[q]; if (v > m) { m = v; FK = q; } } return m; }
+  function comb(sx, sy) { return sx > 0 || sy > 0 ? Math.hypot(Math.max(sx, 0), Math.max(sy, 0)) : Math.max(sx, sy); }
+  // a rounded frustum: y0 … y1, its size r0 … r1 (corner radius of a polygon, or the radius of a round piece), rounded by rn
+  function fr(a, y, b, y0, y1, r0, r1, poly, rn, rho) {
+    var t = clamp((y - y0) / (y1 - y0), 0, 1), rr = lerp(r0, r1, t), ap, sl;
+    if (poly) { ap = rr * COS; sl = (r1 - r0) * COS / (y1 - y0); } else { ap = rr; sl = (r1 - r0) / (y1 - y0); }
+    var rr2 = rho === undefined ? (poly ? rad(a, b) : Math.hypot(a, b)) : rho;
+    return comb((rr2 - ap + rn) / Math.sqrt(1 + sl * sl), Math.max(y0 - y, y - y1) + rn) - rn;
+  }
+  function smin(x, y, kk) { var q = clamp(0.5 + 0.5 * (y - x) / kk, 0, 1); return lerp(y, x, q) - kk * q * (1 - q); }
+  // the stone
+  var e1 = 0.004 * h;
+  function boxD(a, y, b) {
+    var m = rad(a, b), u = -a * SK[FK] + b * CK[FK], hw = B * HL * 0.66, ins = 0;
+    if (Math.abs(u) < hw && y > yWa && y < yWb) ins = Math.abs(u) < hw * 0.08 ? 0.003 * h : rec;
+    return comb(m - (B * COS - ins), Math.max(yLb - y, y - yBx));
+  }
+  function stoneD(a, y, b) {
+    var rr = Math.hypot(a, b), m = rad(a, b), fk = FK, dd = 1e9;
+    // (each piece only when it could be nearer than the nearest so far: its height range, its size)
+    function pc(y0, y1, r0, r1, poly, rn, rho, rmax) {
+      if (Math.max(y0 - y, y - y1, rr - rmax) > dd) return;
+      var v = fr(a, y, b, y0, y1, r0, r1, poly, rn, rho); if (v < dd) dd = v;
+    }
+    pc(yNk, yPt, P, 0.92 * P, 0, 0.002 * h, rr, P);
+    pc(yBa - e1, yNk, 1.3 * P, 1.08 * P, 0, e1, rr, 1.3 * P);
+    pc(yPl - e1, yBa, 1.5 * B, 1.2 * B, 1, e1, m, 1.5 * B);
+    pc(0, yPl, 1.9 * B, 1.86 * B, 1, e1, m, 1.9 * B);
+    if (Math.abs(y - yR1 - rH / 2) < dd + rH) pc(yR1, yR1 + rH, 1.13 * P, 1.13 * P, 0, 0.004 * h, rr, 1.13 * P);
+    if (Math.abs(y - yR2 - rH / 2) < dd + rH) pc(yR2, yR2 + rH, 1.12 * P, 1.12 * P, 0, 0.004 * h, rr, 1.12 * P);
+    if (y > yPt - dd - e1) {
+      // the lotus: petals round its rim (the radius swells at each petal, more toward the top)
+      if (Math.max(yPt - e1 - y, y - yLo, rr - 1.66 * B) <= dd) {
+        var tl = clamp((y - yPt) / (yLo - yPt), 0, 1), th = Math.atan2(b, a), pet = rr / (1 + 0.07 * tl * Math.pow(Math.abs(Math.cos(9 * th)), 0.6));
+        var v = fr(a, y, b, yPt - e1, yLo, 1.05 * P, 1.55 * B, 0, e1, pet); if (v < dd) dd = v;
+      }
+      pc(yLo - e1, yLb, 1.55 * B, 1.5 * B, 1, e1, m, 1.55 * B);
+      if (Math.max(yLb - y, y - yBx, rr - B) <= dd) { FK = fk; var vb = boxD(a, y, b); if (vb < dd) dd = vb; }
+      pc(yBx - e1, yEv, R, 0.97 * R, 1, 0.005 * h, m, R);
+      pc(yEv - 0.002 * h, yRf, 0.97 * R, 0.055 * h, 1, 0.003 * h, m, 0.97 * R);
+      if (y > yRf - dd - e1) {
+        // the jewel: a neck, a bulb with a point
+        pc(yRf - e1, 0.905 * h, 0.035 * h, 0.04 * h, 0, 0.003 * h, rr, 0.04 * h);
+        var vj = Math.hypot(rr, y - 0.94 * h) - 0.05 * h; if (vj < dd) dd = vj;
+        pc(0.95 * h, h, 0.042 * h, 0.003 * h, 0, 0.002 * h, rr, 0.042 * h);
+      }
+      // the curled corners of the roof: small rolls turned up at each corner of the eaves
+      if (L.curls !== false && rK < 0.3 && y < yEv + 0.06 * h && y > yEv - 0.04 * h && rr > R * 0.8) {
+        for (var q = 0; q < n; q++) {
+          var ca = off + q * TAU / n, cx = Math.cos(ca) * R * 1.02, cz = Math.sin(ca) * R * 1.02;
+          var vc = Math.hypot(a - cx, y - (yEv + 0.012 * h), b - cz) - 0.017 * h; if (vc < dd) dd = vc;
+        }
+      }
+    }
+    FK = fk;
+    return dd;
+  }
+  // the snow lying on it
+  var tCap = 0.026 * h * rK, tPl = 0.014 * h * sK, tBa = 0.016 * h * sK, tPn = 0.013 * h * sK;
+  function snowD(a, y, b) {
+    var dd = 1e9, th, rr;
+    if (rK > 0 && y > yEv - 0.03 * h) {
+      th = Math.atan2(b, a); rr = Math.hypot(a, b);
+      // a layer on the roof's slopes (its facets still show), lumpy, thicker in the middle
+      var lmp = vn3(a / (0.05 * h), b / (0.05 * h), seed) * 0.6 + vn3(a / (0.022 * h), b / (0.022 * h), seed + 3) * 0.4;
+      var cap = fr(a, y, b, yEv - 0.012 * h, yRf, 0.97 * R, 0.055 * h, 1, 0.01 * h) - tCap * (0.7 + 0.5 * nth(th, 0) + 0.35 * lmp);
+      // the pillow: a soft mound over the top, merged with the layer
+      var ex = (a / (0.5 * R)), ey = (y - (yRf - 0.035 * h)) / (0.05 * h * (0.6 + 0.4 * rK)), ez = (b / (0.5 * R));
+      var ell = (Math.sqrt(ex * ex + ey * ey + ez * ez) - 1) * Math.min(0.5 * R, 0.05 * h * (0.6 + 0.4 * rK));
+      cap = smin(cap, ell, 0.02 * h);
+      // its lip hangs a little below the eaves' edge, unevenly; none under the eaves
+      var lip = yEv - (0.004 + 0.012 * nth(th, 1)) * h * rK;
+      cap = Math.max(cap, lip - y, rr - (R * 1.0 + tCap * 1.3));
+      dd = cap;
+      // a snowball on the jewel
+      var jb = Math.max(Math.hypot(rr, y - 0.952 * h) - 0.055 * h * (0.7 + 0.3 * rK), 0.93 * h - y);
+      dd = Math.min(dd, jb);
+    }
+    if (sK > 0) {
+      if (y > yLb - 0.02 * h && y < yLb + 0.05 * h) {
+        th = Math.atan2(b, a);
+        dd = Math.min(dd, fr(a, y, b, yLb - 0.008 * h, yLb + tPl * (0.5 + 0.9 * nth(th, 2)), 1.5 * B + 0.005 * h, 1.45 * B, 1, 0.008 * h));
+      }
+      if (y > yPl - 0.01 * h && y < yNk + 0.03 * h) {
+        th = Math.atan2(b, a);
+        // on the base's top, against the neck, and patchy on its sloping face
+        dd = Math.min(dd, fr(a, y, b, yBa - 0.006 * h, yBa + tBa * (0.5 + 0.9 * nth(th, 3)), 1.2 * B + 0.004 * h, 1.12 * B, 1, 0.007 * h));
+        var pt = smooth(0.0, 0.5, vn3(a / (0.025 * h), y / (0.02 * h), b / (0.025 * h) + seed)) * smooth(yPl + 0.015 * h, yBa - 0.004 * h, y);
+        var face = fr(a, y, b, yPl - e1, yBa, 1.5 * B, 1.2 * B, 1, e1) - 0.006 * h * sK * pt + 0.0004 * h;
+        dd = Math.min(dd, Math.max(face, yPl + 0.012 * h - y));
+      }
+      if (y > -0.01 * h && y < yPl + 0.04 * h) {
+        th = Math.atan2(b, a);
+        dd = Math.min(dd, fr(a, y, b, yPl - 0.006 * h, yPl + tPn * (0.4 + 0.9 * nth(th, 5)), 1.9 * B + 0.005 * h, 1.84 * B, 1, 0.007 * h));
+      }
+    }
+    return dd;
+  }
+  // the drift round the plinth: a height field on the ground's own height (a grid of N × N cells)
+  var ap0 = 1.9 * B * COS, RD = 1.9 * B + 0.36 * h * Math.max(0.3, bK), N = 64, cell = 2 * RD / (N - 1);
+  var TOP = new Float32Array(N * N), HD = new Float32Array(N * N), GRD = new Float32Array(N * N), yMin = 0;
+  for (var j = 0; j < N; j++) for (var i = 0; i < N; i++) {
+    var a = -RD + i * cell, b = -RD + j * cell, q = T.w(a, 0, b);
+    var g = look.ground ? look.ground(q[0], q[2]).h - (place.y0 || 0) : 0;
+    var hy2 = Math.hypot(a, b), th2 = Math.atan2(b, a), rho = lerp(rad(a, b), hy2, smooth(ap0, ap0 + 0.12 * h, hy2));
+    // banked against the plinth (in places over it, in places below its top), a rounded shoulder, then down to the ground
+    var Hd = h * (0.03 + 0.055 * Math.pow(nth(th2, 0), 1.5)) * bK, Wd = h * (0.055 + 0.075 * nth(th2 + 1.3, 1)) * Math.max(0.3, bK);
+    var x = (rho - ap0) / Wd, pr = x <= 0 ? 1 : x >= 1 ? 0 : Math.pow(1 - x, 1.7) * (1 + 0.6 * x);
+    var lump = 0.016 * h * fbm3(a / (0.045 * h), b / (0.045 * h), seed, 2) * Math.min(1, pr * 1.5) * bK;
+    var H = Math.max(0, Hd * pr + lump);
+    GRD[j * N + i] = g; HD[j * N + i] = H; yMin = Math.min(yMin, g);
+  }
+  (function blur() {                                       // smoothed once (the ground's own small steps do not show)
+    var tmp = new Float32Array(N * N);
+    [HD, GRD].forEach(function (A) {
+      for (var jj = 0; jj < N; jj++) for (var ii = 0; ii < N; ii++) {
+        var s2 = 0, c2 = 0;
+        for (var dj = -1; dj <= 1; dj++) for (var di = -1; di <= 1; di++) { var x2 = ii + di, y2 = jj + dj; if (x2 < 0 || y2 < 0 || x2 >= N || y2 >= N) continue; s2 += A[y2 * N + x2]; c2++; }
+        tmp[jj * N + ii] = s2 / c2;
+      }
+      A.set(tmp);
+    });
+    for (var q2 = 0; q2 < N * N; q2++) TOP[q2] = GRD[q2] + HD[q2];
+  })();
+  function grid(A, a, b) {
+    var x = (a + RD) / cell, y = (b + RD) / cell; if (x < 0 || y < 0 || x > N - 1.001 || y > N - 1.001) return null;
+    var i = Math.floor(x), j = Math.floor(y), f = x - i, g = y - j, k2 = j * N + i;
+    return lerp(lerp(A[k2], A[k2 + 1], f), lerp(A[k2 + N], A[k2 + N + 1], f), g);
+  }
+  function driftD(a, y, b) { var t = grid(TOP, a, b); return t === null ? 1e9 : (y - t) * 0.5; }
+  var MAT = 0;                                               // which was nearest: 0 stone, 1 snow, 2 drift / ground
+  function scene(a, y, b) {
+    var s1 = stoneD(a, y, b), s2 = snowD(a, y, b), s3 = driftD(a, y, b), m = s1; MAT = 0;
+    if (s2 < m) { m = s2; MAT = 1; } if (s3 < m) { m = s3; MAT = 2; }
+    return m;
+  }
+  function sceneOnly(a, y, b) { return Math.min(stoneD(a, y, b), snowD(a, y, b), driftD(a, y, b)); }
+  function solidD(a, y, b) { return Math.min(stoneD(a, y, b), snowD(a, y, b)); }
+  var Rs = R + tCap * 1.5 + 0.02 * h;                       // the stone and its snow lie inside this
+  // the screen box it covers (the bounding cylinder seen through the camera)
+  var Rb = Math.max(R + tCap * 1.5 + 0.01 * h, RD), X0 = 1e9, Y0 = 1e9, X1 = -1e9, Y1 = -1e9;
+  for (k = 0; k < 16; k++) {
+    var ang = k * TAU / 16;
+    [yMin - 0.01 * h, 1.04 * h].forEach(function (yy) { var pp = T.p(T.w(Math.cos(ang) * Rb, yy, Math.sin(ang) * Rb)); X0 = Math.min(X0, pp[0]); X1 = Math.max(X1, pp[0]); Y0 = Math.min(Y0, pp[1]); Y1 = Math.max(Y1, pp[1]); });
+  }
+  X0 = Math.max(0, Math.floor(X0 - 2)); Y0 = Math.max(0, Math.floor(Y0 - 2)); X1 = Math.min(cam.W, Math.ceil(X1 + 2)); Y1 = Math.min(cam.H, Math.ceil(Y1 + 2));
+  var lb = T.p(T.w(0, 0.67 * h, 0)), ft = T.p(T.w(0, 0, 0)), pxh = h * cam.F / Math.max(0.5, place.z);
+  var out = { x0: X0, y0: Y0, x1: X1, y1: Y1, lx: lb[0], ly: lb[1], fx: ft[0], fy: ft[1], px: pxh };
+  if (X1 <= X0 || Y1 <= Y0) return out;
+  var W2 = Math.ceil((X1 - X0) * PRD), H2 = Math.ceil((Y1 - Y0) * PRD);
+  if (W2 * H2 > 4e6) return out;
+  var im = new ImageData(W2, H2), D = im.data, wim = lit > 0 && wc ? new ImageData(W2, H2) : null;
+  // the eye and the sun in the lantern's own space
+  var E = T.locP([0, cam.eye, 0]), Ls = norm(T.loc(Lt.dir[0], Lt.dir[1], Lt.dir[2])), sunOn = Lt.dir[1] > 0.02;
+  var LR = norm([0.55, 0.8, 0.3]);                            // the reference's light on the snow (as the gates' drifts)
+  var lit0 = look.snowLit || [225, 234, 237], kc = [Math.min(1.05, lit0[0] / 225), Math.min(1.05, lit0[1] / 234), Math.min(1.05, lit0[2] / 237)];
+  var litC = [244 * kc[0], 245 * kc[1], 250 * kc[2]], shC = [185 * kc[0], 196 * kc[1], 214 * kc[2]], deep = [162 * kc[0], 166 * kc[1], 186 * kc[2]];
+  var stone = [C.stone[0] * tone, C.stone[1] * tone, C.stone[2] * tone];
+  var glowWin = mix(C.paper, C.flame, 0.55), hotWin = mix(C.flame, C.glow, 0.6), mist = Lt.mist, hz = PN.hz;
+  var lampC = [0, (yLb + yBx) / 2, 0], warm = mix(C.flame, C.glow, 0.3);
+  function shadeAt(t, dl, i, j, mat) {
+    var a = E[0] + dl[0] * t, y = E[1] + dl[1] * t, b = E[2] + dl[2] * t;
+    if (mat === undefined) { scene(a, y, b); mat = MAT; }
+    var ee = Math.max(0.0012 * h, t * 0.0015);
+    var nx = sceneOnly(a + ee, y, b) - sceneOnly(a - ee, y, b), ny = sceneOnly(a, y + ee, b) - sceneOnly(a, y - ee, b), nz = sceneOnly(a, y, b + ee) - sceneOnly(a, y, b - ee);
+    var nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+    var nc = T.n(nx, ny, nz);
+    // the hollows: how much open space there is above the surface (ambient occlusion)
+    var ao = 0, dk = 0.014 * h;
+    for (var s3 = 1; s3 <= 4; s3++) ao += (s3 * dk - sceneOnly(a + nx * s3 * dk, y + ny * s3 * dk, b + nz * s3 * dk)) / Math.pow(2, s3 - 1);
+    ao = clamp(1 - ao / dk * 0.45, 0, 1);
+    var col, al = 1, win = 0;
+    if (mat === 2) {                                         // the drift: as thick as it is here (feathered into the ground)
+      var Hh = grid(HD, a, b);
+      if (!(Hh > 0.0015)) return null;
+      al = smooth(0.0015, 0.03, Hh);
+    }
+    if (mat >= 1) {
+      // (its slopes read more strongly, as painted: as the gates' drifts)
+      var sn2 = T.n(nx * 1.6, ny, nz * 1.6), sl2 = Math.hypot(sn2[0], sn2[1], sn2[2]) || 1;
+      var dlr = (sn2[0] * LR[0] + sn2[1] * LR[1] + sn2[2] * LR[2]) / sl2, f = smooth(0.42, 0.9, dlr);
+      col = [0, 0, 0];
+      for (var ch = 0; ch < 3; ch++) col[ch] = lerp(lerp(shC[ch], litC[ch], f), deep[ch], (1 - ao) * 0.85);
+      if (mat === 2) { var te = 1 - smooth(0, 0.02 * h, grid(HD, a, b)); for (ch = 0; ch < 3; ch++) col[ch] = lerp(col[ch], lerp(shC[ch], litC[ch], 0.6), te * 0.7); }
+      var gr = 1 + (hs3(i + X0 * 7, j + Y0 * 3, 1) - 0.5) * 0.035;
+      for (ch = 0; ch < 3; ch++) col[ch] *= gr;
+    } else {
+      // which stone: the paper of a window, its middle bar, or the granite
+      var rr = rad(a, b), u = -a * SK[FK] + b * CK[FK], hw = B * HL * 0.66;
+      var inW = y > yWa && y < yWb && Math.abs(u) < hw && rr < B * COS - 0.0015 * h && rr > B * COS - rec - 0.004 * h;
+      var bar = inW && Math.abs(u) < hw * 0.08;
+      var vis = 1;
+      if (sunOn) {                                          // the lantern's own shadow (soft)
+        var tt = 0.006 * h, res = 1;
+        for (var s4 = 0; s4 < 26 && tt < 1.3 * h; s4++) {
+          var dd = sceneOnly(a + nx * 0.004 * h + Ls[0] * tt, y + ny * 0.004 * h + Ls[1] * tt, b + nz * 0.004 * h + Ls[2] * tt);
+          if (dd < 0.0008 * h) { res = 0; break; }
+          res = Math.min(res, 9 * dd / tt); tt += Math.max(0.004 * h, dd * 0.9);
+        }
+        vis = clamp(res, 0, 1);
+      }
+      if (inW && !bar) {
+        var plain = PN.shade(C.paper, nc, 0.6 + 0.4 * vis);
+        var glow = mix(mix(glowWin, hotWin, clamp(lit * (look.windowGlow || 0.43) * 0.5, 0, 1)), mist, hz * 0.5);
+        col = mix(mix(plain, [plain[0] * 0.8, plain[1] * 0.8, plain[2] * 0.82], 0.3 * (1 - ao)), glow, clamp(lit * 2, 0, 1));
+        win = 1;
+        return [col[0], col[1], col[2], 1, win];
+      }
+      // weathered granite: mottled grain and fine flecks, damp and darker toward the ground, rain streaks under the
+      // ledges, lichen; worn edges a little paler
+      var sc = 0.03 * h, gn = fbm3(a / sc, y / sc, b / sc + seed, 4), fl = hs3(Math.floor(a / (0.004 * h)), Math.floor(y / (0.004 * h)), Math.floor(b / (0.004 * h)) + seed);
+      var base = [stone[0], stone[1], stone[2]], kq = 1 + 0.22 * gn * wk + 0.12 * (fl - 0.5) * wk;
+      kq *= 1 - 0.26 * wk * (1 - smooth(0, 0.3 * h, y));
+      var th3 = Math.atan2(b, a), st = Math.max(0, fbm3(th3 * 9, seed, 0.5, 3));
+      var stk = 0;
+      if (y > yLb && y < yBx) stk = smooth(yBx - 0.13 * h, yBx, y) * 0.6 + 0.4 * smooth(yLb, yBx, y);
+      else if (y > yNk && y < yLo) stk = smooth(yPt - 0.26 * h, yPt, y);
+      else if (y > yPl && y < yBa) stk = 0.5 * smooth(yPl, yBa, y);
+      kq *= 1 - 0.36 * wk * stk * st;
+      if (bar) kq *= 0.75;
+      for (var c3 = 0; c3 < 3; c3++) base[c3] *= kq;
+      var lich = smooth(0.15, 0.6, fbm3(a / (0.05 * h) + 7, y / (0.05 * h), b / (0.05 * h) + seed, 3)) * moss * (0.35 + 0.65 * (1 - smooth(0, 0.55 * h, y))) * (0.6 + 0.4 * Math.max(0, ny));
+      base = mix(base, C.moss, clamp(lich * 0.7, 0, 0.8));
+      var aok = 0.45 + 0.55 * ao;
+      col = PN.shade([base[0] * aok, base[1] * aok, base[2] * aok], nc, vis);
+    }
+    // the lamp's light from the windows, on the stone and snow near the light box (dusk and night)
+    if (lit > 0) {
+      var vx = a - lampC[0], vy = y - lampC[1], vz = b - lampC[2], dl2 = Math.hypot(vx, vy, vz) || 1;
+      var fc = Math.max(0, (nx * -vx + ny * -vy + nz * -vz) / dl2);
+      var kk2 = lit * 0.75 * Math.exp(-Math.max(0, dl2 - B) / (0.12 * h)) * (0.3 + 0.7 * fc) * (mat >= 1 ? 1 : 0.7);
+      for (ch = 0; ch < 3; ch++) col[ch] += warm[ch] * kk2 * 0.55;
+    }
+    if (mat >= 1) col = mix(col, mist, hz);
+    return [col[0], col[1], col[2], al, win];
+  }
+  // each pixel: its line of sight, through the bounding cylinder, then sphere traced into the lantern
+  var cx = cam.W / 2, any = 0;
+  function trace(sx, sy, i, j) {
+    var dc = [(sx - cx) / cam.F, (cam.hy - sy) / cam.F, 1], dl = T.loc(dc[0], dc[1], dc[2]), ln = Math.hypot(dl[0], dl[1], dl[2]);
+    dl = [dl[0] / ln, dl[1] / ln, dl[2] / ln];
+    var zk = 1 / ln;                                         // camera depth per unit along the ray
+    function cyl(Rc) {
+      var qa = dl[0] * dl[0] + dl[2] * dl[2], qb = 2 * (E[0] * dl[0] + E[2] * dl[2]), qc = E[0] * E[0] + E[2] * E[2] - Rc * Rc, disc = qb * qb - 4 * qa * qc;
+      if (disc <= 0 || qa < 1e-12) return null;
+      var sq = Math.sqrt(disc), t0 = (-qb - sq) / (2 * qa), t1 = (-qb + sq) / (2 * qa);
+      return t1 <= 0 ? null : [Math.max(t0, 0.5), t1];
+    }
+    // the drift and the ground under it: followed across the grid, then halved down to its surface
+    var tD = 1e9, cD = cyl(RD - cell);
+    if (cD) {
+      var stp = cell * 0.6 / Math.max(0.05, Math.hypot(dl[0], dl[2])), t = cD[0], prev = t;
+      while (t <= cD[1]) {
+        var tp = grid(TOP, E[0] + dl[0] * t, E[2] + dl[2] * t);
+        if (tp !== null && E[1] + dl[1] * t <= tp) {
+          var lo = prev, hi = t;
+          for (var q = 0; q < 8; q++) { var tm = (lo + hi) / 2, tq = grid(TOP, E[0] + dl[0] * tm, E[2] + dl[2] * tm); if (tq !== null && E[1] + dl[1] * tm <= tq) hi = tm; else lo = tm; }
+          tD = hi; break;
+        }
+        prev = t; t += stp;
+      }
+    }
+    // the stone and its snow (only as far as the drift / ground)
+    var cS = cyl(Rs);
+    if (cS) {
+      var t2 = cS[0], tE = Math.min(cS[1], tD);
+      for (var it = 0; it < 200 && t2 < tE; it++) {
+        var a = E[0] + dl[0] * t2, y = E[1] + dl[1] * t2, b = E[2] + dl[2] * t2;
+        if (y > 1.06 * h && dl[1] > 0) break;
+        var dd = solidD(a, y, b), eps = 0.4 * t2 * zk / (cam.F * PRD);
+        if (dd < eps) return shadeAt(t2, dl, i, j, stoneD(a, y, b) <= snowD(a, y, b) ? 0 : 1);
+        t2 += Math.max(dd * 0.85, eps * 0.5);
+      }
+    }
+    return tD < 1e9 ? shadeAt(tD, dl, i, j, 2) : null;
+  }
+  for (j = 0; j < H2; j++) {
+    var sy = Y0 + (j + 0.5) / PRD;
+    for (i = 0; i < W2; i++) {
+      var r1 = trace(X0 + (i + 0.5) / PRD, sy, i, j);
+      if (!r1) continue;
+      var kp = (j * W2 + i) * 4;
+      D[kp] = clamp(r1[0], 0, 255); D[kp + 1] = clamp(r1[1], 0, 255); D[kp + 2] = clamp(r1[2], 0, 255); D[kp + 3] = 255 * r1[3]; any++;
+      if (wim && r1[4]) { wim.data[kp] = wim.data[kp + 1] = wim.data[kp + 2] = 255; wim.data[kp + 3] = 255; }
+    }
+  }
+  // the edges smoothed: where a pixel and its neighbour differ a lot, it is worked out again from 4 samples
+  var D0 = new Uint8ClampedArray(D);
+  function diff(p1, p2) { return Math.abs(D0[p1 + 3] - D0[p2 + 3]) + Math.abs(D0[p1] - D0[p2]) + Math.abs(D0[p1 + 1] - D0[p2 + 1]) > 60; }
+  for (j = 1; j < H2 - 1; j++) for (i = 1; i < W2 - 1; i++) {
+    var k0 = (j * W2 + i) * 4;
+    if (!(diff(k0, k0 + 4) || diff(k0, k0 - 4) || diff(k0, k0 + W2 * 4) || diff(k0, k0 - W2 * 4))) continue;
+    var acc = [0, 0, 0, 0];
+    [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]].forEach(function (o) {
+      var r2 = trace(X0 + (i + o[0]) / PRD, Y0 + (j + o[1]) / PRD, i, j);
+      if (!r2) return;
+      acc[0] += r2[0] * r2[3]; acc[1] += r2[1] * r2[3]; acc[2] += r2[2] * r2[3]; acc[3] += r2[3];
+    });
+    if (acc[3] > 0) { D[k0] = acc[0] / acc[3]; D[k0 + 1] = acc[1] / acc[3]; D[k0 + 2] = acc[2] / acc[3]; }
+    D[k0 + 3] = 255 * acc[3] / 4;
+  }
+  if (!any) return out;
+  var cv = document.createElement('canvas'); cv.width = W2; cv.height = H2; cv.getContext('2d').putImageData(im, 0, 0);
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(cv, Math.round(X0 * PRD), Math.round(Y0 * PRD)); c.restore();
+  if (wim) {
+    var wv = document.createElement('canvas'); wv.width = W2; wv.height = H2; wv.getContext('2d').putImageData(wim, 0, 0);
+    wc.save(); wc.setTransform(1, 0, 0, 1, 0, 0); wc.drawImage(wv, Math.round(X0 * PRD), Math.round(Y0 * PRD)); wc.restore();
+  }
+  return out;
+}
 /* its shadow on the snow: every piece's points sent along the sun down to the snow, each piece's hull filled */
 function lanternShadow(c, place, cam, Lt, h, L) {
   var Ld = Lt.dir;
@@ -1326,5 +1674,5 @@ function lanternShadow(c, place, cam, Lt, h, L) {
 }
 
 return { build: build, draw: draw, shadow: shadow, feet: feet, silhouette: silhouette, members: members,
-         lantern: drawLantern, lanternShadow: lanternShadow };
+         lantern: drawLantern, lanternLit: drawLanternLit, lanternShadow: lanternShadow };
 })();
