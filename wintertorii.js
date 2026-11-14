@@ -119,41 +119,61 @@ function buildSnow(G, o) {
   var tab = []; for (var i = 0; i < 256; i++) tab.push(rs());
   function n1(x, s) { x += s * 17.3; var i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return lerp(tab[(i % 256 + 256) % 256], tab[((i + 1) % 256 + 256) % 256], u) * 2 - 1; }
   var heaps = [], seedN = 0;
-  // ends: 'free' (thins to nothing) or 'wall' (piles up against it)
+  // ends: 'free' (thins to nothing) or a wall it piles up against: { half (m: half the wall's depth across the beam: the
+  // snow may not overhang past it there), off (m: from the end to the wall's face), cyl (a round pillar: the snow is cut
+  // along its curved face) }
   function heap(grp, a0, a1, baseY, hd, H0, e0, e1, slopeK) {
-    var M = Math.max(8, Math.round((a1 - a0) / 0.06)), st = [], sN = ++seedN * 3.1;
+    var M = Math.max(8, Math.round((a1 - a0) / 0.05)), st = [], sN = ++seedN * 3.1;
+    var W0 = e0 === 'free' ? null : e0, W1 = e1 === 'free' ? null : e1;
     for (var i = 0; i <= M; i++) {
-      var a = lerp(a0, a1, i / M), y = baseY(a), t0 = a - a0, t1 = a1 - a;
+      var a = lerp(a0, a1, i / M), y = baseY(a), t0 = a - a0 - (W0 ? W0.off || 0 : 0), t1 = a1 - a - (W1 ? W1.off || 0 : 0);
       var h = H0 * (0.8 + 0.25 * n1(a / 0.9, sN) + 0.08 * n1(a / 0.3, sN + 5));
       // a free end rounds off; against a wall the snow is held and piles up in a rounded drift (the crevice)
-      if (e0 === 'free') h *= Math.sqrt(smooth(0, 0.35, t0)) * (0.55 + 0.45 * smooth(0, 0.8, t0)); else h += H0 * crev * 0.5 * Math.exp(-Math.pow(t0 / 0.42, 2));
-      if (e1 === 'free') h *= Math.sqrt(smooth(0, 0.35, t1)) * (0.55 + 0.45 * smooth(0, 0.8, t1)); else h += H0 * crev * 0.5 * Math.exp(-Math.pow(t1 / 0.42, 2));
+      if (!W0) h *= Math.sqrt(smooth(0, 0.35, t0)) * (0.55 + 0.45 * smooth(0, 0.8, t0)); else h += H0 * crev * 0.5 * Math.exp(-Math.pow(Math.max(0, t0) / 0.42, 2));
+      if (!W1) h *= Math.sqrt(smooth(0, 0.35, t1)) * (0.55 + 0.45 * smooth(0, 0.8, t1)); else h += H0 * crev * 0.5 * Math.exp(-Math.pow(Math.max(0, t1) / 0.42, 2));
       if (slopeK) { var sl = Math.abs(baseY(a + 0.05) - baseY(a - 0.05)) / 0.1; h *= 1 - smooth(0.1, 0.42, sl); }
       // gaps where it has fallen (never right in a crevice)
-      var g = n1(a / 1.25, sN + 11), wallNear = (e0 === 'wall' && t0 < 0.25) || (e1 === 'wall' && t1 < 0.25);
+      var g = n1(a / 1.25, sN + 11), wallNear = (W0 && t0 < 0.25) || (W1 && t1 < 0.25);
       if (!wallNear) h *= lerp(0.3, 1, smooth(gapT - 0.3, gapT + 0.3, g));
-      st.push({ a: a, y: y, h: Math.max(0, h), w: n1(a / 0.7, sN + 21) * 0.5 + 0.5, wb: n1(a / 0.7, sN + 31) * 0.5 + 0.5 });
+      // how far its lips may overhang here: next to a wall no farther than the wall is deep (else they would stand out
+      // past it, resting on nothing)
+      var lim = 1;
+      if (W0) lim = Math.min(lim, lerp(Math.max(0, W0.half * 0.95 - hd), 1, smooth(0.04, 0.45, t0)));
+      if (W1) lim = Math.min(lim, lerp(Math.max(0, W1.half * 0.95 - hd), 1, smooth(0.04, 0.45, t1)));
+      st.push({ a: a, y: y, h: Math.max(0, h), w: n1(a / 0.7, sN + 21) * 0.5 + 0.5, wb: n1(a / 0.7, sN + 31) * 0.5 + 0.5, lim: lim });
     }
-    // smoothed along the beam (no steps or spikes), then the lips from the smoothed depth
+    // smoothed along the beam (no steps or spikes), then the lips from the smoothed depth, broken and uneven: lumps, thicker
+    // and thinner stretches, here and there a drip hanging off (a snow edge is never a clean line)
     for (var pass = 0; pass < 3; pass++) {
       var hs = st.map(function (q) { return q.h; });
       for (i = 1; i < st.length - 1; i++) st[i].h = (hs[i - 1] + 2 * hs[i] + hs[i + 1]) / 4;
     }
     st.forEach(function (q) {
-      var ov = Math.min(0.17 * lipK, 0.015 + q.h * 0.5);
-      q.ovF = ov * (0.75 + 0.45 * q.w); q.ovB = ov * (0.7 + 0.4 * q.wb);
-      q.dF = Math.min(q.h * 0.55, q.ovF * 1.1); q.dB = Math.min(q.h * 0.55, q.ovB * 1.1);
+      var a = q.a, ov = Math.min(0.17 * lipK, 0.015 + q.h * 0.5);
+      function rough(s1) { return 0.7 + 0.3 * (n1(a / 0.45, s1) * 0.65 + n1(a / 0.19, s1 + 3) * 0.35 + 1); }
+      q.ovF = Math.min(ov * (0.75 + 0.45 * q.w) * rough(sN + 41), q.lim); q.ovB = Math.min(ov * (0.7 + 0.4 * q.wb) * rough(sN + 45), q.lim);
+      q.dF = Math.min(q.h * 0.55, q.ovF * 1.1) * rough(sN + 51); q.dB = Math.min(q.h * 0.55, q.ovB * 1.1) * rough(sN + 55);
+      // a few rounded lumps sagging lower off the lip, unevenly spaced (no teeth)
+      var dr = n1(a / 0.16, sN + 61), dr2 = n1(a / 0.16, sN + 65);
+      if (dr > 0.62) q.dF += q.h * 0.3 * Math.sqrt((dr - 0.62) / 0.38) * Math.min(1, q.ovF / 0.05);
+      if (dr2 > 0.62) q.dB += q.h * 0.3 * Math.sqrt((dr2 - 0.62) / 0.38) * Math.min(1, q.ovB / 0.05);
+      q.bmp = n1(a / 0.35, sN + 71) * 0.75 + n1(a / 0.17, sN + 75) * 0.25;
     });
-    heaps.push({ grp: grp, hd: hd, st: st });
+    var hp = { grp: grp, hd: hd, st: st };
+    if (W0 && W0.cyl) hp.cyl = { axis: W0.cyl, r: W0.half, side: 'start' };
+    if (W1 && W1.cyl) hp.cyl = { axis: W1.cyl, r: W1.half, side: 'end' };
+    heaps.push(hp);
   }
   var K = G.kasagi, ht = K.half + K.flare, nk = G.nuki, gw = G.gaku.w, k = G.kus;
   heap('kasagi', -ht * 0.995, ht * 0.995, function (a) { return K.y0 + K.th + soriAt(K, a / ht) * K.lift; }, K.dep / 2, 0.42 * amt, 'free', 'free', true);
   var ny = function () { return nk.y1; };
-  var pIn = nk.aN - nk.rN * 0.86, kOut = nk.aN + nk.rN + k.kw * 1.12, pOut = nk.aN + nk.rN * 0.86;
-  heap('midL', -pIn, -gw, ny, nk.dep / 2, 0.26 * amt, 'wall', 'wall');
-  heap('midR', gw, pIn, ny, nk.dep / 2, 0.26 * amt, 'wall', 'wall');
-  heap('endL', -(nk.aN + nk.over) * 0.995, -(G.kusabi ? kOut : pOut), ny, nk.dep / 2, 0.24 * amt, 'free', 'wall');
-  heap('endR', G.kusabi ? kOut : pOut, (nk.aN + nk.over) * 0.995, ny, nk.dep / 2, 0.24 * amt, 'wall', 'free');
+  var kOut = nk.aN + nk.rN + k.kw * 1.12;
+  // the snow runs right up to the pillars (cut along their round face), to the centre post's sides and to the wedges
+  var pil = function (sd) { return { half: nk.rN, off: nk.rN, cyl: sd * nk.aN }; }, gak = { half: G.gaku.dep / 2, off: 0 }, kus = { half: k.kD / 2, off: 0 };
+  heap('midL', -nk.aN, -gw, ny, nk.dep / 2, 0.26 * amt, pil(-1), gak);
+  heap('midR', gw, nk.aN, ny, nk.dep / 2, 0.26 * amt, gak, pil(1));
+  heap('endL', -(nk.aN + nk.over) * 0.995, G.kusabi ? -kOut : -nk.aN, ny, nk.dep / 2, 0.24 * amt, 'free', G.kusabi ? kus : pil(-1));
+  heap('endR', G.kusabi ? kOut : nk.aN, (nk.aN + nk.over) * 0.995, ny, nk.dep / 2, 0.24 * amt, G.kusabi ? kus : pil(1), 'free');
   if (G.kusabi) {
     var ky = (nk.y0 + nk.y1) / 2 + k.kH / 2;
     [-1, 1].forEach(function (sd) {
@@ -177,7 +197,8 @@ function section(hd, q) {
   var P = [[-hd, -0.004], [-(hd + q.ovF * 0.55), -q.dF * 0.85], [-(hd + q.ovF * 0.9), -q.dF * 0.55], [-(hd + q.ovF), -q.dF * 0.15]];
   for (var j = 1; j <= 11; j++) {
     var t = -1 + 2 * j / 12, w = t < 0 ? hd + q.ovF : hd + q.ovB;
-    P.push([t * w * 0.97, q.h * Math.pow(1 - Math.pow(Math.abs(t), 2.4), 0.55) + (q.dF + q.dB) * 0.08 * (1 - Math.abs(t))]);
+    var bm = (q.bmp || 0) * (1 - Math.abs(t) * 0.5);
+    P.push([t * w * 0.97 * (1 + 0.05 * bm * Math.abs(t)), q.h * Math.pow(1 - Math.pow(Math.abs(t), 2.4), 0.55) * (1 + 0.07 * bm) + (q.dF + q.dB) * 0.08 * (1 - Math.abs(t))]);
   }
   P.push([hd + q.ovB, -q.dB * 0.15], [hd + q.ovB * 0.9, -q.dB * 0.55], [hd + q.ovB * 0.55, -q.dB * 0.85], [hd, -0.004]);
   return P;
@@ -447,7 +468,13 @@ function draw(c, G, place, cam, Lt, look) {
   var fbF = zOf(0, G.Ht * 0.6, -1) < zOf(0, G.Ht * 0.6, 1) ? -1 : 1;        // the side of the gate facing the eye (local b)
   var SNQ = {};
   function heapQuads(hp) {
-    var rings = hp.st.map(function (q) { return section(hp.hd, q).map(function (pp) { return [q.a, q.y + pp[1], pp[0]]; }); });
+    var C = hp.cyl;
+    var rings = hp.st.map(function (q) { return section(hp.hd, q).map(function (pp) {
+      var a = q.a;
+      var cl = false;
+      if (C) { var dd = Math.sqrt(Math.max(0, C.r * C.r - pp[0] * pp[0])), a2 = C.side === 'start' ? Math.max(a, C.axis + dd) : Math.min(a, C.axis - dd); cl = a2 !== a; a = a2; }
+      var pt = [a, q.y + pp[1], pp[0]]; pt.cl = cl; return pt;
+    }); });
     var Kn = rings[0].length, out = { back: [], front: [] }, flip = 1, rr = rng(G.seed * 31 + hp.st.length * 7 + (hp.grp.length * 13));
     var mi = Math.floor(rings.length / 2), cq = [rings[mi][9], rings[mi][10], rings[mi + 1 < rings.length ? mi + 1 : mi - 1][10], rings[mi + 1 < rings.length ? mi + 1 : mi - 1][9]];
     var cn = newell(cq); if (cn[1] < 0) flip = -1;
@@ -455,6 +482,8 @@ function draw(c, G, place, cam, Lt, look) {
       if (hp.st[i].h < 0.004 && hp.st[i + 1].h < 0.004) continue;
       for (var kk = 0; kk < Kn - 1; kk++) {
         var L4 = [rings[i][kk], rings[i][kk + 1], rings[i + 1][kk + 1], rings[i + 1][kk]];
+        // (faces pressed onto the pillar's round face are the snow's contact with it, inside: left out)
+        if ((L4[0].cl ? 1 : 0) + (L4[1].cl ? 1 : 0) + (L4[2].cl ? 1 : 0) + (L4[3].cl ? 1 : 0) >= 3) continue;
         var nl = newell(L4); nl = [nl[0] * flip, nl[1] * flip, nl[2] * flip];
         var m = [0, 0, 0]; L4.forEach(function (p) { m[0] += p[0] / 4; m[1] += p[1] / 4; m[2] += p[2] / 4; });
         var mw = T.w(m[0], m[1], m[2]), nw = T.n(nl[0], nl[1], nl[2]);
@@ -478,7 +507,7 @@ function draw(c, G, place, cam, Lt, look) {
     // colour, drew a fine hatching where neighbouring faces differ a little)
     L.forEach(function (q) {
       var cx = 0, cy = 0; q.Q.forEach(function (p) { cx += p[0] / 4; cy += p[1] / 4; });
-      var E = q.Q.map(function (p) { var dx = p[0] - cx, dy = p[1] - cy, l = Math.hypot(dx, dy) || 1, k = (l + 0.45) / l; return [cx + dx * k, cy + dy * k]; });
+      var E = q.Q.map(function (p) { return [p[0] + (p[0] > cx ? 0.5 : -0.5), p[1] + (p[1] > cy ? 0.5 : -0.5)]; });
       poly(c, E); c.fillStyle = q.col; c.fill(); grow(q.Q);
     });
     // glints: the sun catching a crystal here and there on the lit snow
