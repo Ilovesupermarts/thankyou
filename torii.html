@@ -102,8 +102,8 @@ var V_DEFAULTS = {
              hallPlaster: '#FFF8E8', hallTimber: '#F23A12', hallStone: '#A8A8A0', hallRed: '#F23A12', hallGreen: '#1FA67A', hallSoffit: '#E0360F', flame: '#FFAA5A' }
 };
 var V = JSON.parse(JSON.stringify(V_DEFAULTS));
-try { var sv = JSON.parse(localStorage.getItem('toriiLab-1') || 'null'); if (sv && !(sv.ver >= 2)) { delete sv.gateAir; delete sv.gateDof; } if (sv && !(sv.ver >= 3)) delete sv.gateArrange; if (sv && !(sv.ver >= 4)) delete sv.view; if (sv) for (var k in sv) if (k in V) { if (k === 'colours') Object.assign(V.colours, sv.colours); else V[k] = sv[k]; } } catch (e) {}
-function saveAll() { try { var o = JSON.parse(JSON.stringify(V)); o.ver = 4; localStorage.setItem('toriiLab-1', JSON.stringify(o)); } catch (e) {} }
+try { var sv = JSON.parse(localStorage.getItem('toriiLab-1') || 'null'); if (sv && !(sv.ver >= 2)) { delete sv.gateAir; delete sv.gateDof; } if (sv && !(sv.ver >= 3)) delete sv.gateArrange; if (sv && !(sv.ver >= 4)) delete sv.view; if (sv && !(sv.ver >= 5)) { delete sv.gate3Across; delete sv.gate4Across; }   /* (set while the view was stretched on the tablet: they pushed the far gates 5 m left to look on the path; now 0 is on the path) */ if (sv) for (var k in sv) if (k in V) { if (k === 'colours') Object.assign(V.colours, sv.colours); else V[k] = sv[k]; } } catch (e) {}
+function saveAll() { try { var o = JSON.parse(JSON.stringify(V)); o.ver = 5; localStorage.setItem('toriiLab-1', JSON.stringify(o)); } catch (e) {} }
 
 /* ============================================================
    2. THE LIGHT (newwinter.html's sceneLight and shadeColour)
@@ -738,7 +738,7 @@ var G_PANEL = [
     return ['Gate ' + n + (n === 1 ? ' (the front one)' : ' from the front'), [
       { k: 'gate' + n + 'Show', t: 'Shown', chk: 1 },
       { k: 'gate' + n + 'Across', t: 'Moved across the path (m, + right, − left, looking up the path)', min: -5, max: 5, step: 0.05 },
-      { k: 'gate' + n + 'Along', t: 'Moved along the path (m, + toward the hall)', min: -20, max: 20, step: 0.1 },
+      { k: 'gate' + n + 'Along', t: 'Moved along the path (m, + toward the hall)', min: -70, max: 70, step: 0.1 },
       { k: 'gate' + n + 'Turn', t: 'Turned (°, + its right end toward you)', min: -30, max: 30, step: 0.05 },
       { k: 'gate' + n + 'Tilt', t: 'Leaned (°, + its top toward you)', min: -5, max: 5, step: 0.05 },
       { k: 'gateH' + n, t: 'Height (× the height set above)', min: 0.4, max: 1.3, step: 0.01 }]];
