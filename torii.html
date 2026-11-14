@@ -64,7 +64,7 @@ var V_DEFAULTS = {
   // the gates
   gates: 3, gateFirst: 29, gateGap: 28, gateClear: 0.25, gateHeight: 1.45, gateDia: 0.11, gateLean: 1.5, gateSori: 0.045,
   gateOverhang: 0.39, gateNuki: 0.73, gateNemaki: 0.13, gateDaiwa: false, gateKusabi: true, gatePlaque: false, gateKasagiBlack: true,
-  gateWeather: 1, gateVivid: 0.5, gateSoft: 0.35, gateHaze: 1, gateShadow: 1, gateFootShade: 1, gateFootSnow: 1,
+  gateWeather: 1, gateVivid: 0.5, gateSoft: 0.35, gateHaze: 1, gateShadow: 1, gateFootShade: 1, gateFootSnow: 1, gateAir: 0.3, gateDof: 1.1,
   gateSnowShow: true, gateSnow: 1, gateCrevice: 1, gatePlaster: 1, gateSnowVary: 0.6, gateFall: true, gateFallRate: 8, gatePowder: 1,
   colours: { snow: '#FAFAFC', mist: '#ffffff', bankEarth: '#4D4038', toriiRed: '#D8401E', toriiBlack: '#2A2523' }
 };
@@ -234,10 +234,15 @@ function drawGates() {
                weather: V.gateWeather, haze: V.gateHaze * V.fieldHaze, hazeM: V.fieldHazeDist, footSnow: V.gateFootSnow,
                snowLit: snowAt(1), snowShade: snowAt(0.25), snowRGB: hex(V.colours.snow), shadeRGB: SHADE, crevice: V.gateCrevice, windFrom: wf, pr: PR };
   var order = VIEW.gates.map(function (g, i) { return { g: g, i: i }; }).filter(function (o) { return o.g.z > 1; }).sort(function (a, b) { return b.g.z - a.g.z; });
+  var zNear = order.length ? order[order.length - 1].g.z : 1;
   var info = [], tmp = layer();
   GATES = [];
   order.forEach(function (o) {
-    var G = gateShape(o.i), hzv = clamp((1 - Math.exp(-Math.pow(o.g.z / V.fieldHazeDist, 1.6))) * V.fieldHaze, 0, 1);
+    // each gate farther back than the first: more air between (paler, cooler, softer contrast) and a little out of focus,
+    // so the gates read one behind another, not as one mass
+    var back = 1 - zNear / o.g.z, air = V.gateAir * back, dof = V.gateDof * back;
+    look.hazeAdd = air;
+    var G = gateShape(o.i), hzv = clamp((1 - Math.exp(-Math.pow(o.g.z / V.fieldHazeDist, 1.6))) * V.fieldHaze + air, 0, 1);
     if (V.gateShadow > 0 && L[1] > 0.02) {
       var kk = clamp(V.gateShadow * (1 - hzv) * Math.min(1, LT.vis * 1.1), 0, 1);
       s.fillStyle = rgb(ratio.map(function (r) { return 255 * lerp(1, r, kk); }));
@@ -255,7 +260,7 @@ function drawGates() {
     tmp.c.setTransform(1, 0, 0, 1, 0, 0); tmp.c.clearRect(0, 0, tmp.cnv.width, tmp.cnv.height); tmp.c.setTransform(PR, 0, 0, PR, 0, 0);
     var box = WinterTorii.draw(tmp.c, G, o.g, cam, Lt, look);
     var Lg = layer(); Lg.c.setTransform(1, 0, 0, 1, 0, 0);
-    Lg.c.filter = V.gateSoft > 0 ? 'blur(' + (V.gateSoft * PR).toFixed(2) + 'px)' : 'none'; Lg.c.drawImage(tmp.cnv, 0, 0); Lg.c.filter = 'none';
+    var soft = V.gateSoft + dof; Lg.c.filter = soft > 0 ? 'blur(' + (soft * PR).toFixed(2) + 'px)' : 'none'; Lg.c.drawImage(tmp.cnv, 0, 0); Lg.c.filter = 'none';
     GATES.push({ L: Lg, emit: box.emit || [], z: o.g.z, i: o.i, hz: hzv, next: 0, parts: [] });
     info.push('gate ' + (o.i + 1) + ': ' + o.g.z.toFixed(0) + ' m, ' + G.Ht.toFixed(1) + ' m tall, ' + G.S.toFixed(1) + ' m between pillars');
   });
@@ -451,6 +456,8 @@ var G_PANEL = [
     { k: 'gateVivid', t: 'Paint keeps its colour in the light', min: 0, max: 1, step: 0.01 },
     { k: 'gateWeather', t: 'Grime and weathering', min: 0, max: 2, step: 0.01 },
     { k: 'gateSoft', t: 'Softness of the edges (px)', min: 0, max: 1.5, step: 0.01 },
+    { k: 'gateAir', t: 'Gates farther back: paler in the air between', min: 0, max: 0.8, step: 0.01 },
+    { k: 'gateDof', t: 'Gates farther back: out of focus (px)', min: 0, max: 4, step: 0.05 },
     { k: 'gateHaze', t: 'Haze with distance', min: 0, max: 2, step: 0.01 },
     { k: 'gateShadow', t: 'Shadows on the snow', min: 0, max: 1, step: 0.01 },
     { k: 'gateFootShade', t: 'Shade round the pillars\' feet', min: 0, max: 2, step: 0.01 },

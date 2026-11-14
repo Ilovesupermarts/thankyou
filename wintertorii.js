@@ -224,7 +224,8 @@ function frame(place, cam) {
 function painter(G, place, cam, Lt, look) {
   var T = frame(place, cam), Ls = Lt.dir;
   var zc = Math.max(1, place.z), hazeM = d(look, 'hazeM', 260);
-  var hz = clamp((1 - Math.exp(-Math.pow(zc / hazeM, 1.6))) * d(look, 'haze', 1), 0, 1);
+  // (hazeAdd: more of the air between, so each gate farther back stands apart from the one in front: torii.html's separation)
+  var hz = clamp((1 - Math.exp(-Math.pow(zc / hazeM, 1.6))) * d(look, 'haze', 1) + d(look, 'hazeAdd', 0), 0, 1);
   var vivid = d(look, 'vivid', 0.5);
   // the light the sunlit snow throws back up (an albedo of about 0.8: the snow's own colour lit by sun and sky)
   var sn = Lt.snow || [250, 250, 252], bo = [], skyB = [];
