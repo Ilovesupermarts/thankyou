@@ -93,10 +93,10 @@ var V_DEFAULTS = {
   gateOverhang: 0.39, gateNuki: 0.73, gateNemaki: 0.13, gateDaiwa: false, gateKusabi: true, gatePlaque: false, gateKasagiBlack: true,
   gateWeather: 1, gateVivid: 0.5, gateSoft: 0.35, gateHaze: 1, gateShadow: 1, gateFootShade: 1, gateFootSnow: 1, gateAir: 0, gateDof: 0, gateArrange: false,
   gateH1: 1, gateH2: 0.88, gateH3: 0.66, gateH4: 0.6, gateH5: 0.55, gateH6: 0.5,
-  // each gate's own (1 the front one): shown, moved along the path (m), turned (°, + its right end toward you), leaned (°, + its top toward you)
-  gate1Show: true, gate1Along: 0, gate1Turn: 0, gate1Tilt: 0, gate2Show: true, gate2Along: 0, gate2Turn: 0, gate2Tilt: 0,
-  gate3Show: true, gate3Along: 0, gate3Turn: 0, gate3Tilt: 0, gate4Show: true, gate4Along: 0, gate4Turn: 0, gate4Tilt: 0,
-  gate5Show: true, gate5Along: 0, gate5Turn: 0, gate5Tilt: 0, gate6Show: true, gate6Along: 0, gate6Turn: 0, gate6Tilt: 0,
+  // each gate's own (1 the front one): shown, moved across the path (m, + to the right looking up the path), moved along the path (m), turned (°, + its right end toward you), leaned (°, + its top toward you)
+  gate1Show: true, gate1Across: 0, gate1Along: 0, gate1Turn: 0, gate1Tilt: 0, gate2Show: true, gate2Across: 0, gate2Along: 0, gate2Turn: 0, gate2Tilt: 0,
+  gate3Show: true, gate3Across: 0, gate3Along: 0, gate3Turn: 0, gate3Tilt: 0, gate4Show: true, gate4Across: 0, gate4Along: 0, gate4Turn: 0, gate4Tilt: 0,
+  gate5Show: true, gate5Across: 0, gate5Along: 0, gate5Turn: 0, gate5Tilt: 0, gate6Show: true, gate6Across: 0, gate6Along: 0, gate6Turn: 0, gate6Tilt: 0,
   gateSnowShow: true, gateSnow: 1, gateCrevice: 1, gatePlaster: 1, gateSnowVary: 0.6, gateFall: true, gateFallRate: 8, gatePowder: 1,
   colours: { snow: '#FAFAFC', mist: '#ffffff', bankEarth: '#4D4038', toriiRed: '#D8401E', toriiBlack: '#2A2523',
              hallPlaster: '#FFF8E8', hallTimber: '#F23A12', hallStone: '#A8A8A0', hallRed: '#F23A12', hallGreen: '#1FA67A', hallSoffit: '#E0360F', flame: '#FFAA5A' }
@@ -384,11 +384,13 @@ function gateTurnLimit(g, deg) {
   for (var a = TURN_STEP; a <= Math.abs(deg) + 1e-6; a += TURN_STEP) { if (gateClearAt(g, G, sg * a) < c0 - 1e-4) break; ok = a; }
   return sg * Math.min(ok, Math.abs(deg));
 }
-function gatePlace(g, turn, tilt) {
+function gatePlace(g0, turn, tilt) {
+  // moved across the path (to the right looking up it): sideways from where the path runs, then turned / leaned as asked
+  var ac = V['gate' + (g0.i + 1) + 'Across'] || 0, g = ac ? { x: g0.x + ac * g0.fz, z: g0.z - ac * g0.fx, fx: g0.fx, fz: g0.fz, s: g0.s, i: g0.i } : g0;
   var t = turn ? gateTurnLimit(g, turn) : 0, th = t * PI / 180, c = Math.cos(th), sn = Math.sin(th);
   var fx = g.fx * c + g.fz * sn, fz = -g.fx * sn + g.fz * c;
   var p = VIEW.toCam(g.x, g.z), f = VIEW.dirCam(fx, fz);
-  return { x: p[0], z: p[1], fx: f[0], fz: f[1], s: g.s, i: g.i, turn: t, held: Math.abs(t - turn) > 1e-6, tilt: clamp(tilt, -5, 5) * PI / 180, w: g };
+  return { x: p[0], z: p[1], fx: f[0], fz: f[1], s: g.s, i: g.i, turn: t, held: Math.abs(t - turn) > 1e-6, tilt: clamp(tilt, -5, 5) * PI / 180, w: g0, across: ac };
 }
 
 /* ============================================================
@@ -543,7 +545,7 @@ function drawGates() {
     GATES.push({ L: Lg, emit: box.emit || [], z: o.g.z, i: o.i, hz: hzv, next: 0, parts: [] });
     info.push('gate ' + (o.i + 1) + ': ' + o.g.z.toFixed(0) + ' m' + (ARR[o.i] ? ' (moved ' + (ARR[o.i] > 0 ? '+' : '') + ARR[o.i] + ' m)' : '') + ', ' + G.Ht.toFixed(1) + ' m tall, ' + G.S.toFixed(1) + ' m between pillars' +
               (o.g.turn ? ', turned ' + o.g.turn.toFixed(2) + '°' + (o.g.held ? ' (held: a pillar would touch the path)' : '') : o.g.held ? ', not turned (a pillar would touch the path)' : '') +
-              (o.g.tilt ? ', leaned ' + (o.g.tilt * 180 / PI).toFixed(2) + '°' : ''));
+              (o.g.across ? ', moved ' + Math.abs(o.g.across).toFixed(2) + ' m ' + (o.g.across > 0 ? 'right' : 'left') : '') + (o.g.tilt ? ', leaned ' + (o.g.tilt * 180 / PI).toFixed(2) + '°' : ''));
   });
   gateInfo = info.reverse().join(' · ') + (ARR.even ? ' · evenly spaced ' + ARR.even + ' m apart' : '');
   makeDot();
@@ -732,6 +734,7 @@ var G_PANEL = [
   [1, 2, 3, 4, 5, 6].map(function (n) {
     return ['Gate ' + n + (n === 1 ? ' (the front one)' : ' from the front'), [
       { k: 'gate' + n + 'Show', t: 'Shown', chk: 1 },
+      { k: 'gate' + n + 'Across', t: 'Moved across the path (m, + right, − left, looking up the path)', min: -5, max: 5, step: 0.05 },
       { k: 'gate' + n + 'Along', t: 'Moved along the path (m, + toward the hall)', min: -20, max: 20, step: 0.1 },
       { k: 'gate' + n + 'Turn', t: 'Turned (°, + its right end toward you)', min: -30, max: 30, step: 0.05 },
       { k: 'gate' + n + 'Tilt', t: 'Leaned (°, + its top toward you)', min: -5, max: 5, step: 0.05 },
