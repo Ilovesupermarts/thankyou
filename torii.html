@@ -480,6 +480,8 @@ function stepField(ms) {
   if (!FJ) return;
   if (!FJ.step(ms)) return;
   var q = FIELD; FIELD = FIELDN; FIELDN = q; FJ = null; fieldOK = true; fieldMs = performance.now() - FT0;
+  // the piles of snow at the gates' and lanterns' feet take the ground's colour: drawn again now the ground is there
+  if (VIEW) { drawGates(); return; }
   composeBase();
 }
 
@@ -549,7 +551,12 @@ function drawGates() {
   var zNear = order.length ? order[order.length - 1].g.z : 1;
   var info = [], tmp = layer();
   GATES = [];
+  // first every gate's shadow and foot shade on the snow, then the ground with them read once (the piles of snow at the
+  // gates' feet take the ground's own colour, so they meet it with no edge), then the gates
   order.forEach(function (o) {
+    var back = 1 - zNear / o.g.z, air = V.gateAir * back;
+    var G = gateShape(o.i), hzv = clamp((1 - Math.exp(-Math.pow(o.g.z / V.fieldHazeDist, 1.6))) * V.fieldHaze + air, 0, 1);
+    o.G = G; o.hzv = hzv; o.air = air; o.dof = V.gateDof * back;
     // each gate farther back than the first: more air between (paler, cooler, softer contrast) and a little out of focus,
     // so the gates read one behind another, not as one mass
     var back = 1 - zNear / o.g.z, air = V.gateAir * back, dof = V.gateDof * back;
@@ -569,6 +576,18 @@ function drawGates() {
         s.save(); s.translate(x, y); s.scale(1, ry / rx); s.translate(-x, -y); s.fillStyle = g; s.fillRect(x - rx, y - rx, rx * 2, rx * 2); s.restore();
       });
     }
+  });
+  lanternShadows(cam, Lt, s, ratio);
+  look.groundPix = null;
+  if (fieldOK) {
+    try {
+      var gd = FIELD.c.getImageData(0, 0, FIELD.cnv.width, FIELD.cnv.height), sd2 = SL.c.getImageData(0, 0, SL.cnv.width, SL.cnv.height).data;
+      if (sd2.length === gd.data.length) for (var q = 0; q < gd.data.length; q += 4) { gd.data[q] = gd.data[q] * sd2[q] / 255; gd.data[q + 1] = gd.data[q + 1] * sd2[q + 1] / 255; gd.data[q + 2] = gd.data[q + 2] * sd2[q + 2] / 255; }
+      look.groundPix = { data: gd.data, w: gd.width, h: gd.height };
+    } catch (e) {}
+  }
+  order.forEach(function (o) {
+    var G = o.G, hzv = o.hzv, dof = o.dof; look.hazeAdd = o.air;
     tmp.c.setTransform(1, 0, 0, 1, 0, 0); tmp.c.clearRect(0, 0, tmp.cnv.width, tmp.cnv.height); tmp.c.setTransform(PR, 0, 0, PR, 0, 0);
     var box = WinterTorii.draw(tmp.c, G, o.g, cam, Lt, look);
     var Lg = layer(); Lg.c.setTransform(1, 0, 0, 1, 0, 0);
@@ -579,7 +598,7 @@ function drawGates() {
               (o.g.y0 > 0.05 ? ', on ground ' + o.g.y0.toFixed(2) + ' m up' : '') + (o.g.across ? ', moved ' + Math.abs(o.g.across).toFixed(2) + ' m ' + (o.g.across > 0 ? 'right' : 'left') : '') + (o.g.tilt ? ', leaned ' + (o.g.tilt * 180 / PI).toFixed(2) + '°' : ''));
   });
   gateInfo = info.reverse().join(' · ') + (ARR.even ? ' · evenly spaced ' + ARR.even + ' m apart' : '');
-  drawLanterns(cam, Lt, s, ratio);
+  drawLanterns(cam, Lt, look.groundPix);
   makeDot();
   composeBase();
 }
@@ -621,30 +640,39 @@ function lanternPlaces() {
   return out;
 }
 function lantLook() { return { sides: V.lantSides, pillar: V.lantPillar, box: V.lantBox, roof: V.lantRoof, curls: V.lantCurls }; }
-function drawLanterns(cam, Lt, s, ratio) {
-  LANTS = [];
-  var P = lanternPlaces(), gf = groundFn(), lit = lampLevel() > 0 ? 1 : 0, info = [];
-  var C = { stone: hex(V.colours.lantStone), moss: hex(V.colours.lantMoss), paper: hex(V.colours.lantPaper), flame: hex(V.colours.lantFlame), glow: hex(V.colours.lantGlow) };
-  var tmp = layer(), wtmp = layer(), kb = lantKeyBase();
-  P.forEach(function (Lp) {
+/* first: where each lantern stands, and its shadow and foot shade on the snow (before the ground is read for the piles) */
+var LPLACES = [];
+function lanternShadows(cam, Lt, s, ratio) {
+  var gf = groundFn();
+  LPLACES = lanternPlaces().filter(function (Lp) { return Lp.place.z >= 2; });
+  LPLACES.forEach(function (Lp) {
     var pl = Lp.place;
-    if (pl.z < 2) return;
     // stands on the snow under it (the lowest of its plinth's middle and four corners, so no corner floats)
     var r = V.lantBox * Lp.h * 1.9, y = 1e9;
     [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].forEach(function (d) { y = Math.min(y, gf(pl.x + d[0], pl.z + d[1]).h); });
     pl.y0 = y;
-    var hzv = clamp((1 - Math.exp(-Math.pow(pl.z / V.fieldHazeDist, 1.6))) * V.fieldHaze, 0, 1);
-    if (V.gateShadow > 0 && Lt.dir[1] > 0.02) {
+    var hzv = Lp.hzv = clamp((1 - Math.exp(-Math.pow(pl.z / V.fieldHazeDist, 1.6))) * V.fieldHaze, 0, 1);
+    if (s && V.gateShadow > 0 && Lt.dir[1] > 0.02) {
       var kk = clamp(V.gateShadow * (1 - hzv) * Math.min(1, LT.vis * 1.1), 0, 1);
       s.fillStyle = rgb(ratio.map(function (q) { return 255 * lerp(1, q, kk); }));
       WinterTorii.lanternShadow(s, pl, cam, Lt, Lp.h, lantLook());
     }
-    if (V.gateFootShade > 0) {                                  // the sky's light cut off right round its foot
+    if (s && V.gateFootShade > 0 && !(V.lantSnowShow && V.lantSnowBase > 0)) {   // the sky's light cut off round its foot (the drift has its own shade)
       var x = W / 2 + VIEW.F * pl.x / pl.z, yy = VIEW.hy + VIEW.F * (V.eyeHeight - y) / pl.z, rx = VIEW.F * r * 1.3 / pl.z, ry = rx * V.eyeHeight / pl.z * 1.2 + 1;
       var g = s.createRadialGradient(x, yy, 0, x, yy, rx), a = 0.9 * V.gateFootShade * (1 - hzv);
       g.addColorStop(0, rgb(ratio.map(function (q) { return 255 * lerp(1, q * 0.85, a * 0.6); }))); g.addColorStop(1, 'rgba(255,255,255,0)');
       s.save(); s.translate(x, yy); s.scale(1, ry / rx); s.translate(-x, -yy); s.fillStyle = g; s.fillRect(x - rx, yy - rx, rx * 2, rx * 2); s.restore();
     }
+  });
+}
+/* then each lantern drawn (GP: the ground as it shows, shadows laid on: its drift takes that colour) */
+function drawLanterns(cam, Lt, GP) {
+  LANTS = [];
+  var P = LPLACES, gf = groundFn(), lit = lampLevel() > 0 ? 1 : 0, info = [];
+  var C = { stone: hex(V.colours.lantStone), moss: hex(V.colours.lantMoss), paper: hex(V.colours.lantPaper), flame: hex(V.colours.lantFlame), glow: hex(V.colours.lantGlow) };
+  var tmp = layer(), wtmp = layer(), kb = lantKeyBase() + (GP ? 'f' : 'n');
+  P.forEach(function (Lp) {
+    var pl = Lp.place, y = pl.y0, hzv = Lp.hzv;
     var key = kb + JSON.stringify([pl, Lp.h, Lp.n]);
     if (LCACHE[key]) { var o0 = LCACHE[key]; o0.used = 1; LANTS.push(o0.item); info.push(o0.info); return; }
     [tmp, wtmp].forEach(function (L) { L.c.setTransform(1, 0, 0, 1, 0, 0); L.c.clearRect(0, 0, L.cnv.width, L.cnv.height); L.c.setTransform(PR, 0, 0, PR, 0, 0); });
@@ -653,7 +681,7 @@ function drawLanterns(cam, Lt, s, ratio) {
     var bx = WinterTorii.lanternLit(tmp.c, wtmp.c, pl, cam, Lt, {
       h: Lp.h, L: lantLook(), tone: 1 + (h1 - 0.5) * 0.2 * vr, moss: V.lantMossAmt * clamp(1 + (h2 - 0.5) * 1.2 * vr, 0, 2), lit: lit * V.lantLight * 0.5,
       colours: C, haze: V.gateHaze * V.fieldHaze, hazeM: V.fieldHazeDist, windowGlow: V.lantWindowGlow,
-      pr: PR, ground: gf, seed: Lp.n * 7 + V.seed, weather: V.lantWeather,
+      pr: PR, ground: gf, seed: Lp.n * 7 + V.seed, weather: V.lantWeather, groundPix: GP,
       snowLit: V.lantSnowShow ? snowAt(1) : null, snow: V.lantSnow, roofSnow: V.lantSnowRoof, baseSnow: V.lantSnowBase });
     // only its own box is kept (a full-screen picture for each lantern would cost a lot of memory)
     var x0 = Math.max(0, Math.floor((bx.x0 - 3) * PR)), y0 = Math.max(0, Math.floor((bx.y0 - 3) * PR));
@@ -682,11 +710,11 @@ function lantFlame(L, t) {
   if (r < 0.6 && u < len) f -= V.lantFlicker * 0.45 * Math.sin(PI * u / len) * (0.5 + r);
   return Math.max(0.2, f);
 }
-function lantPools(c, t) {                                     // the warm light on the snow round each lit lantern
+function lantPools(c, t, only) {                               // the warm light on the snow round each lit lantern (and its drift)
   if (!(lampLevel() > 0) || V.lantPool <= 0) return;
   var fl = hex(V.colours.lantFlame);
   c.globalCompositeOperation = 'lighter';
-  LANTS.forEach(function (L) {
+  (only ? [only] : LANTS).forEach(function (L) {
     var f = lantFlame(L, t), rx = L.px * V.lantPoolSize * 1.5, ry = rx * V.eyeHeight / L.z * 1.6 + 2, a = 0.34 * V.lantPool * f * (1 - L.hz * 0.7);
     var g = c.createRadialGradient(L.fx, L.fy, 0, L.fx, L.fy, rx);
     g.addColorStop(0, 'rgba(' + fl.join(',') + ',' + a.toFixed(3) + ')'); g.addColorStop(0.5, 'rgba(' + fl.join(',') + ',' + (a * 0.35).toFixed(3) + ')'); g.addColorStop(1, 'rgba(' + fl.join(',') + ',0)');
@@ -696,6 +724,7 @@ function lantPools(c, t) {                                     // the warm light
 }
 function lantDraw(c, L, t) {                                   // one lantern: its stone, then its windows' flicker and the glow round its light box
   c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(L.pic, L.x, L.y);
+  c.setTransform(PR, 0, 0, PR, 0, 0); lantPools(c, t, L); c.setTransform(1, 0, 0, 1, 0, 0);
   if (!L.win || !(lampLevel() > 0)) return;
   var f = lantFlame(L, t);
   c.globalCompositeOperation = 'lighter';
@@ -845,7 +874,6 @@ var dirty = true;
 function render() {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.drawImage(BASE.cnv, 0, 0);
-  ctx.setTransform(PR, 0, 0, PR, 0, 0); lantPools(ctx, clock);
   // the gates and the lanterns, farthest first
   GATES.map(function (G) { return { z: G.z, G: G }; }).concat(LANTS.map(function (L) { return { z: L.z, L: L }; }))
     .sort(function (a, b) { return b.z - a.z; }).forEach(function (it) {

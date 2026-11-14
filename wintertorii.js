@@ -459,6 +459,10 @@ function draw(c, G, place, cam, Lt, look) {
     // lump each side of it (left and right as seen; one higher, so the snow line climbs the sleeve on a slant), a broad
     // heap away from the path, and low domes along the tails (long away from the path, short toward it)
     var side = [-eb, ea];                                         // across the line of sight (a, b)
+    // seen at a low angle (the gates farther back: their feet nearly edge-on from the eye), the snow behind the post is
+    // hidden by the post itself and only its front shows: there the drift wraps round the post's front at its crest's
+    // height (gz 1), as it is seen to on the front gate from higher up (gz 0: the front gate, unchanged)
+    var elev = (cam.eye - gy0) / Math.max(1, Math.hypot(pc[0], pc[1])), gz = smooth(0.06, 0.035, elev);
     rp();
     var hi = sd * side[0] >= 0 ? 1 : -1, D = [];                  // the side away from the path (a little higher)
     function dome(a, b, r, h, sq) { D.push({ a: a, b: b, r: r, h: h, sq: sq || 1 }); }
@@ -477,13 +481,13 @@ function draw(c, G, place, cam, Lt, look) {
       var sx = Math.max(0, Math.abs(su) - 0.6 * pw) / L;           // a broad shoulder each side of the post, then the flank
       var H = RG.hp * Math.pow(1 + sx * sx, -1.1) * smooth(E, E * 0.55, as);
       // the crest curves a little as it runs out (each pile its own), and the drift narrows toward its toes
-      var q0 = RG.q0 + RG.bend * (sv / E) * (sv / E) * (sv > 0 ? 1 : -1);
+      var q0 = RG.q0 * (1 - gz) + RG.bend * (sv / E) * (sv / E) * (sv > 0 ? 1 : -1);
       var W = RG.w * (1 + 0.35 * Math.exp(-(sv / pw) * (sv / pw))) * lerp(1, 0.45, Math.min(1, as / E));
       var dq = qv - q0, Wq = dq > 0 ? W * 1.3 : W;                 // the face toward the eye longer and gentler
       var u = dq / Wq; if (Math.abs(u) >= 1) return 0;
       // on the path's side its face toward the eye is lower: the sleeve's front corner there shows nearly to its foot while
       // the drift rises behind it (the reference)
-      var fr = dq > 0 ? lerp(1, lerp(0.62, 0.4, smooth(0.2 * pw, -1.2 * pw, sv)), Math.min(1, dq / (0.5 * pw))) : 1;
+      var fr = dq > 0 ? lerp(1, lerp(0.62, 0.4, smooth(0.2 * pw, -1.2 * pw, sv)), Math.min(1, dq / (0.5 * pw)) * (1 - gz * smooth(1.6 * pw, 0.4 * pw, as))) : 1;
       return H * fr * Math.pow(1 - u * u, 1.35);
     }
     dome(a0 + sd * pw * lerp(1.2, 1.6, rp()), -eb * pw * 0.35 + (rp() - 0.5) * pw * 0.4, pw * lerp(1.3, 1.6, rp()), pw * lerp(0.4, 0.5, rp()));
@@ -536,7 +540,7 @@ function draw(c, G, place, cam, Lt, look) {
       if (hol > 0 && p > 0) { var lift = hol * smooth(3.2 * pw, 0.5 * pw, rr2) * Math.min(1, p / (0.15 * pw)) * Math.min(1, fsK); p += lift; pb0 += lift; }
       // right against the post: where the snow meets the sleeve, high on one side, sloping down across the front to the
       // other (as in the reference: a slant, not a ring)
-      if (fsK > 0) { var need = (Math.max(gPost, gy0) + (0.2 + 0.06 * sv2 + 0.08 * nth(Math.atan2(b, a - a0) * 3)) * pw * fsK - gq.h) * Math.exp(-Math.pow(rr2 / (0.45 * pw), 2)); if (need > p) { pb0 += need - p; p = need; } }
+      if (fsK > 0) { var need = (Math.max(gPost, gy0) + (0.2 + 0.06 * sv2 + 0.08 * nth(Math.atan2(b, a - a0) * 3) + gz * 0.9) * pw * fsK - gq.h) * Math.exp(-Math.pow(rr2 / ((0.45 + 0.5 * gz) * pw), 2)); if (need > p) { pb0 += need - p; p = need; } }
       // and the slant itself, on top of the heap: higher on one side of the post, lower on the other
       if (fsK > 0 && p > 0) { var sl2 = 0 * sv2 * Math.exp(-Math.pow(rr2 / (0.6 * pw), 2)); p = Math.max(0, p + sl2); pb0 = Math.max(0, pb0 + sl2); }
       var k = jb * N + ia; TH[k] = p; PB[k] = pb0; GG[k] = gq.h;
@@ -597,9 +601,25 @@ function draw(c, G, place, cam, Lt, look) {
     var lit0 = look.snowLit, kc = [Math.min(1.05, lit0[0] / 225), Math.min(1.05, lit0[1] / 234), Math.min(1.05, lit0[2] / 237)];
     var litC = [244 * kc[0], 245 * kc[1], 250 * kc[2]], shC = [185 * kc[0], 196 * kc[1], 214 * kc[2]], deep = [162 * kc[0], 166 * kc[1], 186 * kc[2]];
     var mist = Lt.mist, hzk = PN.hz;
+    // the ground's level snow round the foot (the brighter part of the ground there: the path's walls and shadows left out),
+    // the colour of the pile: the same snow as the ground, never the ground's details seen through it
+    var L0 = null, GPx = look.groundPix;
+    if (GPx) {
+      var fp = T.p([pc[0], g0, pc[1]]), ppm = cam.F / Math.max(1, Math.hypot(pc[0], pc[1])), hw2 = Math.max(6, 4 * pw * ppm), hv2 = Math.max(3, 1.2 * pw * ppm), smp = [];
+      for (var yy3 = fp[1] - hv2; yy3 <= fp[1] + hv2; yy3 += Math.max(1, hv2 / 8)) for (var xx3 = fp[0] - hw2; xx3 <= fp[0] + hw2; xx3 += Math.max(1, hw2 / 24)) {
+        var gx3 = Math.round(xx3 * PRD), gy3 = Math.round(yy3 * PRD); if (gx3 < 0 || gy3 < 0 || gx3 >= GPx.w || gy3 >= GPx.h) continue;
+        var k3 = (gy3 * GPx.w + gx3) * 4; smp.push([GPx.data[k3], GPx.data[k3 + 1], GPx.data[k3 + 2], GPx.data[k3] * 0.3 + GPx.data[k3 + 1] * 0.59 + GPx.data[k3 + 2] * 0.11]);
+      }
+      if (smp.length > 8) {
+        smp.sort(function (u, v) { return u[3] - v[3]; });
+        var s3 = [0, 0, 0], n3 = 0;
+        for (var q5 = Math.floor(smp.length * 0.5); q5 < Math.floor(smp.length * 0.9); q5++) { s3[0] += smp[q5][0]; s3[1] += smp[q5][1]; s3[2] += smp[q5][2]; n3++; }
+        if (n3) L0 = [s3[0] / n3, s3[1] / n3, s3[2] / n3];
+      }
+    }
     // the post (to hide what lies behind it): a vertical cylinder at its foot
     var pxC = pc[0], pzC = pc[1], eye = cam.eye, aE = 0;
-    var eps = cell;
+    var eps = cell, FILL = new Uint8Array(w * h);
     for (var j = 0; j < h; j++) {
       var sy = Y0 + (j + 0.5) / PRD, dY = -(sy - cam.hy) / cam.F;
       if (dY >= -1e-4) continue;
@@ -630,24 +650,49 @@ function draw(c, G, place, cam, Lt, look) {
         // hidden behind the post? Only where the post stands above the snow: any part of it below the snow's surface
         // (its foot, which goes down into the ground) is buried, and the snow there is painted over it
         var ox = -pxC, oz = -pzC, qa = dx * dx + 1, qb = 2 * (ox * dx + oz), qc = ox * ox + oz * oz - rs * rs, disc = qb * qb - 4 * qa * qc;
+        var inCol = disc > 0 && (-qb - Math.sqrt(Math.max(0, disc))) / (2 * qa) > 0;    // in front of the post's column (solid snow there)
         if (disc > 0) {
           var tc = (-qb - Math.sqrt(disc)) / (2 * qa);
           if (tc > 0 && tc < hit) {
             var hcv = at(HT, aa * tc + ab, ba * tc + bb), ycv = eye + dY * tc;
-            if (hcv === null || ycv > hcv + 0.004) {
+            // seen at a low angle (gz: the gates farther back), the snow wraps the post's front up to the pile seen behind
+            // it: where the pile shows behind the post, the post below that is buried (not a strip of sleeve)
+            var thB = at(TH, aa * hit + ab, ba * hit + bb), wrapB = gz > 0.5 && thB > 0.002 && ycv <= eye + dY * hit + (at(HT, aa * hit + ab, ba * hit + bb) - (eye + dY * hit)) + 0.25 * pw * gz;
+            if (wrapB) { FILL[j * w + i] = 1; continue; }      // the pile runs across the post's front (filled from either side)
+            else if (hcv === null || ycv > hcv + 0.004) {
               // the post in view: above the gate's ground the gate draws it; below that (where the ground round the
               // post lies lower) the post runs on down into the snow, and this picture draws that part (the sleeve's
-              // black), only where nothing stands in front of it
+              // black), only where nothing stands in front of it (the front gate; the gates farther back: buried)
               if (ycv >= gy0 - 0.005) continue;
+              if (gz > 0.5) { FILL[j * w + i] = 1; continue; }
               var kp = (j * w + i) * 4, sh = 0.85 + 0.15 * ihash(i + X0 * 7, j + Y0 * 3);
               D[kp] = look.black ? look.black[0] * 0.8 * sh : 34; D[kp + 1] = look.black ? look.black[1] * 0.8 * sh : 32; D[kp + 2] = look.black ? look.black[2] * 0.8 * sh : 33; D[kp + 3] = 255; any++;
               continue;
             }
-            hit = tc; var buried = true;                         // buried post: the snow at its face
+            else {
+              // the post below the snow's surface: buried in the pile; this pixel is filled afterwards from the pile on
+              // either side of the post in the same row (the snow runs across the post's front unbroken)
+              FILL[j * w + i] = 1; continue;
+            }
           }
         }
-        var pa = aa * hit + ab, pb = ba * hit + bb, thk = at(TH, pa, pb);
-        if (!(thk > 0.002)) continue;
+        var pa = aa * hit + ab, pb = ba * hit + bb;
+        // snow against the post's front: shaded as the pile just in front of the post (not as the flat top inside it)
+        if (buried) { var pa2 = pa + ea * 0.4 * pw, pb2 = pb + eb * 0.4 * pw; if (at(HT, pa2, pb2) !== null) { pa = pa2; pb = pb2; } }
+        var thk = at(TH, pa, pb);
+        if (!(thk > 0.002)) {
+          // bare ground: where it lies in front of the post (the line of sight meets it first), it hides the post's foot:
+          // the ground's own colour is laid there, so no sleeve shows below the snow's surface
+          if (inCol && gz > 0.5) { FILL[j * w + i] = 1; continue; }
+          if (GPx && disc > 0) {
+            var tcb = (-qb - Math.sqrt(disc)) / (2 * qa), gxb = Math.round(X0 * PRD) + i, gyb = Math.round(Y0 * PRD) + j;
+            if (tcb > hit && gxb >= 0 && gyb >= 0 && gxb < GPx.w && gyb < GPx.h) {
+              var kb2 = (gyb * GPx.w + gxb) * 4, kd2 = (j * w + i) * 4;
+              D[kd2] = GPx.data[kb2]; D[kd2 + 1] = GPx.data[kb2 + 1]; D[kd2 + 2] = GPx.data[kb2 + 2]; D[kd2 + 3] = 255; any++;
+            }
+          }
+          continue;
+        }
         // the surface's direction (the grid's slope, the gate's a / b turned back to camera space)
         var ha = (at(HT, pa + eps, pb) - at(HT, pa - eps, pb)) / (2 * eps), hb = (at(HT, pa, pb + eps) - at(HT, pa, pb - eps)) / (2 * eps);
         if (!isFinite(ha)) ha = 0; if (!isFinite(hb)) hb = 0;
@@ -670,9 +715,40 @@ function draw(c, G, place, cam, Lt, look) {
         for (ch = 0; ch < 3; ch++) col[ch] = lerp(col[ch], lerp(shC[ch], litC[ch], 0.6), te * 0.8);
         var gr = 1 + (ihash(i + X0 * 7, j + Y0 * 3) - 0.5) * 0.03;
         var al = smooth(0.002, 0.05 + 0.07 * (0.5 + 0.5 * n2(pa / (0.12 * pw), pb / (0.12 * pw), G.seed + 21)), thk);   // (feathered into the ground over 5-12 cm; fully opaque wherever thicker)
-        var kk = (j * w + i) * 4;
+        var kk = (j * w + i) * 4, gx2 = Math.round(X0 * PRD) + i, gy2 = Math.round(Y0 * PRD) + j;
+        if (L0 && gx2 >= 0 && gy2 >= 0 && gx2 < GPx.w && gy2 < GPx.h) {
+          // the ground's level snow (L0), lit by how the pile's slope faces the light: level, it is the ground's colour;
+          // turned away, the snow's lavender shade; creases deeper. Only at its thin edge the ground right there shows
+          // (it melts into it); nowhere does the ground's detail (the path's wall) show through it
+          var gk2 = (gy2 * GPx.w + gx2) * 4, fLv = smooth(0.3, 0.82, LR[1]), kl2 = clamp(f / fLv, 0, 1), thin = smooth(0.01 * pw, 0.12 * pw, thk);
+          for (ch = 0; ch < 3; ch++) {
+            var kq2 = lerp(shC[ch] / litC[ch], 1, kl2);
+            kq2 = lerp(kq2, deep[ch] / litC[ch], crease * 0.8); kq2 = lerp(kq2, deep[ch] / litC[ch], cs);
+            D[kk + ch] = clamp(lerp(GPx.data[gk2 + ch], L0[ch] * kq2 * gr, thin), 0, 255);
+          }
+          D[kk + 3] = 255 * (inCol ? 1 : al); any++;
+          continue;
+        }
         for (ch = 0; ch < 3; ch++) D[kk + ch] = clamp(lerp(col[ch], mist[ch], hzk) * gr, 0, 255);
-        D[kk + 3] = 255 * al; any++;
+        D[kk + 3] = 255 * (inCol ? 1 : al); any++;
+      }
+    }
+    // the buried post's pixels: each run filled across from the pile's pixels to its left and right
+    for (var jf = 0; jf < h; jf++) {
+      for (var i0 = 0; i0 < w; i0++) {
+        if (!FILL[jf * w + i0]) continue;
+        var i1 = i0; while (i1 + 1 < w && FILL[jf * w + i1 + 1]) i1++;
+        var kl = i0 > 0 ? (jf * w + i0 - 1) * 4 : -1, kr = i1 + 1 < w ? (jf * w + i1 + 1) * 4 : -1;
+        var okL = kl >= 0 && D[kl + 3] > 30, okR = kr >= 0 && D[kr + 3] > 30;
+        if (okL || okR) {
+          for (var ii = i0; ii <= i1; ii++) {
+            var tf = (ii - i0 + 1) / (i1 - i0 + 2), kf = (jf * w + ii) * 4;
+            for (var cf = 0; cf < 3; cf++) D[kf + cf] = okL && okR ? lerp(D[kl + cf], D[kr + cf], tf) : okL ? D[kl + cf] : D[kr + cf];
+            D[kf + 3] = 255;
+          }
+          any++;
+        }
+        i0 = i1;
       }
     }
     if (!any) return;
@@ -1438,7 +1514,8 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
         th = Math.atan2(b, a);
         // on the base's top, against the neck, and patchy on its sloping face
         dd = Math.min(dd, fr(a, y, b, yBa - 0.006 * h, yBa + tBa * (0.5 + 0.9 * nth(th, 3)), 1.2 * B + 0.004 * h, 1.12 * B, 1, 0.007 * h));
-        var pt = smooth(0.0, 0.5, vn3(a / (0.025 * h), y / (0.02 * h), b / (0.025 * h) + seed)) * smooth(yPl + 0.015 * h, yBa - 0.004 * h, y);
+        // one band of snow from the face's top edge down to a wavy line (no holes): grey stone below it
+        var yEdge = yPl + (0.018 + 0.022 * (0.5 + 0.5 * vn3(th * 2.2, seed, 0.3))) * h, pt = smooth(yEdge - 0.003 * h, yEdge + 0.006 * h, y);
         var face = fr(a, y, b, yPl - e1, yBa, 1.5 * B, 1.2 * B, 1, e1) - 0.006 * h * sK * pt + 0.0004 * h;
         dd = Math.min(dd, Math.max(face, yPl + 0.012 * h - y));
       }
@@ -1455,9 +1532,9 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
   for (var j = 0; j < N; j++) for (var i = 0; i < N; i++) {
     var a = -RD + i * cell, b = -RD + j * cell, q = T.w(a, 0, b);
     var g = look.ground ? look.ground(q[0], q[2]).h - (place.y0 || 0) : 0;
-    var hy2 = Math.hypot(a, b), th2 = Math.atan2(b, a), rho = lerp(rad(a, b), hy2, smooth(ap0, ap0 + 0.12 * h, hy2));
+    var hy2 = Math.hypot(a, b), th2 = Math.atan2(b, a), rho = lerp(rad(a, b), hy2, smooth(ap0, ap0 + 0.03 * h, hy2));
     // banked against the plinth (in places over it, in places below its top), a rounded shoulder, then down to the ground
-    var Hd = h * (0.03 + 0.055 * Math.pow(nth(th2, 0), 1.5)) * bK, Wd = h * (0.055 + 0.075 * nth(th2 + 1.3, 1)) * Math.max(0.3, bK);
+    var Hd = h * (0.038 + 0.05 * Math.pow(nth(th2, 0), 1.5)) * bK, Wd = h * (0.055 + 0.075 * nth(th2 + 1.3, 1)) * Math.max(0.3, bK) * (0.8 + 0.4 * (0.5 + 0.5 * fbm3(a / (0.035 * h), b / (0.035 * h), seed + 9, 2)));
     var x = (rho - ap0) / Wd, pr = x <= 0 ? 1 : x >= 1 ? 0 : Math.pow(1 - x, 1.7) * (1 + 0.6 * x);
     var lump = 0.016 * h * fbm3(a / (0.045 * h), b / (0.045 * h), seed, 2) * Math.min(1, pr * 1.5) * bK;
     var H = Math.max(0, Hd * pr + lump);
@@ -1511,6 +1588,26 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
   var stone = [C.stone[0] * tone, C.stone[1] * tone, C.stone[2] * tone];
   var glowWin = mix(C.paper, C.flame, 0.55), hotWin = mix(C.flame, C.glow, 0.6), mist = Lt.mist, hz = PN.hz;
   var lampC = [0, (yLb + yBx) / 2, 0], warm = mix(C.flame, C.glow, 0.3);
+  // the ground's own level snow right round the foot (its average), the colour of the snow lying on the lantern
+  var gAvg = null;
+  if (look.groundPix) {
+    var GPa = look.groundPix, fx0 = Math.round(ft[0] * PRD), fy0 = Math.round(ft[1] * PRD), rr0 = Math.max(4, Math.round(pxh * 0.25 * PRD)), sa = [0, 0, 0], na = 0;
+    for (var yy0 = fy0 - 2; yy0 <= fy0 + Math.round(rr0 * 0.3); yy0 += 2) for (var xx0 = fx0 - rr0; xx0 <= fx0 + rr0; xx0 += 2) {
+      if (xx0 < 0 || yy0 < 0 || xx0 >= GPa.w || yy0 >= GPa.h) continue;
+      var ka = (yy0 * GPa.w + xx0) * 4; if (GPa.data[ka + 3] < 200) continue;
+      sa[0] += GPa.data[ka]; sa[1] += GPa.data[ka + 1]; sa[2] += GPa.data[ka + 2]; na++;
+    }
+    if (na > 4) gAvg = [sa[0] / na, sa[1] / na, sa[2] / na];
+  }
+  function snowOnGround(base, nx, ny, nz, ao) {
+    // how far the surface turns from level (the ground's own snow is level): the steeper, the more of the snow's soft
+    // lavender shade; a little more on the side away from the light; deeper in the creases
+    var tu = 1 - clamp(ny, 0, 1), sh0 = smooth(0.02, 0.6, tu) * 0.55;
+    var away = clamp(-(nx * Ls[0] + nz * Ls[2]) / (Math.hypot(Ls[0], Ls[2]) || 1), 0, 1) * smooth(0.05, 0.5, tu) * 0.25;
+    var kd = (1 - ao) * 0.6, ksh = clamp(sh0 + away, 0, 0.8), out = [0, 0, 0];
+    for (var c5 = 0; c5 < 3; c5++) out[c5] = base[c5] * lerp(lerp(1, shC[c5] / litC[c5], ksh), deep[c5] / litC[c5], kd);
+    return out;
+  }
   function shadeAt(t, dl, i, j, mat) {
     var a = E[0] + dl[0] * t, y = E[1] + dl[1] * t, b = E[2] + dl[2] * t;
     if (mat === undefined) { scene(a, y, b); mat = MAT; }
@@ -1520,7 +1617,9 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
     var nc = T.n(nx, ny, nz);
     // the hollows: how much open space there is above the surface (ambient occlusion)
     var ao = 0, dk = 0.014 * h;
-    for (var s3 = 1; s3 <= 4; s3++) ao += (s3 * dk - sceneOnly(a + nx * s3 * dk, y + ny * s3 * dk, b + nz * s3 * dk)) / Math.pow(2, s3 - 1);
+    // (the drift's own term is a height difference halved for safe stepping: here its true height is used, else level
+    // snow would read as a hollow)
+    for (var s3 = 1; s3 <= 4; s3++) { var qa3 = a + nx * s3 * dk, qy3 = y + ny * s3 * dk, qb3 = b + nz * s3 * dk; ao += (s3 * dk - Math.min(solidD(qa3, qy3, qb3), 2 * driftD(qa3, qy3, qb3))) / Math.pow(2, s3 - 1); }
     ao = clamp(1 - ao / dk * 0.45, 0, 1);
     var col, al = 1, win = 0;
     if (mat === 2) {                                         // the drift: as thick as it is here (feathered into the ground)
@@ -1528,7 +1627,22 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
       if (!(Hh > 0.0015)) return null;
       al = smooth(0.0015, 0.03, Hh);
     }
-    if (mat >= 1) {
+    if (mat === 2 && look.groundPix) {
+      // the drift: the ground's own snow (its colour and grain, read from the ground's picture right here), darkened only
+      // where its slopes turn from the light, so where it thins out it is the ground itself: no edge
+      var GP = look.groundPix, gx = Math.round(X0 * PRD) + i, gyy = Math.round(Y0 * PRD) + j;
+      if (gx >= 0 && gyy >= 0 && gx < GP.w && gyy < GP.h) {
+        var gk = (gyy * GP.w + gx) * 4, gcol = [GP.data[gk], GP.data[gk + 1], GP.data[gk + 2]];
+        // (no crease where it thins to the ground: there it is the ground's own colour)
+        col = snowOnGround(gcol, nx, ny, nz, lerp(1, ao, smooth(0.01, 0.08, Hh)));
+      }
+    }
+    if (col) { /* the drift, done above */ }
+    else if (mat >= 1 && gAvg) {
+      col = snowOnGround(gAvg, nx, ny, nz, ao);
+      var gr0 = 1 + (hs3(i + X0 * 7, j + Y0 * 3, 1) - 0.5) * 0.035;
+      for (var c6 = 0; c6 < 3; c6++) col[c6] *= gr0;
+    } else if (mat >= 1) {
       // (its slopes read more strongly, as painted: as the gates' drifts)
       var sn2 = T.n(nx * 1.6, ny, nz * 1.6), sl2 = Math.hypot(sn2[0], sn2[1], sn2[2]) || 1;
       var dlr = (sn2[0] * LR[0] + sn2[1] * LR[1] + sn2[2] * LR[2]) / sl2, f = smooth(0.42, 0.9, dlr);
@@ -1563,7 +1677,7 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
       // ledges, lichen; worn edges a little paler
       var sc = 0.03 * h, gn = fbm3(a / sc, y / sc, b / sc + seed, 4), fl = hs3(Math.floor(a / (0.004 * h)), Math.floor(y / (0.004 * h)), Math.floor(b / (0.004 * h)) + seed);
       var base = [stone[0], stone[1], stone[2]], kq = 1 + 0.22 * gn * wk + 0.12 * (fl - 0.5) * wk;
-      kq *= 1 - 0.26 * wk * (1 - smooth(0, 0.3 * h, y));
+      kq *= 1 - 0.16 * wk * (1 - smooth(0, 0.3 * h, y));
       var th3 = Math.atan2(b, a), st = Math.max(0, fbm3(th3 * 9, seed, 0.5, 3));
       var stk = 0;
       if (y > yLb && y < yBx) stk = smooth(yBx - 0.13 * h, yBx, y) * 0.6 + 0.4 * smooth(yLb, yBx, y);
@@ -1574,7 +1688,7 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
       for (var c3 = 0; c3 < 3; c3++) base[c3] *= kq;
       var lich = smooth(0.15, 0.6, fbm3(a / (0.05 * h) + 7, y / (0.05 * h), b / (0.05 * h) + seed, 3)) * moss * (0.35 + 0.65 * (1 - smooth(0, 0.55 * h, y))) * (0.6 + 0.4 * Math.max(0, ny));
       base = mix(base, C.moss, clamp(lich * 0.7, 0, 0.8));
-      var aok = 0.45 + 0.55 * ao;
+      var aok = 0.62 + 0.38 * ao;
       col = PN.shade([base[0] * aok, base[1] * aok, base[2] * aok], nc, vis);
     }
     // the lamp's light from the windows, on the stone and snow near the light box (dusk and night)
@@ -1584,7 +1698,7 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
       var kk2 = lit * 0.75 * Math.exp(-Math.max(0, dl2 - B) / (0.12 * h)) * (0.3 + 0.7 * fc) * (mat >= 1 ? 1 : 0.7);
       for (ch = 0; ch < 3; ch++) col[ch] += warm[ch] * kk2 * 0.55;
     }
-    if (mat >= 1) col = mix(col, mist, hz);
+    if (mat >= 1 && !gAvg) col = mix(col, mist, hz);              // (the ground's colour has its haze already)
     return [col[0], col[1], col[2], al, win];
   }
   // each pixel: its line of sight, through the bounding cylinder, then sphere traced into the lantern
@@ -1667,6 +1781,8 @@ function lanternShadow(c, place, cam, Lt, h, L) {
   if (Ld[1] < 0.02) return;
   var T = frame(place, cam), y0 = place.y0 || 0;
   lanternPieces(h, 0.2, L || {}).forEach(function (pc) {
+    // (the plinth and the base stand in the snow drifted round them: their shadow would only show as a strip in front)
+    if (pc.c[1] < 0.11 * h) return;
     var Q = [];
     pc.faces.forEach(function (f) { f.p.forEach(function (p) { var q = T.w(p[0], p[1], p[2]), t = (q[1] - y0) / Ld[1]; Q.push(T.p([q[0] - Ld[0] * t, y0, q[2] - Ld[2] * t])); }); });
     poly(c, hull(Q)); c.fill();
