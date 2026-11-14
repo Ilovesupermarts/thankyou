@@ -701,6 +701,51 @@ function paintBough(c, E, P, K, S) {
   Bru.flush(0.18);
   E.pieces.forEach(function (Pc) { if (!Pc.loose) paintBoughSnow(c, E, Pc, P, K); });
 }
+/* o.wash (the pagoda hill's firs only: so small and far that single needle strokes cannot be seen): each bough is ONE
+   soft shape instead of needles: along the top of its branch, down to the lowest tips of its branchlets and hanging twigs
+   (a lumpy lower edge), out to its tip; filled with a gradient from deep shade under it near the trunk to the lit needles
+   at its tip on the sun's side. Its snow is drawn on it as before. */
+function paintBoughWash(c, E, P, K) {
+  var M = boughModel(E), Sh = boughShape(E, P), s = Sh.s, rr = rng(E.seed + 5), n = 10, drop = [], i;
+  for (i = 0; i <= n; i++) drop.push(Sh.hang * 0.25);
+  function deepen(t, y) { var k = clamp(Math.round(t * n), 0, n), q = Sh.Q(t); drop[k] = Math.max(drop[k], y - q[1]); }
+  M.tw.forEach(function (T) {
+    deepen(T.t, P(T.tip)[1]);
+    T.hang.forEach(function (H) { deepen(T.t, P(H[1])[1]); });
+  });
+  // smoothed, with a little unevenness (its lower edge is a row of drooping tips, never a clean line)
+  var d2 = drop.map(function (d, k) { return (drop[Math.max(0, k - 1)] + 2 * d + drop[Math.min(n, k + 1)]) / 4 * lerp(0.85, 1.12, rr()); });
+  var top = [], bot = [], up = Sh.up, wid0 = Math.max(1, 0.12 * s);
+  for (i = 0; i <= n; i++) { var t = i / n, q = Sh.Q(t); top.push([q[0], q[1] - up * (1 - 0.5 * t)]); bot.push([q[0], q[1] + d2[i] * (0.4 + 0.6 * Math.sin(PI * Math.min(1, t * 0.95 + 0.08)))]); }
+  var A = Sh.A, B = Sh.B, dx = B[0] - A[0], dy = B[1] - A[1], dl = Math.hypot(dx, dy) || 1, ex = dx / dl * wid0 * 1.2, ey = dy / dl * wid0 * 1.2;
+  c.beginPath(); c.moveTo(top[0][0], top[0][1]);
+  for (i = 1; i <= n; i++) c.lineTo(top[i][0], top[i][1]);
+  c.quadraticCurveTo(B[0] + ex, B[1] + ey, bot[n][0], bot[n][1]);           // the rounded tip
+  for (i = n - 1; i >= 0; i--) { var mx = (bot[i][0] + bot[i + 1][0]) / 2, my = (bot[i][1] + bot[i + 1][1]) / 2 + (d2[i] + d2[i + 1]) * 0.08; c.quadraticCurveTo(mx, my, bot[i][0], bot[i][1]); }
+  c.closePath();
+  // the light: deep shade under the bough near the trunk, lighter out toward its tip and its top; the sun's side lit
+  var litSide = dx * K.lx > 0, dmax = Math.max.apply(null, d2);
+  var g = c.createLinearGradient(lerp(A[0], B[0], 0.1), lerp(A[1], B[1], 0.1) + dmax, B[0], B[1] - up);
+  g.addColorStop(0, css(K.under)); g.addColorStop(0.35, css(K.dark)); g.addColorStop(0.72, css(K.mid)); g.addColorStop(1, css(litSide ? K.lit : mix(K.mid, K.lit, 0.35)));
+  c.fillStyle = g; c.fill();
+  E.pieces.forEach(function (Pc) { if (!Pc.loose) paintBoughSnow(c, E, Pc, P, K); });
+}
+/* o.wash: the crown's dark inside as one soft shape (no strokes), darkest in the middle, a little lighter at its sides */
+function paintCoreWash(c, T, P, K) {
+  var Co = T.core, L = [], Rr = [], n = 14, i;
+  for (i = 0; i <= n; i++) {
+    var y = lerp(Math.max(Co.y0, Co.floor), Co.y1, i / n), C0 = Co.at(y), R = Co.R(y) * 0.85;
+    L.push(P([C0[0] - R, y - R * 0.2, C0[2]])); Rr.push(P([C0[0] + R, y - R * 0.2, C0[2]]));
+  }
+  c.beginPath(); c.moveTo(L[0][0], L[0][1]);
+  for (i = 1; i <= n; i++) c.lineTo(L[i][0], L[i][1]);
+  for (i = n; i >= 0; i--) c.lineTo(Rr[i][0], Rr[i][1]);
+  c.closePath();
+  var x0 = Math.min.apply(null, L.map(function (q) { return q[0]; })), x1 = Math.max.apply(null, Rr.map(function (q) { return q[0]; }));
+  var g = c.createLinearGradient(x0, 0, x1, 0), lk = K.lx < 0;
+  g.addColorStop(0, css(lk ? K.dark : K.under)); g.addColorStop(0.5, css(K.under)); g.addColorStop(1, css(lk ? K.under : K.dark));
+  c.fillStyle = g; c.fill();
+}
 function boughGroup(c, s) { var lw = Math.max(0.45, 0.012 * s); return { back: Brush(c, lw), fore: Brush(c, lw), lines: [], snow: [], lw: lw }; }
 function flushGroup(S) {
   S.back.flush(0.18);
@@ -1050,7 +1095,7 @@ function bakeJob(T, o) {
   // A rope's last stretch, inside the foliage of the branch it is tied to, goes just behind that branch's needles.
   var items = [], R = { box: box, P: P, K: K, loose: [], pads: [], wood: '' };
   function segRect(A, B, w) { return [Math.min(A[0], B[0]) - w, Math.min(A[1], B[1]) - w, Math.max(A[0], B[0]) + w, Math.max(A[1], B[1]) + w]; }
-  if (T.core) items.push({ z: -1e6, rects: [], draw: function () { paintCore(c, T, P, K); } });
+  if (T.core) items.push({ z: -1e6, rects: [], draw: function () { if (o.wash) paintCoreWash(c, T, P, K); else paintCore(c, T, P, K); } });
   T.fol.forEach(function (E) {
     E._s = P.s(E.kind === 'pad' ? E.c[2] : E.p1[2]); E._m = null; E._lod = !!o.lod;
     var Sh = E.kind === 'pad' ? padShape(E, P) : boughShape(E, P), r0;
@@ -1094,7 +1139,7 @@ function bakeJob(T, o) {
   pickLoose();
   var tasks = [];
   // (o.batch: groups of up to that many neighbouring small boughs, in their depth order, drawn together: paintBough's S)
-  var NB = o.batch > 1 && o.lod ? Math.round(o.batch) : 0, grp = null;
+  var NB = o.batch > 1 && o.lod && !o.wash ? Math.round(o.batch) : 0, grp = null;
   function endGrp() { if (grp) { var g = grp; tasks.push(function () { var S = boughGroup(c, g[0]._s); g.forEach(function (E) { paintBough(c, E, P, K, S); }); flushGroup(S); }); grp = null; } }
   items.forEach(function (it) {
     var E = it.E;
@@ -1134,7 +1179,7 @@ function bakeJob(T, o) {
       return ti >= tasks.length;
     }
   };
-  function paintFol(E) { if (E.kind === 'pad') paintPad(c, E, P, K); else paintBough(c, E, P, K); }
+  function paintFol(E) { if (E.kind === 'pad') paintPad(c, E, P, K); else if (o.wash) paintBoughWash(c, E, P, K); else paintBough(c, E, P, K); }
   function pickLoose() {
     function hit(a, b) { return a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]; }
     var pr = rng(T.seed * 31 + 7), share = o.loose === undefined ? 0.5 : o.loose;
