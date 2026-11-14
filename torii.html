@@ -467,7 +467,7 @@ function stepField(ms) {
   if (!FJ) return;
   if (!FJ.step(ms)) return;
   var q = FIELD; FIELD = FIELDN; FIELDN = q; FJ = null; fieldOK = true; fieldMs = performance.now() - FT0;
-  composeBase();
+  drawGates();                                  // the gates' feet are cut from the ground's picture, so they wait for it (this lays the base too)
 }
 
 /* ============================================================
@@ -506,6 +506,17 @@ function snowAt(k) {
 }
 function layer() { var L = mk(); L.cnv.width = Math.round(W * PR); L.cnv.height = Math.round(H * PR); L.c.setTransform(PR, 0, 0, PR, 0, 0); return L; }
 /* Each gate on a layer of its own (laid down a little soft), so the snow falling from a gate goes behind the nearer gates */
+/* the snow ground's colour at a screen point (CSS px), averaged over a few pixels: so snow banked round a gate's feet takes the colour of the ground it lies on */
+function groundSampler() {
+  if (!fieldOK) return null;
+  return function (x, y) {
+    var px = Math.round(x * PR), py = Math.round(y * PR), w = 5, h = 3, cw = FIELD.cnv.width, ch = FIELD.cnv.height;
+    if (px < 3 || py < 2 || px > cw - 4 || py > ch - 3) return null;
+    var d = FIELD.c.getImageData(px - 2, py - 1, w, h).data, r = 0, g = 0, b = 0, n = 0, i;
+    for (i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+    return n ? [r / n, g / n, b / n] : null;
+  };
+}
 function drawGates() {
   var cam = { W: W, H: H, hy: VIEW.hy, F: VIEW.F, eye: V.eyeHeight }, Lt = gateLight();
   SL.cnv.width = Math.round(W * PR); SL.cnv.height = Math.round(H * PR); SL.c.setTransform(PR, 0, 0, PR, 0, 0);
@@ -519,6 +530,7 @@ function drawGates() {
   var wf = VIEW.dirCam(-0.94, -0.34);                          // the wind comes from the left of the winter scene (as the frosted trees' rime)
   var look = { red: hex(V.colours.toriiRed), black: hex(V.colours.toriiBlack), kasagiBlack: V.gateKasagiBlack, vivid: V.gateVivid,
                weather: V.gateWeather, haze: V.gateHaze * V.fieldHaze, hazeM: V.fieldHazeDist, footSnow: V.gateFootSnow,
+               fieldCnv: null,
                snowLit: snowAt(1), snowShade: snowAt(0.25), snowRGB: hex(V.colours.snow), shadeRGB: SHADE, crevice: V.gateCrevice, windFrom: wf, pr: PR };
   var order = VIEW.gates.map(function (g) { return { g: g, i: g.i }; }).filter(function (o) { return o.g.z > 1; }).sort(function (a, b) { return b.g.z - a.g.z; });
   var zNear = order.length ? order[order.length - 1].g.z : 1;
@@ -544,6 +556,13 @@ function drawGates() {
         s.save(); s.translate(x, y); s.scale(1, ry / rx); s.translate(-x, -y); s.fillStyle = g; s.fillRect(x - rx, y - rx, rx * 2, rx * 2); s.restore();
       });
     }
+  });
+  composeBase();                                     // the ground with every gate's shadow, so the gates' snow can be cut from what is really on screen there
+  look.fieldCnv = BASE.cnv;
+  order.forEach(function (o) {
+    var back = 1 - zNear / o.g.z, air = V.gateAir * back, dof = V.gateDof * back;
+    look.hazeAdd = air;
+    var G = gateShape(o.i), hzv = clamp((1 - Math.exp(-Math.pow(o.g.z / V.fieldHazeDist, 1.6))) * V.fieldHaze + air, 0, 1);
     tmp.c.setTransform(1, 0, 0, 1, 0, 0); tmp.c.clearRect(0, 0, tmp.cnv.width, tmp.cnv.height); tmp.c.setTransform(PR, 0, 0, PR, 0, 0);
     var box = WinterTorii.draw(tmp.c, G, o.g, cam, Lt, look);
     var Lg = layer(); Lg.c.setTransform(1, 0, 0, 1, 0, 0);
