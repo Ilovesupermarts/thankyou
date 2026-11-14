@@ -428,25 +428,82 @@ function draw(c, G, place, cam, Lt, look) {
   var fsK = d(look, 'footSnow', 1);
   function footSnow(a0) {
     if (fsK <= 0 || !look.snowLit) return;
-    var rr0 = G.r0 * 1.07, fc = T.w(a0, 0, 0), vd = norm([-fc[0], 0, -fc[2]]), pr = [-vd[2], 0, vd[0]];
+    var rr0 = G.r0 * 1.04, fc = T.w(a0, 0, 0), vd = norm([-fc[0], 0, -fc[2]]);
+    var pb = T.p(fc), pt = T.p([fc[0], 1, fc[2]]), pn = T.p([fc[0] + vd[0] * 0.5, 0, fc[2] + vd[2] * 0.5]);
+    var ppm = pb[1] - pt[1], bx = pb[0], by = pb[1];
+    if (!(ppm > 1) || !isFinite(bx + by)) return;
+    var rpx = ppm * rr0, dyM = Math.max(0.6, (pn[1] - by) * 2);            // pixels the ground moves down per metre toward you
     var kn = [], q;
-    for (q = 0; q < 7; q++) kn.push(r());
-    function nz(t) { var x = (t + 1) / 2 * 6, i = Math.min(5, Math.floor(x)), f = x - i, u = f * f * (3 - 2 * f); return lerp(kn[i], kn[i + 1], u); }
-    var M = 22, inner = [], outer = [], A = PI / 2 * 1.06;
-    for (q = 0; q <= M; q++) {
-      var t = -1 + 2 * q / M, th = t * A, dx = vd[0] * Math.cos(th) + pr[0] * Math.sin(th), dz = vd[2] * Math.cos(th) + pr[2] * Math.sin(th);
-      var ht = (0.07 + 0.12 * nz(t)) * fsK * (1 - 0.3 * t * t), wd = rr0 * 0.3 + (0.25 + 0.3 * nz(-t)) * fsK;
-      inner.push(T.p([fc[0] + dx * rr0, ht, fc[2] + dz * rr0]));
-      outer.push(T.p([fc[0] + dx * (rr0 + wd), 0, fc[2] + dz * (rr0 + wd)]));
+    for (q = 0; q < 12; q++) kn.push(r());
+    function nz(t) { t = Math.max(-1, Math.min(1, t)); var x = (t + 1) / 2 * 11, i = Math.min(10, Math.floor(x)), f = x - i, u = f * f * (3 - 2 * f); return lerp(kn[i], kn[i + 1], u); }
+    // the pillar stands IN a drift: the snow climbs its black sleeve to an uneven crest (about a third of a metre), then
+    // slopes down and away on both sides, wide enough to lie across the path's wall beside it, and dissolves into the ground
+    var htM = (0.34 + 0.16 * r()) * fsK, wdM = (0.7 + 0.35 * r()) * fsK;
+    var reach = rpx + wdM * ppm, ry = Math.max(2.5, wdM * dyM * 1.4 + rpx * 0.22), N = 48, top = [], bot = [], i, dx, u, t;
+    for (i = 0; i <= N; i++) {
+      t = -1 + 2 * i / N; dx = t * reach; u = Math.max(0, (Math.abs(dx) - rpx * 0.95) / (reach - rpx * 0.95));      // 0 on the pillar, 1 at the skirt's edge
+      var prof = 1 - u * u * (3 - 2 * u), lump = 0.8 + 0.4 * nz(t * 0.95) + 0.18 * (nz(t * 3.1 + 0.4) - 0.5);
+      var hh = htM * ppm * prof * (u < 0.02 ? lump : lump * 0.85 + 0.15);
+      top.push([bx + dx, by + ry * 0.35 * (1 - prof) - hh]);
+      bot.push([bx + dx, by + ry * Math.sqrt(Math.max(0, 1 - t * t)) * 0.9]);
     }
-    var Q = inner.concat(outer.reverse());
-    var sunRight = pr[0] * Lt.dir[0] + pr[2] * Lt.dir[2] > 0;
-    var lit = mix(look.snowLit, Lt.mist, PN.hz), dim = mix(mix(look.snowLit, look.snowShade, 0.55), Lt.mist, PN.hz);
-    var xl = Math.min.apply(null, Q.map(function (p) { return p[0]; })), xr = Math.max.apply(null, Q.map(function (p) { return p[0]; }));
-    var g = c.createLinearGradient(xl, 0, xr, 0);
-    g.addColorStop(0, rgb(sunRight ? dim : lit)); g.addColorStop(0.5, rgb(mix(lit, dim, 0.45))); g.addColorStop(1, rgb(sunRight ? lit : dim));
-    c.save(); c.filter = 'blur(1px)'; poly(c, Q); c.fillStyle = g; c.fill(); c.restore();
-    grow(Q);
+    var pad = 6, xl = bx - reach - pad, xr = bx + reach + pad, yt = by - htM * ppm * 1.7 - pad, yb = by + ry + pad, Wc = Math.ceil(xr - xl), Hc = Math.ceil(yb - yt), sc = look.pr || 1;
+    var oc = document.createElement('canvas'); oc.width = Math.ceil(Wc * sc); oc.height = Math.ceil(Hc * sc);
+    var o = oc.getContext('2d'); o.setTransform(sc, 0, 0, sc, -xl * sc, -yt * sc);
+    var sunRight = Lt.dir[0] < 0;                                           // the sun is to the left of the winter scene's view
+    var lit = mix(look.snowLit, Lt.mist, PN.hz), sh = mix(look.snowShade, Lt.mist, PN.hz), dim = mix(mix(look.snowLit, look.snowShade, 0.4), Lt.mist, PN.hz);
+    o.beginPath(); top.forEach(function (p, k) { if (k) o.lineTo(p[0], p[1]); else o.moveTo(p[0], p[1]); });
+    for (i = N; i >= 0; i--) o.lineTo(bot[i][0], bot[i][1]);
+    o.closePath();
+    // the ground's own colour along the skirt's rim (read from the snow ground picture), so the drift melts into it
+    var rim = [], gAt = look.ground, k2;
+    for (k2 = 0; k2 <= 8; k2++) {
+      var tt = -1 + k2 / 4, gc = gAt ? gAt(bx + tt * reach, by + ry * 0.85) : null;
+      rim.push(gc || (tt * (sunRight ? 1 : -1) > 0 ? dim : lit));
+    }
+    var gh = o.createLinearGradient(bx - reach, 0, bx + reach, 0);
+    for (k2 = 0; k2 <= 8; k2++) gh.addColorStop(k2 / 8, rgb(mix(rim[k2], lit, 0.18)));
+    o.fillStyle = gh; o.fill();
+    o.save(); o.clip();
+    var gv = o.createLinearGradient(0, by - htM * ppm * 1.2, 0, by + ry);    // lit on the crest the sky and sun reach, the ground's own tone at the rim
+    gv.addColorStop(0, rgb(mix(lit, [255, 255, 255], 0.3), 0.75)); gv.addColorStop(0.45, rgb(lit, 0.38)); gv.addColorStop(1, rgb(lit, 0));
+    o.fillStyle = gv; o.fillRect(xl, yt, Wc, Hc);
+    // the sun's side of the drift brighter, the far side a little shaded
+    var gs = o.createLinearGradient(bx - reach, 0, bx + reach, 0);
+    gs.addColorStop(0, rgb(sunRight ? [255, 255, 255] : sh, sunRight ? 0.18 : 0.2)); gs.addColorStop(0.5, rgb(sh, 0)); gs.addColorStop(1, rgb(sunRight ? sh : [255, 255, 255], sunRight ? 0.2 : 0.18));
+    o.fillStyle = gs; o.fillRect(xl, yt, Wc, Hc);
+    // soft rounded lumps across the slope
+    for (i = 0; i < 8; i++) {
+      var lx = bx + (r() * 2 - 1) * reach * 0.85, ly = by - htM * ppm * (0.1 + 0.5 * r()) + (r() - 0.2) * ry * 0.6, lr = reach * lerp(0.07, 0.17, r());
+      var gl = o.createRadialGradient(lx, ly, 0, lx, ly, lr); gl.addColorStop(0, rgb(i & 1 ? [255, 255, 255] : sh, i & 1 ? 0.3 : 0.12)); gl.addColorStop(1, rgb(i & 1 ? [255, 255, 255] : sh, 0));
+      o.fillStyle = gl; o.fillRect(lx - lr, ly - lr, lr * 2, lr * 2);
+    }
+    o.restore();
+    // the crest: a lit rounded ridge where the snow climbs the black, fading out along the slope (no outline round the drift)
+    o.save(); o.lineCap = 'round'; o.lineJoin = 'round'; o.beginPath();
+    top.forEach(function (p, k) { if (k) o.lineTo(p[0], p[1] + 0.4); else o.moveTo(p[0], p[1] + 0.4); });
+    var gc2 = o.createLinearGradient(bx - reach, 0, bx + reach, 0), hc = rgb(mix(lit, [255, 255, 255], 0.5), 0.5);
+    gc2.addColorStop(0, rgb(lit, 0)); gc2.addColorStop(0.3, rgb(lit, 0)); gc2.addColorStop(0.42, hc); gc2.addColorStop(0.58, hc); gc2.addColorStop(0.7, rgb(lit, 0)); gc2.addColorStop(1, rgb(lit, 0));
+    o.strokeStyle = gc2; o.lineWidth = Math.max(1, ppm * 0.035); o.stroke(); o.restore();
+    // fine grain like the ground's, so the drift is not a smooth plate
+    var gw = Math.max(1, Math.ceil(Wc * sc)), gh2 = Math.max(1, Math.ceil(Hc * sc)), id = o.getImageData ? null : null, gn = document.createElement('canvas');
+    gn.width = gw; gn.height = gh2; var gx2 = gn.getContext('2d'), gd2 = gx2.createImageData(gw, gh2), v, kk;
+    for (kk = 0; kk < gd2.data.length; kk += 4) { v = r() < 0.5 ? 255 : 90; gd2.data[kk] = v; gd2.data[kk + 1] = v; gd2.data[kk + 2] = Math.min(255, v + 10); gd2.data[kk + 3] = r() < 0.5 ? 0 : (v > 200 ? 46 : 26); }
+    gx2.putImageData(gd2, 0, 0);
+    o.save(); o.globalCompositeOperation = 'source-atop'; o.setTransform(1, 0, 0, 1, 0, 0); o.drawImage(gn, 0, 0); o.restore();
+    // dissolve the rim into the ground (only its far ends and its lowest edge; the part against the pillar stays solid)
+    o.globalCompositeOperation = 'destination-out';
+    var gx = o.createLinearGradient(bx - reach, 0, bx + reach, 0);
+    gx.addColorStop(0, 'rgba(0,0,0,1)'); gx.addColorStop(0.07, 'rgba(0,0,0,0.9)'); gx.addColorStop(0.16, 'rgba(0,0,0,0.5)'); gx.addColorStop(0.27, 'rgba(0,0,0,0.1)'); gx.addColorStop(0.34, 'rgba(0,0,0,0)');
+    gx.addColorStop(0.66, 'rgba(0,0,0,0)'); gx.addColorStop(0.73, 'rgba(0,0,0,0.1)'); gx.addColorStop(0.84, 'rgba(0,0,0,0.5)'); gx.addColorStop(0.93, 'rgba(0,0,0,0.9)'); gx.addColorStop(1, 'rgba(0,0,0,1)');
+    o.fillStyle = gx; o.fillRect(xl, yt, Wc, Hc);
+    var gy = o.createLinearGradient(0, by, 0, by + ry);
+    gy.addColorStop(0, 'rgba(0,0,0,0)'); gy.addColorStop(0.5, 'rgba(0,0,0,0.04)'); gy.addColorStop(0.8, 'rgba(0,0,0,0.4)'); gy.addColorStop(1, 'rgba(0,0,0,1)');
+    o.fillStyle = gy; o.fillRect(xl, by, Wc, Hc);
+    o.globalCompositeOperation = 'source-over';
+    o.globalCompositeOperation = 'source-over';
+    c.save(); c.filter = 'blur(' + Math.max(0.3, 0.35 * sc).toFixed(2) + 'px)'; c.drawImage(oc, xl, yt, Wc, Hc); c.restore();
+    grow([[xl, yt], [xr, yt], [xr, yb], [xl, yb]]);
   }
 
   // which pillar, end and so on is nearer: draw the farther first
