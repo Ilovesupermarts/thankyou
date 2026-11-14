@@ -20,8 +20,8 @@
 -->
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #d4dae6; font: 14px/1.35 system-ui, sans-serif; }
-  canvas#c { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; }
-  #sp { position: fixed; right: 10px; top: 10px; width: 330px; max-height: calc(100vh - 20px); overflow: auto; background: rgba(255,255,255,0.92);
+  canvas#c { position: fixed; left: 0; top: 0; width: 100%; height: 100%; }   /* (100%, not 100vh: on a tablet's Chrome 100vh is the taller viewport with the address bar hidden, which stretched the whole scene; newwinter.html's canvases are 100% too) */
+  #sp { position: fixed; right: 10px; top: 10px; width: 330px; max-height: calc(100% - 20px); overflow: auto; background: rgba(255,255,255,0.92);
         border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.25); padding: 0 12px 12px; }
   #sp.min { width: auto; } #sp.min .body { display: none; }
   #sp .head { position: sticky; top: 0; background: rgba(255,255,255,0.97); padding: 10px 0 6px; display: flex; gap: 6px; align-items: center; }
@@ -32,7 +32,7 @@
   #sp label span { float: right; color: #666; font-variant-numeric: tabular-nums; }
   #sp input[type=range] { width: 100%; height: 26px; }
   #sp select { width: 100%; font: inherit; padding: 4px; }
-  #ax { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; display: none; touch-action: none; }
+  #ax { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: none; touch-action: none; }
   #axbar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); display: none; gap: 8px; align-items: center;
            background: rgba(255,255,255,0.95); padding: 8px 10px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); font-size: 15px; }
   #axbar button { font: inherit; padding: 10px 16px; border-radius: 8px; border: 1px solid #aab; background: #f4f5f9; }
@@ -390,7 +390,10 @@ function gatePlace(g0, turn, tilt) {
   var t = turn ? gateTurnLimit(g, turn) : 0, th = t * PI / 180, c = Math.cos(th), sn = Math.sin(th);
   var fx = g.fx * c + g.fz * sn, fz = -g.fx * sn + g.fz * c;
   var p = VIEW.toCam(g.x, g.z), f = VIEW.dirCam(fx, fz);
-  return { x: p[0], z: p[1], fx: f[0], fz: f[1], s: g.s, i: g.i, turn: t, held: Math.abs(t - turn) > 1e-6, tilt: clamp(tilt, -5, 5) * PI / 180, w: g0, across: ac };
+  // the ground the feet stand on: on the rise the hall stands on it is higher than the plain snow (winter scene's view; the
+  // close-up draws the flat snow). The gate is lifted by that, so it stands on the path's own ground, not sunk in it.
+  var y0 = V.view === 'scene' && TRAIL.hall && TRAIL.hall.ground ? Math.max(0, TRAIL.hall.ground(g.x, g.z)) : 0;
+  return { x: p[0], z: p[1], y0: y0, fx: f[0], fz: f[1], s: g.s, i: g.i, turn: t, held: Math.abs(t - turn) > 1e-6, tilt: clamp(tilt, -5, 5) * PI / 180, w: g0, across: ac };
 }
 
 /* ============================================================
@@ -532,7 +535,7 @@ function drawGates() {
     if (V.gateFootShade > 0) {                       // the sky's light cut off right at each pillar's foot
       WinterTorii.feet(G, o.g).forEach(function (f) {
         var z = f.z; if (z < 1) return;
-        var x = W / 2 + VIEW.F * f.x / z, y = VIEW.hy + VIEW.F * V.eyeHeight / z, rx = VIEW.F * f.r * 2.4 / z, ry = rx * V.eyeHeight / z * 1.2 + 1;
+        var x = W / 2 + VIEW.F * f.x / z, y = VIEW.hy + VIEW.F * (V.eyeHeight - (o.g.y0 || 0)) / z, rx = VIEW.F * f.r * 2.4 / z, ry = rx * V.eyeHeight / z * 1.2 + 1;
         var g = s.createRadialGradient(x, y, 0, x, y, rx), a = 0.32 * V.gateFootShade * (1 - hzv);
         g.addColorStop(0, rgb(ratio.map(function (r) { return 255 * lerp(1, r * 0.85, a / 0.32 * 0.9); }))); g.addColorStop(1, 'rgba(255,255,255,0)');
         s.save(); s.translate(x, y); s.scale(1, ry / rx); s.translate(-x, -y); s.fillStyle = g; s.fillRect(x - rx, y - rx, rx * 2, rx * 2); s.restore();
@@ -542,10 +545,10 @@ function drawGates() {
     var box = WinterTorii.draw(tmp.c, G, o.g, cam, Lt, look);
     var Lg = layer(); Lg.c.setTransform(1, 0, 0, 1, 0, 0);
     var soft = V.gateSoft + dof; Lg.c.filter = soft > 0 ? 'blur(' + (soft * PR).toFixed(2) + 'px)' : 'none'; Lg.c.drawImage(tmp.cnv, 0, 0); Lg.c.filter = 'none';
-    GATES.push({ L: Lg, emit: box.emit || [], z: o.g.z, i: o.i, hz: hzv, next: 0, parts: [] });
+    GATES.push({ L: Lg, emit: box.emit || [], z: o.g.z, y0: o.g.y0 || 0, i: o.i, hz: hzv, next: 0, parts: [] });
     info.push('gate ' + (o.i + 1) + ': ' + o.g.z.toFixed(0) + ' m' + (ARR[o.i] ? ' (moved ' + (ARR[o.i] > 0 ? '+' : '') + ARR[o.i] + ' m)' : '') + ', ' + G.Ht.toFixed(1) + ' m tall, ' + G.S.toFixed(1) + ' m between pillars' +
               (o.g.turn ? ', turned ' + o.g.turn.toFixed(2) + '°' + (o.g.held ? ' (held: a pillar would touch the path)' : '') : o.g.held ? ', not turned (a pillar would touch the path)' : '') +
-              (o.g.across ? ', moved ' + Math.abs(o.g.across).toFixed(2) + ' m ' + (o.g.across > 0 ? 'right' : 'left') : '') + (o.g.tilt ? ', leaned ' + (o.g.tilt * 180 / PI).toFixed(2) + '°' : ''));
+              (o.g.y0 > 0.05 ? ', on ground ' + o.g.y0.toFixed(2) + ' m up' : '') + (o.g.across ? ', moved ' + Math.abs(o.g.across).toFixed(2) + ' m ' + (o.g.across > 0 ? 'right' : 'left') : '') + (o.g.tilt ? ', leaned ' + (o.g.tilt * 180 / PI).toFixed(2) + '°' : ''));
   });
   gateInfo = info.reverse().join(' · ') + (ARR.even ? ' · evenly spaced ' + ARR.even + ' m apart' : '');
   makeDot();
@@ -609,7 +612,7 @@ function stepSnow(dt) {
       var rate = Math.max(0.01, V.gateFallRate) / 60;                   // clumps a second
       G.next = clock + (-Math.log(1 - Math.random()) / rate) * lerp(0.6, 1.5, ((G.i * 0.618) % 1));
     }
-    var P = G.parts, keep = [];
+    var P = G.parts, keep = [], gy = G.y0 || 0;
     for (var i = 0; i < P.length; i++) {
       var q = P[i]; q.age += dt;
       if (q.t === 'clump' || q.t === 'bit') {
@@ -627,12 +630,12 @@ function stepSnow(dt) {
           powder(G, q.x, q.y, q.z, Math.round(6 * V.gatePowder), q.s * 2, 1.2);
           continue;
         }
-        if (q.y <= 0.02) { powder(G, q.x, 0.05, q.z, Math.round(4 * V.gatePowder + 1), q.s * 3, 1.4); continue; }
+        if (q.y <= gy + 0.02) { powder(G, q.x, gy + 0.05, q.z, Math.round(4 * V.gatePowder + 1), q.s * 3, 1.4); continue; }
         keep.push(q);
       } else {
         if (q.age > q.life) continue;
         q.vy += (-0.25 - q.vy) * dt * 1.5; q.vx += (wd[0] * wind * 0.9 - q.vx) * dt; q.vz += (wd[1] * wind * 0.9 - q.vz) * dt;
-        q.x += q.vx * dt; q.y = Math.max(0.02, q.y + q.vy * dt); q.z += q.vz * dt;
+        q.x += q.vx * dt; q.y = Math.max(gy + 0.02, q.y + q.vy * dt); q.z += q.vz * dt;
         keep.push(q);
       }
     }
@@ -840,7 +843,7 @@ function axRings(i) {
   var pl = axPlace(i); if (!pl) return null;
   // (seen from the eye, 3 m up, a level ring round the gate's middle is almost edge-on: a line. So the rings are drawn
   // open on the screen, as a gizmo: the flat one as wide as the gate, the upright one as tall)
-  var G = gateShape(i), yc = G.Ht * 0.52, R = G.S * 0.8, flat = [], k;
+  var G = gateShape(i), yc = G.Ht * 0.52 + (pl.y0 || 0), R = G.S * 0.8, flat = [], k;
   var c = axProj([pl.x, yc, pl.z]), sideP = axProj([pl.x + R * pl.fz, yc, pl.z - R * pl.fx]), fw = Math.max(40, Math.abs(sideP[0] - c[0])), fh = fw * 0.3;
   for (k = 0; k <= 64; k++) { var t = k / 64 * 2 * PI; flat.push([c[0] + fw * Math.cos(t), c[1] + fh * Math.sin(t)]); }
   var top = axProj([pl.x, yc + R * 0.95, pl.z]), ry = c[1] - top[1], rw = Math.max(18, ry * 0.32), up = [];
