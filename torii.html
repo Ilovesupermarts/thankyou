@@ -64,13 +64,14 @@ var V_DEFAULTS = {
   // the gates
   gates: 3, gateFirst: 29, gateGap: 28, gateClear: 0.25, gateHeight: 1.45, gateDia: 0.11, gateLean: 1.5, gateSori: 0.045,
   gateOverhang: 0.39, gateNuki: 0.73, gateNemaki: 0.13, gateDaiwa: false, gateKusabi: true, gatePlaque: false, gateKasagiBlack: true,
-  gateWeather: 1, gateVivid: 0.5, gateSoft: 0.35, gateHaze: 1, gateShadow: 1, gateFootShade: 1, gateFootSnow: 1, gateAir: 0, gateDof: 0, gateArrange: true,
+  gateWeather: 1, gateVivid: 0.5, gateSoft: 0.35, gateHaze: 1, gateShadow: 1, gateFootShade: 1, gateFootSnow: 1, gateAir: 0, gateDof: 0, gateArrange: false,
+  gateH1: 1, gateH2: 0.88, gateH3: 0.66, gateH4: 0.6, gateH5: 0.55, gateH6: 0.5,
   gateSnowShow: true, gateSnow: 1, gateCrevice: 1, gatePlaster: 1, gateSnowVary: 0.6, gateFall: true, gateFallRate: 8, gatePowder: 1,
   colours: { snow: '#FAFAFC', mist: '#ffffff', bankEarth: '#4D4038', toriiRed: '#D8401E', toriiBlack: '#2A2523' }
 };
 var V = JSON.parse(JSON.stringify(V_DEFAULTS));
-try { var sv = JSON.parse(localStorage.getItem('toriiLab-1') || 'null'); if (sv && !(sv.ver >= 2)) { delete sv.gateAir; delete sv.gateDof; } if (sv) for (var k in sv) if (k in V) { if (k === 'colours') Object.assign(V.colours, sv.colours); else V[k] = sv[k]; } } catch (e) {}
-function saveAll() { try { var o = JSON.parse(JSON.stringify(V)); o.ver = 2; localStorage.setItem('toriiLab-1', JSON.stringify(o)); } catch (e) {} }
+try { var sv = JSON.parse(localStorage.getItem('toriiLab-1') || 'null'); if (sv && !(sv.ver >= 2)) { delete sv.gateAir; delete sv.gateDof; } if (sv && !(sv.ver >= 3)) delete sv.gateArrange; if (sv) for (var k in sv) if (k in V) { if (k === 'colours') Object.assign(V.colours, sv.colours); else V[k] = sv[k]; } } catch (e) {}
+function saveAll() { try { var o = JSON.parse(JSON.stringify(V)); o.ver = 3; localStorage.setItem('toriiLab-1', JSON.stringify(o)); } catch (e) {} }
 
 /* ============================================================
    2. THE LIGHT (newwinter.html's sceneLight and shadeColour)
@@ -318,7 +319,9 @@ function gateShape(i) {
   var D = V.gateDia, clear = V.gateClear;
   // the pillars stand just outside the path: its half width, its wall's slope, a clear gap, the pillar's own radius
   var span0 = 2 * (V.trailWidth / 2 + V.trailWall + clear), span = span0 / (1 - D);
-  return WinterTorii.build({ span: span, height: span * V.gateHeight, dia: span * D, lean: V.gateLean, sori: V.gateSori * span * V.gateHeight,
+  // each gate its own height (the same width: it follows the path), shorter toward the shrine
+  var hk = V.gateHeight * (V['gateH' + (i + 1)] || 1);
+  return WinterTorii.build({ span: span, height: span * hk, dia: span * D, lean: V.gateLean, sori: V.gateSori * span * hk,
     overhang: V.gateOverhang * span, nukiAt: V.gateNuki, nemaki: V.gateNemaki, daiwa: V.gateDaiwa, kusabi: V.gateKusabi,
     plaque: V.gatePlaque, seed: V.seed * 31 + i * 7 + 3,
     snow: V.gateSnowShow ? V.gateSnow : 0, crevice: V.gateCrevice, plaster: V.gatePlaster, snowVary: V.gateSnowVary });
@@ -560,7 +563,13 @@ var G_PANEL = [
     { k: 'gateGap', t: 'Between the gates, along the path (m)', min: 8, max: 60, step: 0.5 },
     { k: 'gateClear', t: 'Gap between the path\'s wall and a pillar (m)', min: 0, max: 1.5, step: 0.05 },
     { k: 'gateArrange', t: 'Move the gates behind a little so none peeps out as a sliver or lines up with the one in front', chk: 1 },
-    { k: 'gateHeight', t: 'Height (× the width between the pillars)', min: 0.9, max: 2, step: 0.01 }]],
+    { k: 'gateHeight', t: 'Height (× the width between the pillars)', min: 0.9, max: 2, step: 0.01 },
+    { k: 'gateH1', t: 'Gate 1 from the front: height (× the height set above)', min: 0.4, max: 1.3, step: 0.01 },
+    { k: 'gateH2', t: 'Gate 2 from the front: height (× the height set above)', min: 0.4, max: 1.3, step: 0.01 },
+    { k: 'gateH3', t: 'Gate 3 from the front: height (× the height set above)', min: 0.4, max: 1.3, step: 0.01 },
+    { k: 'gateH4', t: 'Gate 4 from the front: height (× the height set above)', min: 0.4, max: 1.3, step: 0.01 },
+    { k: 'gateH5', t: 'Gate 5 from the front: height (× the height set above)', min: 0.4, max: 1.3, step: 0.01 },
+    { k: 'gateH6', t: 'Gate 6 from the front: height (× the height set above)', min: 0.4, max: 1.3, step: 0.01 }]],
   ['Torii: shape', [
     { k: 'gateDia', t: 'Pillars: thickness (× the width)', min: 0.06, max: 0.18, step: 0.002 },
     { k: 'gateLean', t: 'Pillars lean in (°)', min: 0, max: 4, step: 0.1 },
