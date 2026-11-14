@@ -92,6 +92,17 @@ var V_DEFAULTS = {
   gates: 3, gateFirst: 29, gateGap: 28, gateClear: 0.25, gateHeight: 1.45, gateDia: 0.11, gateLean: 1.5, gateSori: 0.045,
   gateOverhang: 0.39, gateNuki: 0.73, gateNemaki: 0.13, gateDaiwa: false, gateKusabi: true, gatePlaque: false, gateKasagiBlack: true,
   gateWeather: 1, gateVivid: 0.5, gateSoft: 0.35, gateHaze: 1, gateShadow: 1, gateFootShade: 1, gateFootSnow: 1, gateAir: 0, gateDof: 0, gateArrange: false,
+  // the stone lanterns (the autumn scene's LANT, in eye heights there; here lantSize is × the front gate's height, which gives
+  // the autumn's size ratio 0.82 / 1.15)
+  lantShow: true, lantSize: 0.713, lantRightAlong: 0.81, lantRightFrom: 0.49, lantLeftAlong: 0.38, lantLeftFrom: 0.43,
+  lantSides: 6, lantPillar: 0.07, lantBox: 0.1, lantRoof: 0.28, lantCurls: true, lantMossAmt: 0.53, lantVariety: 0.78,
+  lantLight: 1.3, lantWindowGlow: 0.43, lantHalo: 0.7, lantHaloSize: 2.05, lantPool: 1.1, lantPoolSize: 1.25,
+  lantFlicker: 0.77, lantFlickerEvery: 1, lantFlickerLength: 1.2, lantWobble: 0.58,
+  lant1Show: true, lant1Along: 0, lant1Across: 0, lant1Size: 1, lant2Show: true, lant2Along: 0, lant2Across: 0, lant2Size: 1,
+  lant3Show: true, lant3Along: 0, lant3Across: 0, lant3Size: 1, lant4Show: true, lant4Along: 0, lant4Across: 0, lant4Size: 1,
+  lant5Show: true, lant5Along: 0, lant5Across: 0, lant5Size: 1, lant6Show: true, lant6Along: 0, lant6Across: 0, lant6Size: 1,
+  lant7Show: true, lant7Along: 0, lant7Across: 0, lant7Size: 1, lant8Show: true, lant8Along: 0, lant8Across: 0, lant8Size: 1,
+  lant9Show: true, lant9Along: 0, lant9Across: 0, lant9Size: 1, lant10Show: true, lant10Along: 0, lant10Across: 0, lant10Size: 1,
   gateH1: 1, gateH2: 0.88, gateH3: 0.66, gateH4: 0.6, gateH5: 0.55, gateH6: 0.5,
   // each gate's own (1 the front one): shown, moved across the path (m, + to the right looking up the path), moved along the path (m), turned (°, + its right end toward you), leaned (°, + its top toward you)
   gate1Show: true, gate1Size: 1, gate1Across: 0, gate1Along: 0, gate1Turn: 0, gate1Tilt: 0, gate2Show: true, gate2Size: 1, gate2Across: 0, gate2Along: 0, gate2Turn: 0, gate2Tilt: 0,
@@ -99,7 +110,8 @@ var V_DEFAULTS = {
   gate5Show: true, gate5Size: 1, gate5Across: 0, gate5Along: 0, gate5Turn: 0, gate5Tilt: 0, gate6Show: true, gate6Size: 1, gate6Across: 0, gate6Along: 0, gate6Turn: 0, gate6Tilt: 0,
   gateSnowShow: true, gateSnow: 1, gateCrevice: 1, gatePlaster: 1, gateSnowVary: 0.6, gateFall: true, gateFallRate: 8, gatePowder: 1,
   colours: { snow: '#FAFAFC', mist: '#ffffff', bankEarth: '#4D4038', toriiRed: '#D8401E', toriiBlack: '#2A2523',
-             hallPlaster: '#FFF8E8', hallTimber: '#F23A12', hallStone: '#A8A8A0', hallRed: '#F23A12', hallGreen: '#1FA67A', hallSoffit: '#E0360F', flame: '#FFAA5A' }
+             hallPlaster: '#FFF8E8', hallTimber: '#F23A12', hallStone: '#A8A8A0', hallRed: '#F23A12', hallGreen: '#1FA67A', hallSoffit: '#E0360F', flame: '#FFAA5A',
+             lantStone: '#B3ADA3', lantMoss: '#6E7A4C', lantPaper: '#F4EEE2', lantFlame: '#FFAE52', lantGlow: '#FFD89A' }
 };
 var V = JSON.parse(JSON.stringify(V_DEFAULTS));
 try { var sv = JSON.parse(localStorage.getItem('toriiLab-1') || 'null'); if (sv && !(sv.ver >= 2)) { delete sv.gateAir; delete sv.gateDof; } if (sv && !(sv.ver >= 3)) delete sv.gateArrange; if (sv && !(sv.ver >= 4)) delete sv.view; if (sv && !(sv.ver >= 5)) { delete sv.gate3Across; delete sv.gate4Across; }   /* (set while the view was stretched on the tablet: they pushed the far gates 5 m left to look on the path; now 0 is on the path) */ if (sv) for (var k in sv) if (k in V) { if (k === 'colours') Object.assign(V.colours, sv.colours); else V[k] = sv[k]; } } catch (e) {}
@@ -566,9 +578,131 @@ function drawGates() {
               (o.g.y0 > 0.05 ? ', on ground ' + o.g.y0.toFixed(2) + ' m up' : '') + (o.g.across ? ', moved ' + Math.abs(o.g.across).toFixed(2) + ' m ' + (o.g.across > 0 ? 'right' : 'left') : '') + (o.g.tilt ? ', leaned ' + (o.g.tilt * 180 / PI).toFixed(2) + '°' : ''));
   });
   gateInfo = info.reverse().join(' · ') + (ARR.even ? ' · evenly spaced ' + ARR.even + ' m apart' : '');
+  drawLanterns(cam, Lt, s, ratio);
   makeDot();
   composeBase();
 }
+/* ============================================================
+   5a. THE STONE LANTERNS (wintertorii.js's lantern: the autumn scene's Kasuga lantern, plain stone for now)
+   Placed as the autumn scene places them (app.js torPlaceLanterns): one on each side of the path in every gap between two
+   gates, each side at its own place in the gap ("along": 0 by the gate farther away, 1 by the nearer), standing out from
+   the path's middle by its half width + its wall + fromEdge × the lantern's height + its light box's reach. The autumn's
+   "right" side (as a walker coming toward you sees it) is the left of the screen. Each lantern n has its own Shown / Along /
+   Across / Size (n = 1, 2 in the nearest gap: 1 left, 2 right; 3, 4 in the next …).
+   ============================================================ */
+var LANTS = [], lantInfo = '';
+function lantHash(n) { var x = Math.sin(n * 127.1 + V.seed * 311.7) * 43758.5453; return x - Math.floor(x); }
+function lanternPlaces() {
+  var out = [], gw = VIEW.gatesW.slice().sort(function (a, b) { return a.s - b.s; }), TW = VIEW.TW;
+  if (!V.lantShow || gw.length < 2) return out;
+  var hF = gateShape(gw[0].i).Ht * V.lantSize;
+  for (var g = 0; g + 1 < gw.length; g++) {
+    var sNear = gw[g].s, sFar = gw[g + 1].s;
+    [['left', V.lantRightAlong, V.lantRightFrom, -1], ['right', V.lantLeftAlong, V.lantLeftFrom, 1]].forEach(function (sd, k) {
+      var n = g * 2 + k + 1;
+      if (n > 10 || V['lant' + n + 'Show'] === false) return;
+      var h = hF * (V['lant' + n + 'Size'] || 1);
+      var sv = clamp(sFar - sd[1] * (sFar - sNear) + (V['lant' + n + 'Along'] || 0), 1, TW.length - 1);
+      var q = TW.at(sv), q0 = TW.at(sv - 1.5), q1 = TW.at(sv + 1.5), tx = q1[0] - q0[0], tz = q1[1] - q0[1], tl = Math.hypot(tx, tz) || 1;
+      tx /= tl; tz /= tl;
+      var off = V.trailWidth / 2 + V.trailWall + sd[2] * h + V.lantBox * h * 1.9 + (V['lant' + n + 'Across'] || 0);
+      var wx = q[0] + sd[3] * off * tz, wz = q[1] - sd[3] * off * tx;
+      var p = VIEW.toCam(wx, wz), f = VIEW.dirCam(tx, tz);
+      out.push({ n: n, side: sd[0], h: h, s: sv, place: { x: p[0], z: p[1], fx: f[0], fz: f[1], y0: 0 } });
+    });
+  }
+  return out;
+}
+function lantLook() { return { sides: V.lantSides, pillar: V.lantPillar, box: V.lantBox, roof: V.lantRoof, curls: V.lantCurls }; }
+function drawLanterns(cam, Lt, s, ratio) {
+  LANTS = [];
+  var P = lanternPlaces(), gf = groundFn(), lit = lampLevel() > 0 ? 1 : 0, info = [];
+  var C = { stone: hex(V.colours.lantStone), moss: hex(V.colours.lantMoss), paper: hex(V.colours.lantPaper), flame: hex(V.colours.lantFlame), glow: hex(V.colours.lantGlow) };
+  var tmp = layer(), wtmp = layer();
+  P.forEach(function (Lp) {
+    var pl = Lp.place;
+    if (pl.z < 2) return;
+    // stands on the snow under it (the lowest of its plinth's middle and four corners, so no corner floats)
+    var r = V.lantBox * Lp.h * 1.9, y = 1e9;
+    [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].forEach(function (d) { y = Math.min(y, gf(pl.x + d[0], pl.z + d[1]).h); });
+    pl.y0 = y;
+    var hzv = clamp((1 - Math.exp(-Math.pow(pl.z / V.fieldHazeDist, 1.6))) * V.fieldHaze, 0, 1);
+    if (V.gateShadow > 0 && Lt.dir[1] > 0.02) {
+      var kk = clamp(V.gateShadow * (1 - hzv) * Math.min(1, LT.vis * 1.1), 0, 1);
+      s.fillStyle = rgb(ratio.map(function (q) { return 255 * lerp(1, q, kk); }));
+      WinterTorii.lanternShadow(s, pl, cam, Lt, Lp.h, lantLook());
+    }
+    if (V.gateFootShade > 0) {                                  // the sky's light cut off right round its foot
+      var x = W / 2 + VIEW.F * pl.x / pl.z, yy = VIEW.hy + VIEW.F * (V.eyeHeight - y) / pl.z, rx = VIEW.F * r * 1.3 / pl.z, ry = rx * V.eyeHeight / pl.z * 1.2 + 1;
+      var g = s.createRadialGradient(x, yy, 0, x, yy, rx), a = 0.9 * V.gateFootShade * (1 - hzv);
+      g.addColorStop(0, rgb(ratio.map(function (q) { return 255 * lerp(1, q * 0.85, a * 0.6); }))); g.addColorStop(1, 'rgba(255,255,255,0)');
+      s.save(); s.translate(x, yy); s.scale(1, ry / rx); s.translate(-x, -yy); s.fillStyle = g; s.fillRect(x - rx, yy - rx, rx * 2, rx * 2); s.restore();
+    }
+    [tmp, wtmp].forEach(function (L) { L.c.setTransform(1, 0, 0, 1, 0, 0); L.c.clearRect(0, 0, L.cnv.width, L.cnv.height); L.c.setTransform(PR, 0, 0, PR, 0, 0); });
+    var vr = V.lantVariety, h1 = lantHash(Lp.n), h2 = lantHash(Lp.n + 50);
+    var bx = WinterTorii.lantern(tmp.c, wtmp.c, pl, cam, Lt, {
+      h: Lp.h, L: lantLook(), tone: 1 + (h1 - 0.5) * 0.2 * vr, moss: V.lantMossAmt * clamp(1 + (h2 - 0.5) * 1.2 * vr, 0, 2), lit: lit * V.lantLight * 0.5,
+      colours: C, haze: V.gateHaze * V.fieldHaze, hazeM: V.fieldHazeDist, windowGlow: V.lantWindowGlow });
+    // only its own box is kept (a full-screen picture for each lantern would cost a lot of memory)
+    var x0 = Math.max(0, Math.floor((bx.x0 - 3) * PR)), y0 = Math.max(0, Math.floor((bx.y0 - 3) * PR));
+    var x1 = Math.min(tmp.cnv.width, Math.ceil((bx.x1 + 3) * PR)), y1 = Math.min(tmp.cnv.height, Math.ceil((bx.y1 + 3) * PR));
+    if (x1 <= x0 || y1 <= y0) return;
+    function crop(src, soft) {
+      var c = document.createElement('canvas'); c.width = x1 - x0; c.height = y1 - y0;
+      var g = c.getContext('2d'); g.filter = soft > 0 ? 'blur(' + (soft * PR).toFixed(2) + 'px)' : 'none';
+      g.drawImage(src, x0, y0, c.width, c.height, 0, 0, c.width, c.height); return c;
+    }
+    LANTS.push({ n: Lp.n, z: pl.z, x: x0, y: y0, pic: crop(tmp.cnv, V.gateSoft), win: lit ? crop(wtmp.cnv, 0) : null,
+                 lx: bx.lx, ly: bx.ly, fx: bx.fx, fy: bx.fy, px: bx.px, hz: hzv, seed: h1 * 1000 });
+    info.push('lantern ' + Lp.n + ' (' + Lp.side + '): ' + pl.z.toFixed(0) + ' m, ' + Lp.h.toFixed(2) + ' m tall' + (y > 0.05 || y < -0.05 ? ', on snow ' + y.toFixed(2) + ' m' : ''));
+  });
+  lantInfo = info.join(' · ');
+}
+/* the flame's flicker (as the autumn's torFlameAt, without the wind's gusts): a slow wobble, and now and then a dip */
+function lantFlame(L, t) {
+  var sd = L.seed, w = Math.sin(t * 2.1 + sd) * 0.5 + Math.sin(t * 3.7 + sd * 1.7) * 0.3 + Math.sin(t * 7.3 + sd * 0.3) * 0.2;
+  var f = 1 + 0.12 * V.lantWobble * w;
+  var every = 7 / Math.max(0.05, V.lantFlickerEvery), len = 0.35 * V.lantFlickerLength, ph = (t + sd * 0.37) / every, k = Math.floor(ph), u = (ph - k) * every;
+  var r = Math.sin(k * 91.7 + sd) * 43758.5; r -= Math.floor(r);
+  if (r < 0.6 && u < len) f -= V.lantFlicker * 0.45 * Math.sin(PI * u / len) * (0.5 + r);
+  return Math.max(0.2, f);
+}
+function lantPools(c, t) {                                     // the warm light on the snow round each lit lantern
+  if (!(lampLevel() > 0) || V.lantPool <= 0) return;
+  var fl = hex(V.colours.lantFlame);
+  c.globalCompositeOperation = 'lighter';
+  LANTS.forEach(function (L) {
+    var f = lantFlame(L, t), rx = L.px * V.lantPoolSize * 1.5, ry = rx * V.eyeHeight / L.z * 1.6 + 2, a = 0.34 * V.lantPool * f * (1 - L.hz * 0.7);
+    var g = c.createRadialGradient(L.fx, L.fy, 0, L.fx, L.fy, rx);
+    g.addColorStop(0, 'rgba(' + fl.join(',') + ',' + a.toFixed(3) + ')'); g.addColorStop(0.5, 'rgba(' + fl.join(',') + ',' + (a * 0.35).toFixed(3) + ')'); g.addColorStop(1, 'rgba(' + fl.join(',') + ',0)');
+    c.save(); c.translate(L.fx, L.fy); c.scale(1, ry / rx); c.translate(-L.fx, -L.fy); c.fillStyle = g; c.fillRect(L.fx - rx, L.fy - rx, rx * 2, rx * 2); c.restore();
+  });
+  c.globalCompositeOperation = 'source-over';
+}
+function lantDraw(c, L, t) {                                   // one lantern: its stone, then its windows' flicker and the glow round its light box
+  c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(L.pic, L.x, L.y);
+  if (!L.win || !(lampLevel() > 0)) return;
+  var f = lantFlame(L, t);
+  c.globalCompositeOperation = 'lighter';
+  c.globalAlpha = clamp(V.lantWindowGlow * 0.9 * f * (1 - L.hz * 0.5), 0, 1);
+  var fl = hex(V.colours.lantFlame), gl = hex(V.colours.lantGlow);
+  // the window picture is white: tinted by drawing it through the flame's colour
+  if (!L.tint) {
+    L.tint = document.createElement('canvas'); L.tint.width = L.win.width; L.tint.height = L.win.height;
+    var tg = L.tint.getContext('2d'); tg.drawImage(L.win, 0, 0); tg.globalCompositeOperation = 'source-in'; tg.fillStyle = rgb(mix(fl, gl, 0.4)); tg.fillRect(0, 0, L.tint.width, L.tint.height);
+  }
+  c.drawImage(L.tint, L.x, L.y);
+  c.globalAlpha = 1;
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  if (V.lantHalo > 0) {
+    var rr = L.px * 0.35 * V.lantHaloSize, a = 0.28 * V.lantHalo * f * (1 - L.hz * 0.6);
+    var g = c.createRadialGradient(L.lx, L.ly, 0, L.lx, L.ly, rr);
+    g.addColorStop(0, 'rgba(' + gl.join(',') + ',' + a.toFixed(3) + ')'); g.addColorStop(0.35, 'rgba(' + fl.join(',') + ',' + (a * 0.4).toFixed(3) + ')'); g.addColorStop(1, 'rgba(' + fl.join(',') + ',0)');
+    c.fillStyle = g; c.fillRect(L.lx - rr, L.ly - rr, rr * 2, rr * 2);
+  }
+  c.globalCompositeOperation = 'source-over'; c.setTransform(1, 0, 0, 1, 0, 0);
+}
+
 /* the sky, the snow ground and the gates' shadows, laid together once (each frame only the gates and the falling snow) */
 function composeBase() {
   BASE.cnv.width = Math.round(W * PR); BASE.cnv.height = Math.round(H * PR);
@@ -696,20 +830,25 @@ var dirty = true;
 function render() {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.drawImage(BASE.cnv, 0, 0);
-  GATES.forEach(function (G) {
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(G.L.cnv, 0, 0);
-    ctx.setTransform(PR, 0, 0, PR, 0, 0); drawSnowParts(ctx, G);
-  });
+  ctx.setTransform(PR, 0, 0, PR, 0, 0); lantPools(ctx, clock);
+  // the gates and the lanterns, farthest first
+  GATES.map(function (G) { return { z: G.z, G: G }; }).concat(LANTS.map(function (L) { return { z: L.z, L: L }; }))
+    .sort(function (a, b) { return b.z - a.z; }).forEach(function (it) {
+      if (it.L) { lantDraw(ctx, it.L, clock); return; }
+      var G = it.G;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(G.L.cnv, 0, 0);
+      ctx.setTransform(PR, 0, 0, PR, 0, 0); drawSnowParts(ctx, G);
+    });
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   document.getElementById('msg').textContent = (FJ ? 'drawing the snow ground… ' : 'snow ground ' + Math.round(fieldMs) + ' ms · ') +
-    (V.view !== 'scene' ? 'hall: only in the winter scene\'s view · ' : HALLD.job ? 'drawing the hall… ' : HALLD.cnv ? 'hall ' + Math.round(HALLD.ms) + ' ms · ' : '') + gateInfo;
+    (V.view !== 'scene' ? 'hall: only in the winter scene\'s view · ' : HALLD.job ? 'drawing the hall… ' : HALLD.cnv ? 'hall ' + Math.round(HALLD.ms) + ' ms · ' : '') + gateInfo + (lantInfo ? ' · ' + lantInfo : '');
 }
 function loop(t) {
   var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0; lastT = t; clock += dt;
   if (FJ) stepField(30);
   if (HALLD.job) stepHall(30);
   stepSnow(dt);
-  var moving = GATES.some(function (G) { return G.parts.length > 0; });
+  var moving = GATES.some(function (G) { return G.parts.length > 0; }) || (LANTS.length && lampLevel() > 0);
   if (dirty || moving) { dirty = false; render(); }
   requestAnimationFrame(loop);
 }
@@ -791,15 +930,55 @@ var G_PANEL = [
     { k: 'gateFall', t: 'Snow falling off the gates', chk: 1 },
     { k: 'gateFallRate', t: 'How often (clumps a minute, each gate)', min: 1, max: 40, step: 1 },
     { k: 'gatePowder', t: 'Powder as they fall and land', min: 0, max: 2, step: 0.01 }]],
+  ['Stone lanterns: place and size', [
+    { k: 'lantShow', t: 'Show the stone lanterns (one each side in every gap between two gates)', chk: 1 },
+    { k: 'lantSize', t: 'Height (× the front gate\'s height)', min: 0.3, max: 1.2, step: 0.005 },
+    { k: 'lantRightAlong', t: 'Left of the path: where in the gap (0 by the gate behind, 1 by the gate in front)', min: 0, max: 1, step: 0.01 },
+    { k: 'lantRightFrom', t: 'Left of the path: out from the path\'s wall (× its height)', min: 0, max: 2, step: 0.01 },
+    { k: 'lantLeftAlong', t: 'Right of the path: where in the gap (0 by the gate behind, 1 by the gate in front)', min: 0, max: 1, step: 0.01 },
+    { k: 'lantLeftFrom', t: 'Right of the path: out from the path\'s wall (× its height)', min: 0, max: 2, step: 0.01 }]],
+  ['Stone lanterns: shape and look', [
+    { k: 'lantSides', t: 'Sides of the light box and roof', min: 4, max: 8, step: 1 },
+    { k: 'lantPillar', t: 'Pillar: thickness (× the height)', min: 0.04, max: 0.12, step: 0.002 },
+    { k: 'lantBox', t: 'Light box: size (× the height)', min: 0.06, max: 0.16, step: 0.002 },
+    { k: 'lantRoof', t: 'Roof: reach (× the height)', min: 0.15, max: 0.4, step: 0.005 },
+    { k: 'lantCurls', t: 'Curled-up roof corners', chk: 1 },
+    { k: 'lantStone', t: 'Stone', col: 1 },
+    { k: 'lantMoss', t: 'Moss', col: 1 },
+    { k: 'lantMossAmt', t: 'How much moss', min: 0, max: 1.5, step: 0.01 },
+    { k: 'lantVariety', t: 'How different each lantern is', min: 0, max: 1, step: 0.01 },
+    { k: 'lantPaper', t: 'Paper windows', col: 1 }]],
+  ['Stone lanterns: their light (dusk and night)', [
+    { k: 'lantLight', t: 'How bright the windows', min: 0, max: 2.5, step: 0.01 },
+    { k: 'lantFlame', t: 'Flame', col: 1 },
+    { k: 'lantGlow', t: 'Glow', col: 1 },
+    { k: 'lantWindowGlow', t: 'Windows\' glow (flickering)', min: 0, max: 1.5, step: 0.01, re: 'live' },
+    { k: 'lantHalo', t: 'Glow in the air round the light box', min: 0, max: 2, step: 0.01, re: 'live' },
+    { k: 'lantHaloSize', t: 'Its size', min: 0.5, max: 4, step: 0.05, re: 'live' },
+    { k: 'lantPool', t: 'Light on the snow', min: 0, max: 2.5, step: 0.01, re: 'live' },
+    { k: 'lantPoolSize', t: 'Its size', min: 0.3, max: 3, step: 0.05, re: 'live' },
+    { k: 'lantFlicker', t: 'Flicker: how deep', min: 0, max: 1.5, step: 0.01, re: 'live' },
+    { k: 'lantFlickerEvery', t: 'Flicker: how often', min: 0.1, max: 3, step: 0.05, re: 'live' },
+    { k: 'lantFlickerLength', t: 'Flicker: how long', min: 0.2, max: 3, step: 0.05, re: 'live' },
+    { k: 'lantWobble', t: 'Flame wobble', min: 0, max: 1.5, step: 0.01, re: 'live' }]]].concat(
+  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
+    var g = Math.ceil(n / 2);
+    return ['Lantern ' + n + ' (' + (n % 2 ? 'left' : 'right') + ' of the path, between gates ' + g + ' and ' + (g + 1) + ')', [
+      { k: 'lant' + n + 'Show', t: 'Shown', chk: 1 },
+      { k: 'lant' + n + 'Along', t: 'Moved along the path (m, + toward the hall)', min: -15, max: 15, step: 0.05 },
+      { k: 'lant' + n + 'Across', t: 'Moved out from the path (m, + away from it, − toward it)', min: -3, max: 6, step: 0.02 },
+      { k: 'lant' + n + 'Size', t: 'Size (×)', min: 0.4, max: 2, step: 0.01 }]];
+  }), [
   ['The shrine hall (as in newwinter.html)', [
     { k: 'hallShow', t: 'Show the hall (in the winter scene\'s view)', chk: 1, re: 'field' }]],
   ['The path (as in newwinter.html)', [
     { k: 'trailWidth', t: 'Width (m)', min: 1.5, max: 6, step: 0.1, re: 'field' },
     { k: 'trailDepth', t: 'Side walls: height (m)', min: 0, max: 0.5, step: 0.01, re: 'field' }]]
-]);
+]));
 var body = document.getElementById('body'), timer = null, CTL = {};
 function changed(re) {
   saveAll();
+  if (re === 'live') { dirty = true; return; }
   if (re === 'field') { clearTimeout(timer); timer = setTimeout(function () { rebuild('field'); }, 250); }
   else { LT = sceneLight(); SHADE = shadeColour(); setupView(); drawGates(); }
 }

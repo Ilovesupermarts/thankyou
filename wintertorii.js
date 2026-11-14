@@ -1197,5 +1197,134 @@ function feet(G, place) {
   return [-1, 1].map(function (sd) { var q = T.w(sd * G.axis(0), 0, 0); return { x: q[0], z: q[2], r: G.r0 * 1.07 }; });
 }
 
-return { build: build, draw: draw, shadow: shadow, feet: feet, silhouette: silhouette, members: members };
+/* ============================================================
+   THE STONE LANTERNS (tōrō), ported from the autumn theme (app.js, torLanternPieces and torBake): a Kasuga-style lantern
+   of grey granite, built in 3D in the scene's own camera and light: a plinth and base, a round pillar with two rings, a
+   lotus platform, a six-sided light box with a paper window in each side, a roof with curled-up corners and a jewel on
+   top; each a little different (paler or darker stone, more or less moss). Sizes are shares of its height h (m), as in
+   the autumn scene. The autumn's fallen red leaves are left out (winter). From dusk the windows glow (lit); torii.html
+   adds the flicker, the glow in the air and the pool of light on the snow each frame.
+   L: { sides, pillar, box, roof, curls } (as the autumn's LANT) */
+function lanternPieces(h, lod, L) {
+  var n = Math.round(L.sides || 6), off = Math.PI / n, P = (L.pillar || 0.07) * h, B = (L.box || 0.1) * h, R = (L.roof || 0.28) * h;
+  var round = lod > 0.5 ? 12 : lod > 0.2 ? 8 : lod > 0.08 ? 6 : 4, full = lod > 0.3, tiny = lod <= 0.1;
+  var pieces = [];
+  function ring(cx, cz, y, r, k, o) {
+    var out = [];
+    for (var i = 0; i < k; i++) { var a = o + (i / k) * TAU; out.push([cx + Math.cos(a) * r, y, cz + Math.sin(a) * r]); }
+    return out;
+  }
+  function frustum(y0, y1, r0, r1, k, o, tone, opt) {
+    opt = opt || {};
+    var c0 = opt.c0 || [0, 0], c1 = opt.c1 || c0;
+    var lo = ring(c0[0], c0[1], y0, r0, k, o), hi = ring(c1[0], c1[1], y1, r1, k, o), faces = [];
+    for (var i = 0; i < k; i++) { var j = (i + 1) % k; faces.push({ tone: opt.alt && i % 2 ? opt.alt : tone, p: [lo[i], lo[j], hi[j], hi[i]] }); }
+    if (opt.top && r1 > 1e-4) faces.push({ tone: opt.topTone || tone, p: hi.slice().reverse() });
+    if (opt.bottom && r0 > 1e-4) faces.push({ tone: tone, p: lo });
+    if (opt.windows) {
+      for (var w = 0; w < k; w++) {
+        var a = lo[w], b = lo[(w + 1) % k], mx = (a[0] + b[0]) / 2, mz = (a[2] + b[2]) / 2, ml = Math.hypot(mx, mz) || 1;
+        var px = mx / ml * 0.004 * h, pz = mz / ml * 0.004 * h, f = opt.windows;
+        var ya = y0 + (y1 - y0) * 0.14, yb = y1 - (y1 - y0) * 0.12;
+        var wp = function (t, y) { return [lerp(mx, lerp(a[0], b[0], t), f) + px, y, lerp(mz, lerp(a[2], b[2], t), f) + pz]; };
+        faces.push({ tone: 'w', p: [wp(0, ya), wp(1, ya), wp(1, yb), wp(0, yb)] });
+      }
+    }
+    pieces.push({ faces: faces, c: [(c0[0] + c1[0]) / 2, (y0 + y1) / 2, (c0[1] + c1[1]) / 2], part: opt.part || 's' });
+  }
+  var yPl = 0.035 * h, yBa = 0.085 * h, yNk = 0.105 * h, yR1 = 0.27 * h, yR2 = 0.3 * h, rH = 0.014 * h, yPt = 0.5 * h;
+  var yLo = 0.565 * h, yLb = 0.595 * h, yBx = 0.745 * h, yEv = 0.77 * h, yRf = 0.875 * h;
+  if (tiny) frustum(0, yBa, B * 1.9, B * 1.2, n, off, 'm', { top: true });
+  else {
+    frustum(0, yPl, B * 1.9, B * 1.86, n, off, 'm', { top: true });
+    frustum(yPl, yBa, B * 1.5, B * 1.2, n, off, 'm', { top: true });
+    frustum(yBa, yNk, P * 1.3, P * 1.08, round, 0, 's', { top: true });
+  }
+  if (full) {
+    frustum(yNk, yR1, P, P * 0.97, round, 0, 's');
+    frustum(yR1, yR1 + rH, P * 1.13, P * 1.13, round, 0, 's', { top: true });
+    frustum(yR1 + rH, yR2, P * 0.965, P * 0.96, round, 0, 's');
+    frustum(yR2, yR2 + rH, P * 1.12, P * 1.12, round, 0, 's', { top: true });
+    frustum(yR2 + rH, yPt, P * 0.955, P * 0.92, round, 0, 's');
+  } else frustum(tiny ? yBa : yNk, yPt, P, P * 0.92, round, 0, 's');
+  if (tiny) frustum(yPt, yLb, P * 1.05, B * 1.5, n, off, 's', { top: true });
+  else {
+    frustum(yPt, yLo, P * 1.05, B * 1.55, full ? Math.max(n * 3, round + 4) : n, full ? 0 : off, 's', full ? { alt: 'd' } : {});
+    frustum(yLo, yLb, B * 1.55, B * 1.5, n, off, 's', { top: true });
+  }
+  frustum(yLb, yBx, B, B, n, off, 'b', { windows: 0.66, part: 'box' });
+  frustum(yBx, yEv, R, R * 0.97, n, off, 's', { bottom: true });
+  frustum(yEv, yRf, R * 0.97, 0.055 * h, n, off, 'r', { top: true });
+  if (L.curls !== false && lod > 0.25) {
+    ring(0, 0, 0, R, n, off).forEach(function (v) {
+      frustum(yEv - 0.012 * h, yEv + 0.03 * h, 0.016 * h, 0.01 * h, 4, Math.PI / 4, 'r',
+              { c0: [v[0] * 0.97, v[2] * 0.97], c1: [v[0] * 1.05, v[2] * 1.05], top: true });
+    });
+  }
+  var J = full ? [[yRf, 0.035], [0.9 * h, 0.04], [0.925 * h, 0.052], [0.952 * h, 0.05], [0.976 * h, 0.032], [h, 0.002]]
+               : tiny ? [[yRf, 0.045], [h, 0.002]] : [[yRf, 0.035], [0.925 * h, 0.052], [h, 0.002]];
+  for (var j = 0; j < J.length - 1; j++) frustum(J[j][0], J[j + 1][0], J[j][1] * h, J[j + 1][1] * h, round, 0, 's', { top: j === J.length - 2 });
+  return pieces;
+}
+/* One lantern drawn into c (CSS px, already set up), its windows' glow also into w (a canvas context set up the same
+   way, or null): each window drawn there, and every face drawn after it (nearer) rubbing it out, so only the parts of
+   the windows that can be seen are left (torii.html makes them flicker). place: { x, z, fx, fz, y0 } (as a gate's);
+   look: { h, L, tone, moss, lit, colours: { stone, moss, paper, flame, glow }, haze, hazeM, windowGlow } */
+function drawLantern(c, w, place, cam, Lt, look) {
+  var h = look.h, PN = painter(null, place, cam, Lt, { haze: look.haze, hazeM: look.hazeM, vivid: 0 }), T = PN.T;
+  var C = look.colours, tone = look.tone || 1, moss = look.moss || 0, lit = look.lit || 0;
+  var px = h * cam.F / Math.max(0.5, place.z), lod = clamp(px / 90, 0, 1);
+  var pieces = lanternPieces(h, lod, look.L || {});
+  var stone = [C.stone[0] * tone, C.stone[1] * tone, C.stone[2] * tone];
+  var glowWin = mix(C.paper, C.flame, 0.55), hotWin = mix(C.flame, C.glow, 0.6);
+  var X0 = 1e9, Y0 = 1e9, X1 = -1e9, Y1 = -1e9;
+  function face(Q, col) {
+    poly(c, Q); c.fillStyle = col; c.strokeStyle = col; c.lineWidth = 0.6; c.lineJoin = 'round'; c.fill(); c.stroke();
+    for (var i = 0; i < Q.length; i++) { X0 = Math.min(X0, Q[i][0]); X1 = Math.max(X1, Q[i][0]); Y0 = Math.min(Y0, Q[i][1]); Y1 = Math.max(Y1, Q[i][1]); }
+  }
+  pieces.forEach(function (pc) {
+    pc.faces.forEach(function (f) {
+      var n = f.p.length, cx = 0, cy = 0, cz = 0, i;
+      for (i = 0; i < n; i++) { cx += f.p[i][0]; cy += f.p[i][1]; cz += f.p[i][2]; }
+      cx /= n; cy /= n; cz /= n;
+      var nl = newell(f.p);
+      if (nl[0] * (cx - pc.c[0]) + nl[1] * (cy - pc.c[1]) + nl[2] * (cz - pc.c[2]) < 0) nl = [-nl[0], -nl[1], -nl[2]];
+      var nw = T.n(nl[0], nl[1], nl[2]), cw = T.w(cx, cy, cz);
+      if (!PN.facing(nw, cw)) return;
+      var Q = f.p.map(function (q) { return T.p(T.w(q[0], q[1], q[2])); }), col;
+      if (f.tone === 'w') {                    // the paper window: plain by day, glowing (as far as it is lit) after dusk
+        var plain = PN.shade(C.paper, nw, 0.9), glow = mix(mix(glowWin, hotWin, clamp(lit * (look.windowGlow || 0.43) * 0.5, 0, 1)), Lt.mist, PN.hz * 0.5);
+        col = mix(plain, glow, clamp(lit * 2, 0, 1));
+        face(Q, rgb(col));
+        if (w && lit > 0) { w.globalCompositeOperation = 'source-over'; poly(w, Q); w.fillStyle = '#fff'; w.fill(); }
+        return;
+      }
+      var base = stone;
+      if (f.tone === 'd') base = [base[0] * 0.84, base[1] * 0.84, base[2] * 0.84];      // between the lotus petals
+      var mk = moss * (f.tone === 'm' ? 0.75 : f.tone === 'r' ? (nl[1] > 0.2 ? 0.6 : 0.3) : 0.22 * clamp(1 - cy / h * 1.4, 0, 1));
+      base = mix(base, C.moss, mk);
+      if (f.tone === 'b') base = [base[0] * 0.92, base[1] * 0.92, base[2] * 0.92];
+      col = PN.shade(base, nw, 1);
+      face(Q, rgb(col));
+      // nearer than a window already drawn: rub that part of the window out
+      if (w && lit > 0) { w.globalCompositeOperation = 'destination-out'; poly(w, Q); w.fillStyle = w.strokeStyle = '#000'; w.lineWidth = 0.6; w.fill(); w.stroke(); w.globalCompositeOperation = 'source-over'; }
+    });
+  });
+  var lb = T.p(T.w(0, 0.67 * h, 0)), ft = T.p(T.w(0, 0, 0));
+  return { x0: X0, y0: Y0, x1: X1, y1: Y1, lx: lb[0], ly: lb[1], fx: ft[0], fy: ft[1], px: px };
+}
+/* its shadow on the snow: every piece's points sent along the sun down to the snow, each piece's hull filled */
+function lanternShadow(c, place, cam, Lt, h, L) {
+  var Ld = Lt.dir;
+  if (Ld[1] < 0.02) return;
+  var T = frame(place, cam), y0 = place.y0 || 0;
+  lanternPieces(h, 0.2, L || {}).forEach(function (pc) {
+    var Q = [];
+    pc.faces.forEach(function (f) { f.p.forEach(function (p) { var q = T.w(p[0], p[1], p[2]), t = (q[1] - y0) / Ld[1]; Q.push(T.p([q[0] - Ld[0] * t, y0, q[2] - Ld[2] * t])); }); });
+    poly(c, hull(Q)); c.fill();
+  });
+}
+
+return { build: build, draw: draw, shadow: shadow, feet: feet, silhouette: silhouette, members: members,
+         lantern: drawLantern, lanternShadow: lanternShadow };
 })();
