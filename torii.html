@@ -64,13 +64,13 @@ var V_DEFAULTS = {
   // the gates
   gates: 3, gateFirst: 29, gateGap: 28, gateClear: 0.25, gateHeight: 1.45, gateDia: 0.11, gateLean: 1.5, gateSori: 0.045,
   gateOverhang: 0.39, gateNuki: 0.73, gateNemaki: 0.13, gateDaiwa: false, gateKusabi: true, gatePlaque: false, gateKasagiBlack: true,
-  gateWeather: 1, gateVivid: 0.5, gateSoft: 0.35, gateHaze: 1, gateShadow: 1, gateFootShade: 1, gateFootSnow: 1, gateAir: 0.3, gateDof: 1.1,
+  gateWeather: 1, gateVivid: 0.5, gateSoft: 0.35, gateHaze: 1, gateShadow: 1, gateFootShade: 1, gateFootSnow: 1, gateAir: 0, gateDof: 0, gateArrange: true,
   gateSnowShow: true, gateSnow: 1, gateCrevice: 1, gatePlaster: 1, gateSnowVary: 0.6, gateFall: true, gateFallRate: 8, gatePowder: 1,
   colours: { snow: '#FAFAFC', mist: '#ffffff', bankEarth: '#4D4038', toriiRed: '#D8401E', toriiBlack: '#2A2523' }
 };
 var V = JSON.parse(JSON.stringify(V_DEFAULTS));
-try { var sv = JSON.parse(localStorage.getItem('toriiLab-1') || 'null'); if (sv) for (var k in sv) if (k in V) { if (k === 'colours') Object.assign(V.colours, sv.colours); else V[k] = sv[k]; } } catch (e) {}
-function saveAll() { try { localStorage.setItem('toriiLab-1', JSON.stringify(V)); } catch (e) {} }
+try { var sv = JSON.parse(localStorage.getItem('toriiLab-1') || 'null'); if (sv && !(sv.ver >= 2)) { delete sv.gateAir; delete sv.gateDof; } if (sv) for (var k in sv) if (k in V) { if (k === 'colours') Object.assign(V.colours, sv.colours); else V[k] = sv[k]; } } catch (e) {}
+function saveAll() { try { var o = JSON.parse(JSON.stringify(V)); o.ver = 2; localStorage.setItem('toriiLab-1', JSON.stringify(o)); } catch (e) {} }
 
 /* ============================================================
    2. THE LIGHT (newwinter.html's sceneLight and shadeColour)
@@ -127,6 +127,126 @@ function pathOpts(pts) {
   return { pts: pts, width: V.trailWidth, depth: V.trailDepth, wall: V.trailWall, berm: V.trailBerm, wobble: V.trailWobble, trod: V.trailTrod, endHalf: 0, seed: V.seed * 13 + 5 };
 }
 var VIEW = null;
+/* The gates behind the first are moved a little along the path (up to 12 m either way, half a metre at a time) to where,
+   seen from this camera, no part of one peeps out from behind a nearer gate as a thin sliver (a strip of its black top
+   beam just under the tie beam in front, a beam's tip beside a pillar), and none of its uprights (pillars, centre post)
+   lines up with or just grazes one of a nearer gate (two in a line read as one piece). Each candidate place: the gate's
+   outline drawn into a small mask, compared with the nearer gates' outlines; the least such trouble wins, the smallest
+   move breaking ties. Gate 1 stays where it is. */
+function arrangeGates(TW, gates, toCam, dirCam, hy, F) {
+  if (!V.gateArrange || gates.length < 2 || typeof WinterTorii.silhouette !== 'function') return gates;
+  var cam = { W: W, H: H, hy: hy, F: F, eye: V.eyeHeight }, sc = 0.5, mw = Math.ceil(W * sc), mh = Math.ceil(H * sc);
+  var cnv = document.createElement('canvas'); cnv.width = mw; cnv.height = mh;
+  var c = cnv.getContext('2d', { willReadFrequently: true });
+  function placeAt(s) {
+    var q = TW.at(s), q0 = TW.at(s - 1.5), q1 = TW.at(s + 1.5), tx = q1[0] - q0[0], tz = q1[1] - q0[1], tl = Math.hypot(tx, tz) || 1;
+    var w = { x: q[0], z: q[1], fx: tx / tl, fz: tz / tl, s: s }, p = toCam(w.x, w.z), f = dirCam(w.fx, w.fz);
+    return { world: w, cam: { x: p[0], z: p[1], fx: f[0], fz: f[1] } };
+  }
+  function mask(G, pl, only) {
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, mw, mh); c.setTransform(sc, 0, 0, sc, 0, 0); c.fillStyle = '#fff';
+    WinterTorii.silhouette(c, G, pl, cam, only);
+    var D = c.getImageData(0, 0, mw, mh).data, m = new Uint8Array(mw * mh);
+    for (var i = 0; i < m.length; i++) m[i] = D[i * 4 + 3] > 110 ? 1 : 0;
+    return m;
+  }
+  var near = new Uint8Array(mw * mh), nearMem = [], out = [];
+  // pixels of it seen only as a strip up to about 16 px thick (on the screen) wedged against a nearer gate: a beam of the
+  // gate behind peeping out just under or beside one in front
+  var TH = 4;
+  function sliver(m) {
+    var n = 0;
+    for (var y = TH; y < mh - TH; y++) for (var x = TH; x < mw - TH; x++) {
+      var k = y * mw + x; if (!m[k] || near[k]) continue;
+      var u = 0, dn = 0, l = 0, r = 0, ou = false, od = false, ol = false, orr = false;
+      for (u = 1; u <= TH; u++) { var j = k - u * mw; if (!m[j] || near[j]) { ou = near[j] === 1; break; } }
+      for (dn = 1; dn <= TH; dn++) { var j2 = k + dn * mw; if (!m[j2] || near[j2]) { od = near[j2] === 1; break; } }
+      for (l = 1; l <= TH; l++) { var j3 = k - l; if (!m[j3] || near[j3]) { ol = near[j3] === 1; break; } }
+      for (r = 1; r <= TH; r++) { var j4 = k + r; if (!m[j4] || near[j4]) { orr = near[j4] === 1; break; } }
+      var thinV = u + dn <= 2 * TH && (ou || od), thinH = l + r <= 2 * TH && (ol || orr);
+      if (thinV || thinH) n++;
+    }
+    return n;
+  }
+  // its black top beam (with the snow on it) partly hidden behind a nearer gate: in each column of the screen it must be
+  // either hidden or show at least three quarters of its height (a band of black peeping out under a tie beam in front)
+  function peep(km) {
+    var n = 0;
+    for (var x = 0; x < mw; x++) {
+      var K = 0, Vv = 0;
+      for (var y = 0; y < mh; y++) { var k = y * mw + x; if (km[k]) { K++; if (!near[k]) Vv++; } }
+      if (K > 0 && Vv > 0 && Vv < K * 0.75) n += K;
+    }
+    // and as a whole: almost all of it seen, or none (else its ends poke out either side of a tie beam in front)
+    var KT = 0, VT = 0;
+    for (var i = 0; i < km.length; i++) if (km[i]) { KT++; if (!near[i]) VT++; }
+    if (KT > 0 && VT > KT * 0.03 && VT < KT * 0.9) n += (KT - VT) + 200;
+    return n;
+  }
+  function lined(M) {                                    // its uprights against the nearer gates' uprights
+    var cost = 0;
+    M.forEach(function (a) {
+      nearMem.forEach(function (b) {
+        var ov = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+        if (ov < -6) return;                                                   // a clear gap between: fine
+        var inside = a.x0 >= b.x0 - 0.5 && a.x1 <= b.x1 + 0.5 && a.y0 >= b.y0 - 2 && a.y1 <= b.y1 + 2;   // wholly behind it: hidden
+        if (inside) return;
+        cost += 200 + 25 * Math.max(0, 6 + Math.min(ov, 8));
+      });
+    });
+    return cost;
+  }
+  // first: one spacing for all (the gates stay evenly spaced, as on a real approach) that gives no trouble; only if none
+  // does, each gate behind is moved on its own
+  var GS = gates.map(function (g, k) { return gateShape(k); });
+  function trouble(sList) {
+    near.fill(0); nearMem.length = 0;
+    var tot = 0;
+    for (var k = 0; k < sList.length; k++) {
+      if (sList[k] < 2 || sList[k] > TW.length - 3) return 1e9;
+      var pl = placeAt(sList[k]); if (pl.cam.z < 2) return 1e9;
+      var m = mask(GS[k], pl.cam);
+      if (k) tot += sliver(m) * 4 + peep(mask(GS[k], pl.cam, 'kasagi')) * 4 + lined(WinterTorii.members(GS[k], pl.cam, cam));
+      for (var i = 0; i < near.length; i++) if (m[i]) near[i] = 1;
+      WinterTorii.members(GS[k], pl.cam, cam).forEach(function (q) { nearMem.push(q); });
+    }
+    return tot;
+  }
+  var s0 = gates[0].s, gap0 = gates.length > 1 ? gates[1].s - s0 : V.gateGap, bestU = null;
+  for (var gp = Math.max(8, gap0 - 10); gp <= gap0 + 14.001; gp += 0.5) {
+    var sl = gates.map(function (g, k) { return s0 + k * gp; }), tr = trouble(sl);
+    var cst = tr + Math.abs(gp - gap0) * 2;
+    if (!bestU || cst < bestU.cost) bestU = { gap: gp, cost: cst, tr: tr, sl: sl };
+  }
+  ARR.u = bestU ? { gap: bestU.gap, tr: bestU.tr } : null;
+  if (bestU && bestU.tr < 40) {
+    ARR.length = 0; ARR.even = bestU.gap;
+    return bestU.sl.map(function (sv, k) { ARR[k] = 0; return placeAt(sv).world; });
+  }
+  ARR.even = 0;
+  near.fill(0); nearMem.length = 0;
+  gates.forEach(function (g, k) {
+    var G = GS[k], best = null;
+    if (k === 0) { best = { pl: placeAt(g.s), off: 0 }; }
+    else {
+      for (var off = -12; off <= 12.001; off += 0.5) {
+        var s = g.s + off;
+        if (s < 2 || s > TW.length - 3 || (out.length && s < out[out.length - 1].s + 6)) continue;
+        var pl = placeAt(s); if (pl.cam.z < 2) continue;
+        var m = mask(G, pl.cam), cost = sliver(m) * 4 + peep(mask(G, pl.cam, 'kasagi')) * 4 + lined(WinterTorii.members(G, pl.cam, cam)) + Math.abs(off) * Math.abs(off) * 2;
+        if (!best || cost < best.cost) best = { pl: pl, off: off, cost: cost, m: m };
+      }
+      if (!best) best = { pl: placeAt(g.s), off: 0 };
+    }
+    var mk2 = best.m || mask(G, best.pl.cam);
+    for (var i = 0; i < near.length; i++) if (mk2[i]) near[i] = 1;
+    WinterTorii.members(G, best.pl.cam, cam).forEach(function (q) { nearMem.push(q); });
+    out.push(best.pl.world);
+    ARR[k] = best.off;
+  });
+  return out;
+}
+var ARR = [];
 function setupView() {
   var ptsW = pathWorld(), TW = WinterPath.build(pathOpts(ptsW));
   // the gates on the path (world): the first where the path is gateFirst m from the eye of the winter scene, then every gateGap m
@@ -150,6 +270,7 @@ function setupView() {
   var rx = dz, rz = -dx;
   function toCam(x, z) { var X = x - cx, Z = z - cz; return [X * rx + Z * rz, X * dx + Z * dz]; }
   function dirCam(x, z) { return [x * rx + z * rz, x * dx + z * dz]; }
+  gates = arrangeGates(TW, gates, toCam, dirCam, H * hzn, lensF());
   VIEW = { hy: H * hzn, F: lensF(), toCam: toCam, dirCam: dirCam, gatesW: gates,
            pts: ptsW.map(function (p) { return toCam(p[0], p[1]); }) };
   VIEW.gates = gates.map(function (g) { var p = toCam(g.x, g.z), f = dirCam(g.fx, g.fz); return { x: p[0], z: p[1], fx: f[0], fz: f[1], s: g.s }; });
@@ -262,9 +383,9 @@ function drawGates() {
     var Lg = layer(); Lg.c.setTransform(1, 0, 0, 1, 0, 0);
     var soft = V.gateSoft + dof; Lg.c.filter = soft > 0 ? 'blur(' + (soft * PR).toFixed(2) + 'px)' : 'none'; Lg.c.drawImage(tmp.cnv, 0, 0); Lg.c.filter = 'none';
     GATES.push({ L: Lg, emit: box.emit || [], z: o.g.z, i: o.i, hz: hzv, next: 0, parts: [] });
-    info.push('gate ' + (o.i + 1) + ': ' + o.g.z.toFixed(0) + ' m, ' + G.Ht.toFixed(1) + ' m tall, ' + G.S.toFixed(1) + ' m between pillars');
+    info.push('gate ' + (o.i + 1) + ': ' + o.g.z.toFixed(0) + ' m' + (ARR[o.i] ? ' (moved ' + (ARR[o.i] > 0 ? '+' : '') + ARR[o.i] + ' m)' : '') + ', ' + G.Ht.toFixed(1) + ' m tall, ' + G.S.toFixed(1) + ' m between pillars');
   });
-  gateInfo = info.reverse().join(' · ');
+  gateInfo = info.reverse().join(' · ') + (ARR.even ? ' · evenly spaced ' + ARR.even + ' m apart' : '');
   makeDot();
   composeBase();
 }
@@ -438,6 +559,7 @@ var G_PANEL = [
     { k: 'gateFirst', t: 'First gate: its distance in the winter scene (m)', min: 18, max: 80, step: 0.5 },
     { k: 'gateGap', t: 'Between the gates, along the path (m)', min: 8, max: 60, step: 0.5 },
     { k: 'gateClear', t: 'Gap between the path\'s wall and a pillar (m)', min: 0, max: 1.5, step: 0.05 },
+    { k: 'gateArrange', t: 'Move the gates behind a little so none peeps out as a sliver or lines up with the one in front', chk: 1 },
     { k: 'gateHeight', t: 'Height (× the width between the pillars)', min: 0.9, max: 2, step: 0.01 }]],
   ['Torii: shape', [
     { k: 'gateDia', t: 'Pillars: thickness (× the width)', min: 0.06, max: 0.18, step: 0.002 },
@@ -514,7 +636,7 @@ document.getElementById('copy').onclick = function () {
   var t = JSON.stringify(V, null, 1);
   if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { alert('Copied'); }, function () { prompt('Copy:', t); }); else prompt('Copy:', t);
 };
-window.toriiLab = { layers: function () { return { field: FIELD.cnv.toDataURL(), shadow: SL.cnv.toDataURL() }; }, gates: function () { return GATES; }, spawnAll: function (n) { GATES.forEach(function (G) { for (var i = 0; i < (n || 1); i++) spawn(G); }); }, freeze: function (on) { window.__freeze = on; }, V: V, changed: changed, rebuild: rebuild, busy: function () { return !!FJ; }, view: function () { return VIEW; }, info: function () { return gateInfo; } };
+window.toriiLab = { arr: function () { return { u: ARR.u, even: ARR.even, moves: ARR.slice() }; }, layers: function () { return { field: FIELD.cnv.toDataURL(), shadow: SL.cnv.toDataURL() }; }, gates: function () { return GATES; }, spawnAll: function (n) { GATES.forEach(function (G) { for (var i = 0; i < (n || 1); i++) spawn(G); }); }, freeze: function (on) { window.__freeze = on; }, V: V, changed: changed, rebuild: rebuild, busy: function () { return !!FJ; }, view: function () { return VIEW; }, info: function () { return gateInfo; } };
 
 resize();
 requestAnimationFrame(loop);

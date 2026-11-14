@@ -274,7 +274,7 @@ function solids(G) {
   var n = G.nuki;
   out.push({ tag: 'nuki', pts: boxPts(-(n.aN + n.over), n.aN + n.over, n.y0, n.y1, -n.dep / 2, n.dep / 2) });
   var g = G.gaku; out.push({ tag: 'gaku', pts: boxPts(-g.w, g.w, g.y0, g.y1, -g.dep / 2, g.dep / 2) });
-  [G.shimaki, G.kasagi].forEach(function (B) {
+  [G.shimaki, G.kasagi].forEach(function (B, bi) {
     var M = 8;
     for (k = 0; k < M; k++) {
       var u0 = -1 + 2 * k / M, u1 = -1 + 2 * (k + 1) / M, P = [];
@@ -282,7 +282,7 @@ function solids(G) {
         var hb = B.half, ht = B.half + B.flare, sb = soriAt(B, u);
         P.push([u * hb, B.y0 + sb, -B.dep / 2], [u * hb, B.y0 + sb, B.dep / 2], [u * ht, B.y0 + B.th + sb * B.lift, -B.dep / 2], [u * ht, B.y0 + B.th + sb * B.lift, B.dep / 2]);
       });
-      out.push({ tag: 'beam', pts: P });
+      out.push({ tag: bi ? 'kasagi' : 'shimaki', pts: P });
     }
   });
   return out;
@@ -899,11 +899,37 @@ function shadow(c, G, place, cam, Lt) {
     }
   });
 }
+/* its outline on the screen (every solid and the snow lying on it), filled in c's current fillStyle: for working out how
+   the gates overlap one another */
+function silhouette(c, G, place, cam, only) {
+  var T = frame(place, cam), S = solids(G);
+  S.forEach(function (s) { if (only && s.tag !== only) return; poly(c, hull(s.pts.map(function (p) { return T.p(T.w(p[0], p[1], p[2])); }))); c.fill(); });
+  if (G.snow) G.snow.heaps.forEach(function (hp) {
+    if (only && hp.grp !== only) return;
+    for (var i = 0; i < hp.st.length - 1; i += 3) {
+      var Q = [];
+      for (var j = i; j <= Math.min(hp.st.length - 1, i + 3); j++) section(hp.hd, hp.st[j]).forEach(function (pp) { Q.push(T.p(T.w(hp.st[j].a, hp.st[j].y + pp[1], pp[0]))); });
+      poly(c, hull(Q)); c.fill();
+    }
+  });
+}
+/* its upright members on the screen (the two pillars and the centre post): { x0, x1, y0, y1 } CSS px */
+function members(G, place, cam) {
+  var T = frame(place, cam), out = [];
+  [-1, 1].forEach(function (sd) {
+    var yb = G.nY, a = sd * G.axis(yb), r = G.radius(yb), L = T.p(T.w(a - r, yb, 0)), R = T.p(T.w(a + r, yb, 0));
+    var top = T.p(T.w(sd * G.axis(G.yP), G.yP, 0)), foot = T.p(T.w(sd * G.axis(0), 0, 0));
+    out.push({ x0: Math.min(L[0], R[0]), x1: Math.max(L[0], R[0]), y0: top[1], y1: foot[1] });
+  });
+  var g = G.gaku, l = T.p(T.w(-g.w, (g.y0 + g.y1) / 2, 0)), r2 = T.p(T.w(g.w, (g.y0 + g.y1) / 2, 0));
+  out.push({ x0: Math.min(l[0], r2[0]), x1: Math.max(l[0], r2[0]), y0: T.p(T.w(0, g.y1, 0))[1], y1: T.p(T.w(0, g.y0, 0))[1] });
+  return out;
+}
 /* where each pillar stands (camera space, m) and its radius: for the soft shade at its foot */
 function feet(G, place) {
   var T = frame(place, { W: 0, H: 0, hy: 0, F: 1, eye: 0 });
   return [-1, 1].map(function (sd) { var q = T.w(sd * G.axis(0), 0, 0); return { x: q[0], z: q[2], r: G.r0 * 1.07 }; });
 }
 
-return { build: build, draw: draw, shadow: shadow, feet: feet };
+return { build: build, draw: draw, shadow: shadow, feet: feet, silhouette: silhouette, members: members };
 })();
