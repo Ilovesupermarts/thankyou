@@ -99,7 +99,7 @@ function build(o) {
   // each pillar runs up to it, its top following the curve across its own width)
   G.underAt = function (a) { return yP + soriAt(G.shimaki, a / G.shimaki.half); };
   G.topMax = G.underAt(aT + r1) + 0.02;
-  G.kus = { kw: Math.max(0.05, rN * 0.38), kH: nT * 1.3, kD: nD * 0.7 };
+  G.kus = { kw: Math.max(0.05, rN * 0.3), kH: nT * 1.12, kD: nD * 0.8 };
   G.snow = d(o, 'snow', 0) > 0 ? buildSnow(G, o) : null;
   return G;
 }
@@ -452,14 +452,15 @@ function draw(c, G, place, cam, Lt, look) {
   var SN = look.snowRGB || [250, 250, 252], SH = look.shadeRGB || [170, 185, 210], Ls = Lt.dir, sunV = Lt.vis === undefined ? 1 : Lt.vis;
   var gLit = []; for (var ch0 = 0; ch0 < 3; ch0++) gLit.push(SN[ch0] * Lt.sun[ch0] * Math.max(0, Ls[1]) * 1.25 + SH[ch0]);
   function roll(v) { if (v > 226) v = 226 + (v - 226) * 26 / (v - 226 + 26); if (v > 228) v = 228 + (v - 228) * 24 / (v - 228 + 24); return v; }
-  function snowShade(n, q, occ, thin, red) {
+  function snowShade(n, q, occ, thin, red, sv) {
+    if (sv === undefined) sv = 1;
     n = norm(n);
-    var k = occ === undefined ? 1 : occ, dl = Math.max(0, n[0] * Ls[0] + n[1] * Ls[1] + n[2] * Ls[2]) * k;
+    var k = occ === undefined ? 1 : occ, dl = Math.max(0, n[0] * Ls[0] + n[1] * Ls[1] + n[2] * Ls[2]) * Math.min(k, sv);
     var sk = (0.5 + 0.5 * n[1]) * lerp(0.6, 1, k), up = (0.5 - 0.5 * n[1]) * 0.85;
-    var vd = norm(sub(q, T.eye)), back = Math.pow(Math.max(0, vd[0] * Ls[0] + vd[1] * Ls[1] + vd[2] * Ls[2]), 3) * (thin || 0) * sunV;
+    var vd = norm(sub(q, T.eye)), back = Math.pow(Math.max(0, vd[0] * Ls[0] + vd[1] * Ls[1] + vd[2] * Ls[2]), 3) * (thin || 0) * sunV * sv;
     // (and its edges seen against the low sun behind it glow: light scattered forward through the crystals at the rim)
     var ndv = Math.abs(n[0] * vd[0] + n[1] * vd[1] + n[2] * vd[2]), sunB = Math.max(0, vd[0] * Ls[0] + vd[1] * Ls[1] + vd[2] * Ls[2]);
-    var rim = Math.pow(1 - ndv, 3) * sunB * sunV * Math.max(0, n[1] + 0.3) * 0.5;
+    var rim = Math.pow(1 - ndv, 3) * sunB * sunV * Math.max(0, n[1] + 0.3) * 0.5 * sv;
     var out = [];
     for (var ch = 0; ch < 3; ch++) {
       var v = SN[ch] * Lt.sun[ch] * dl * 1.25 + SH[ch] * sk + SN[ch] * gLit[ch] / 255 * up + SN[ch] * Lt.sun[ch] * (0.45 * back + rim);
@@ -532,6 +533,56 @@ function draw(c, G, place, cam, Lt, look) {
     return { G: inRim, shape: shape, box: [ax - rOut - 0.06, ax + rOut + 0.06, yR - 0.05, yR + H0 * 1.8 + 0.03, -rOut - 0.06, rOut + 0.06], hd: 0,
              thin: function () { return 0.6; }, ring: true, step: 0.005 };
   }
+  /* ---- what of the sun and the sky a point of snow sees: the gate's own parts stand in the way (the pillars, the centre
+     post, the wedges, the beams), so snow tucked against a post or under a beam lies in their shade ---- */
+  var LsA = Ls[0] * T.rx + Ls[2] * T.rz, LsB = Ls[0] * T.fx + Ls[2] * T.fz, LsY = Ls[1];
+  var nkS = G.nuki, gkS = G.gaku, KS = G.kasagi, SS2 = G.shimaki, ksS = G.kus;
+  var BOX = [
+    [-gkS.w, gkS.w, gkS.y0, gkS.y1, -gkS.dep / 2, gkS.dep / 2],
+    [-(nkS.aN + nkS.over), nkS.aN + nkS.over, nkS.y0, nkS.y1, -nkS.dep / 2, nkS.dep / 2],
+    [-SS2.half - SS2.flare, SS2.half + SS2.flare, SS2.y0, SS2.y0 + SS2.th, -SS2.dep / 2, SS2.dep / 2],
+    // (the kasagi to the height of its middle: the snow lying on it must not count as inside it)
+    [-KS.half - KS.flare, KS.half + KS.flare, KS.y0, KS.y0 + KS.th - 0.005, -KS.dep / 2, KS.dep / 2]];
+  if (G.kusabi) [-1, 1].forEach(function (sd) {
+    var ka = sd * (nkS.aN + nkS.rN + ksS.kw * 0.6), ym = (nkS.y0 + nkS.y1) / 2;
+    BOX.push([ka - ksS.kw / 2, ka + ksS.kw / 2, ym - ksS.kH / 2, ym + ksS.kH / 2, -ksS.kD / 2, ksS.kD / 2]);
+  });
+  function hitBox(B, a, y, b, da, dy, db) {
+    var O = [a, y, b], D = [da, dy, db], t0 = 1e-4, t1 = 1e9;
+    for (var k = 0; k < 3; k++) {
+      var lo = B[k * 2], hi = B[k * 2 + 1];
+      if (Math.abs(D[k]) < 1e-9) { if (O[k] < lo || O[k] > hi) return false; continue; }
+      var ta = (lo - O[k]) / D[k], tb = (hi - O[k]) / D[k]; if (ta > tb) { var q = ta; ta = tb; tb = q; }
+      if (ta > t0) t0 = ta; if (tb < t1) t1 = tb; if (t0 > t1) return false;
+    }
+    return true;
+  }
+  function hitPillar(sd, a, y, b, da, dy, db) {
+    var ac = sd * G.axis(Math.max(0, y)), r = G.radius(Math.max(0, y)), oa = a - ac;
+    var A = da * da + db * db, Bq = 2 * (oa * da + b * db), Cq = oa * oa + b * b - r * r;
+    if (A < 1e-12) return false;
+    var disc = Bq * Bq - 4 * A * Cq; if (disc < 0) return false;
+    var sq = Math.sqrt(disc), t = (-Bq - sq) / (2 * A); if (t < 1e-4) t = (-Bq + sq) / (2 * A); if (t < 1e-4) return false;
+    var yy = y + dy * t; return yy > 0 && yy < G.topMax;
+  }
+  function sunSeen(a, y, b) {
+    if (LsY < 0.01) return 0;
+    for (var i = 0; i < BOX.length; i++) if (hitBox(BOX[i], a, y, b, LsA, LsY, LsB)) return 0.12;
+    if (hitPillar(-1, a, y, b, LsA, LsY, LsB) || hitPillar(1, a, y, b, LsA, LsY, LsB)) return 0.12;
+    return 1;
+  }
+  // the sky's share: less next to a post, a pillar or a wedge (the corner sees half the sky or less)
+  function skySeen(a, y, b) {
+    var dmin = 9;
+    [-1, 1].forEach(function (sd) { var ac = sd * G.axis(Math.max(0, y)); dmin = Math.min(dmin, Math.hypot(a - ac, b) - G.radius(Math.max(0, y))); });
+    for (var i = 0; i < BOX.length; i++) {
+      var B = BOX[i]; if (i === 1 || i === 3 || i === 2) continue;           // (not the beams it lies on or under)
+      if (y < B[2] - 0.05 || y > B[3] + 0.3) continue;
+      var dx = Math.max(B[0] - a, 0, a - B[1]), dz = Math.max(B[4] - b, 0, b - B[5]);
+      dmin = Math.min(dmin, Math.hypot(dx, dz));
+    }
+    return lerp(0.55, 1, smooth(0, 0.35, Math.max(0, dmin)));
+  }
   function ihash(i, j) { var h = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return h - Math.floor(h); }
   function renderBody(S) {
     var bx = S.box, X0 = 1e9, Y0 = 1e9, X1 = -1e9, Y1 = -1e9;
@@ -571,7 +622,8 @@ function draw(c, G, place, cam, Lt, look) {
         var gx = S.shape(pa + eps, py, pb) - S.shape(pa - eps, py, pb), gy = S.shape(pa, py + eps, pb) - S.shape(pa, py - eps, pb), gz = S.shape(pa, py, pb + eps) - S.shape(pa, py, pb - eps);
         var nl = Math.sqrt(gx * gx + gy * gy + gz * gz) || 1, nw = T.n(gx / nl, gy / nl, gz / nl), pw = T.w(pa, py, pb);
         if (nw[0] * (0 - pw[0]) + nw[1] * (cam.eye - pw[1]) + nw[2] * (0 - pw[2]) < 0) { nw = [-nw[0], -nw[1], -nw[2]]; }
-        var sc = snowShade(nw, pw, 1, S.thin(pa, py, pb), gy / nl < -0.3 ? 1 : 0), col = sc.col;
+        var sv = sunSeen(pa + gx / nl * 0.012, py + gy / nl * 0.012, pb + gz / nl * 0.012), sk = skySeen(pa, py, pb);
+        var sc = snowShade(nw, pw, sk, S.thin(pa, py, pb), gy / nl < -0.3 ? 1 : 0, sv), col = sc.col;
         // a little darker where it sits on the beam (the light cut off in the corner), fine grain, a few glints
         var ao = 1;
         if (!S.ring) { var vv = py - S.beamY(pa); if (Math.abs(pb) < S.hd + 0.03 && vv < 0.05) ao = 0.9 + 0.1 * Math.max(0, vv) / 0.05; }
@@ -604,9 +656,9 @@ function draw(c, G, place, cam, Lt, look) {
   function plaster(sd, aShaftH) {
     if (!G.snow || !(G.snow.plaster > 0)) return;
     var wf = look.windFrom || [-1, 0], wa = wf[0] * T.rx + wf[1] * T.rz, wb = wf[0] * T.fx + wf[1] * T.fz, phW = Math.atan2(wb, wa);
-    var rp = rng(G.seed * 71 + (sd + 3) * 19 + G.snow.seed), n = Math.round(lerp(4, 10, rp()) * Math.min(2, G.snow.plaster));
+    var rp = rng(G.seed * 71 + (sd + 3) * 19 + G.snow.seed), n = Math.round(lerp(3, 6, rp()) * Math.min(2, G.snow.plaster));
     for (var i = 0; i < n; i++) {
-      var y0 = lerp(G.nem + 0.15, G.yP - 0.3, Math.pow(rp(), 0.8)), dh = lerp(0.12, 0.7, rp()) * Math.min(1.5, G.snow.plaster), y1 = Math.min(G.yP - 0.1, y0 + dh);
+      var y0 = lerp(G.nem + 0.15, G.yP - 0.3, Math.pow(rp(), 0.8)), dh = lerp(0.06, 0.24, rp()) * Math.min(1.5, G.snow.plaster), y1 = Math.min(G.yP - 0.1, y0 + dh);
       var phc = phW + (rp() - 0.5) * 1.1, dph = lerp(0.12, 0.42, rp()), M = 7, Lp = [], Rp = [];
       // the side of the pillar facing the eye, in the gate's own angle: a patch is cut to it
       var axw = T.w(sd * G.axis((y0 + y1) / 2), (y0 + y1) / 2, 0), ex = -axw[0], ez = -axw[2];
@@ -615,7 +667,7 @@ function draw(c, G, place, cam, Lt, look) {
       var lo = phc - dph, hi = phc + dph, dc = wrap(phc - phV);
       lo = phV + Math.max(wrap(lo - phV), -PI / 2 * 0.98); hi = phV + Math.min(wrap(hi - phV), PI / 2 * 0.98);
       if (Math.abs(dc) > PI / 2 + dph || hi - lo < 0.02) continue;
-      var mid = (lo + hi) / 2, hw = (hi - lo) / 2, th0 = lerp(0.025, 0.06, rp()) * Math.min(1.5, G.snow.plaster);
+      var mid = (lo + hi) / 2, hw = (hi - lo) / 2 * lerp(0.4, 0.8, rp()), th0 = lerp(0.012, 0.03, rp()) * Math.min(1.5, G.snow.plaster);
       // a crust with its own thickness (it stands out past the pillar's outline where it is seen edge-on), lumpy,
       // its edges broken
       for (var j = 0; j <= M; j++) {
@@ -663,14 +715,14 @@ function draw(c, G, place, cam, Lt, look) {
     });
   }
   var endA = nk.aN + nk.rN * 0.92, endB = nk.aN + nk.over;
-  var kw = Math.max(0.05, nk.rN * 0.38), kH = (nk.y1 - nk.y0) * 1.3, kD = nk.dep * 0.7;
+  var kw = G.kus.kw, kH = G.kus.kH, kD = G.kus.kD;
   var nearSide = zOf(-nk.aN, nk.y0, 0) < zOf(nk.aN, nk.y0, 0) ? -1 : 1;     // the pillar nearer the eye
   function endPiece(sd) {
     var sh = sd < 0 ? nukiPiece(-endB, -endA) : nukiPiece(endA, endB);
     nukiShade(sh);
     if (G.kusabi) {                                             // the wedge just outside the pillar
       var ka = sd * (nk.aN + nk.rN + kw * 0.6);
-      drawBox(ka - kw / 2, ka + kw / 2, (nk.y0 + nk.y1) / 2 - kH / 2, (nk.y0 + nk.y1) / 2 + kH / 2, -kD / 2, kD / 2, mix(RED, BLACK, 0.35), 0.9);
+      drawBox(ka - kw / 2, ka + kw / 2, (nk.y0 + nk.y1) / 2 - kH / 2, (nk.y0 + nk.y1) / 2 + kH / 2, -kD / 2, kD / 2, mix(RED, BLACK, 0.08), 0.9);
     }
     snowFront(sd < 0 ? 'endL' : 'endR'); snowFront(sd < 0 ? 'kusL' : 'kusR');
   }
