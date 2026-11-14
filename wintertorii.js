@@ -427,79 +427,26 @@ function draw(c, G, place, cam, Lt, look) {
      wind has drifted it against the post, lit as the snow ground is (the sun's side brighter), its edge soft */
   var fsK = d(look, 'footSnow', 1);
   function footSnow(a0) {
-    if (fsK <= 0 || !look.fieldCnv) return;
-    var rr0 = G.r0 * 1.04, fc = T.w(a0, 0, 0), F = cam.F, W0 = cam.W / 2, hy = cam.hy, eye = cam.eye, sc = look.pr || 1;
-    var cx = fc[0], cz = fc[2], y0 = fc[1];
-    if (!(cz > 1)) return;
-    /* A real drift round the pillar: a height field on the ground (a peak against the post, concave slopes, long low tails
-       to the left and right, lumps), seen through the camera pixel by pixel (the line of sight is followed to the surface).
-       Each pixel it covers takes the ground picture's own pixel at that place and is lit by the slope it lies on (sun on the
-       side that faces it, the sky's blue in the shade), so it is the same snow, with the same grain, and where it thins to
-       nothing it IS the ground: no outline, no seam. The pillar stays in front of the half of the drift behind it. */
-    var rg = rng(Math.round(cx * 977 + cz * 331 + a0 * 7919) + 5), kn = [], q;
-    for (q = 0; q < 16; q++) kn.push(rg());
-    function nzA(t) { t = (t % 1 + 1) % 1; var x = t * 15, i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return lerp(kn[i], kn[(i + 1) % 16], u); }
-    var hash = function (i, j) { var n = Math.sin(i * 127.1 + j * 311.7 + cx * 3.1) * 43758.5453; return n - Math.floor(n); };
-    function vn(x, z) { var i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j, ux = fx * fx * (3 - 2 * fx), uz = fz * fz * (3 - 2 * fz);
-      return lerp(lerp(hash(i, j), hash(i + 1, j), ux), lerp(hash(i, j + 1), hash(i + 1, j + 1), ux), uz); }
-    var H0 = (0.95 + 0.2 * rg()) * fsK, R0 = (1.05 + 0.2 * rg()) * Math.max(0.6, fsK), tailL = 1.8 + 1.4 * rg(), tailR = 1.8 + 1.4 * rg(), Rmax = R0 * (1 + Math.max(tailL, tailR)) + rr0;
-    function hAt(x, z) {
-      var dx = x - cx, dz = z - cz, rho = Math.sqrt(dx * dx + dz * dz); if (rho >= Rmax) return 0;
-      var th = Math.atan2(dz, dx), ct = Math.cos(th);
-      // reach in this direction: round about, with long tails along the screen's left-right line and uneven lobes
-      var Rr = R0 * (0.78 + 0.5 * nzA(th / TAU) + 0.8 * Math.pow(Math.max(0, ct), 5) * tailR + 0.8 * Math.pow(Math.max(0, -ct), 5) * tailL);
-      var s = Math.max(0, (rho - rr0 * 0.6) / Math.max(0.05, Rr - rr0 * 0.6)); if (s >= 1) return 0;
-      var hh = H0 * Math.pow(1 - s, 2.3) * (0.88 + 0.24 * vn(x * 3.1, z * 3.1)) * (0.9 + 0.2 * nzA(th / TAU + 0.31));
-      return hh * Math.min(1, 0.35 + 3 * s);                                  // the plateau against the post
+    if (fsK <= 0 || !look.snowLit) return;
+    var rr0 = G.r0 * 1.07, fc = T.w(a0, 0, 0), vd = norm([-fc[0], 0, -fc[2]]), pr = [-vd[2], 0, vd[0]];
+    var kn = [], q;
+    for (q = 0; q < 7; q++) kn.push(r());
+    function nz(t) { var x = (t + 1) / 2 * 6, i = Math.min(5, Math.floor(x)), f = x - i, u = f * f * (3 - 2 * f); return lerp(kn[i], kn[i + 1], u); }
+    var M = 22, inner = [], outer = [], A = PI / 2 * 1.06;
+    for (q = 0; q <= M; q++) {
+      var t = -1 + 2 * q / M, th = t * A, dx = vd[0] * Math.cos(th) + pr[0] * Math.sin(th), dz = vd[2] * Math.cos(th) + pr[2] * Math.sin(th);
+      var ht = (0.07 + 0.12 * nz(t)) * fsK * (1 - 0.3 * t * t), wd = rr0 * 0.3 + (0.25 + 0.3 * nz(-t)) * fsK;
+      inner.push(T.p([fc[0] + dx * rr0, ht, fc[2] + dz * rr0]));
+      outer.push(T.p([fc[0] + dx * (rr0 + wd), 0, fc[2] + dz * (rr0 + wd)]));
     }
-    var Hm = H0 * 1.3 + 0.05, tB = rr0, k;
-    // the screen box that can hold it
-    var sxs = [], sys = [], xs = [cx - Rmax, cx + Rmax], zs = [Math.max(1, cz - Rmax), cz + Rmax], hs = [0, Hm];
-    xs.forEach(function (x) { zs.forEach(function (z) { hs.forEach(function (h) { sxs.push(W0 + F * x / z); sys.push(hy - F * (y0 + h - eye) / z); }); }); });
-    var X0 = Math.floor(Math.min.apply(null, sxs) * sc) - 2, X1 = Math.ceil(Math.max.apply(null, sxs) * sc) + 2, Y0 = Math.floor(Math.min.apply(null, sys) * sc) - 2, Y1 = Math.ceil(Math.max.apply(null, sys) * sc) + 2;
-    var fcv = look.fieldCnv; X0 = Math.max(0, X0); Y0 = Math.max(0, Y0); X1 = Math.min(fcv.width, X1); Y1 = Math.min(fcv.height, Y1);
-    var wpx = X1 - X0, hpx = Y1 - Y0; if (wpx < 4 || hpx < 4 || wpx * hpx > 4e6) return;
-    var bd = fcv.getContext('2d').getImageData(X0, Y0, wpx, hpx).data, out = new ImageData(wpx, hpx), D = out.data;
-    var Ls2 = Lt.dir, sunN = [SN[0] * Lt.sun[0] * 1.25, SN[1] * Lt.sun[1] * 1.25, SN[2] * Lt.sun[2] * 1.25], fl = Math.max(0.02, Ls2[1]), eps = 0.03, x, y, ch;
-    var dn = [sunN[0] * fl + SH[0], sunN[1] * fl + SH[1], sunN[2] * fl + SH[2]];
-    for (y = 0; y < hpx; y++) {
-      var sy = (Y0 + y + 0.5) / sc, ddy = -(sy - hy) / F; if (ddy >= -1e-4) continue;
-      var tg = (eye - y0) / -ddy, tt = (eye - y0 - Hm) / -ddy;
-      for (x = 0; x < wpx; x++) {
-        var ddx = ((X0 + x + 0.5) / sc - W0) / F;
-        // too far from the drift to meet it?
-        var gx = tg * ddx - cx, gz = tg - cz, reach = Rmax + (tg - tt) * Math.sqrt(ddx * ddx + 1);
-        if (gx * gx + gz * gz > reach * reach) continue;
-        // follow the line of sight down to the surface
-        var tlo = Math.max(tt, cz - Rmax), thi = Math.min(tg, cz + Rmax), tHit = -1, st = (thi - tlo) / 110, t, hx;
-        if (thi <= tlo) continue;
-        for (k = 1; k <= 110; k++) {
-          t = tlo + st * k; hx = hAt(t * ddx, t);
-          if (eye + t * ddy - y0 - hx <= 0) { var lo = tlo + st * (k - 1), hi = t, m, j; for (j = 0; j < 9; j++) { m = (lo + hi) / 2; if (eye + m * ddy - y0 - hAt(m * ddx, m) <= 0) hi = m; else lo = m; } tHit = hi; break; }
-        }
-        if (tHit < 0) continue;
-        // the pillar is in front of the part of the drift that lies behind it
-        var aa = ddx * ddx + 1, bb = -2 * (ddx * cx + cz), cc = cx * cx + cz * cz - rr0 * rr0, di = bb * bb - 4 * aa * cc;
-        if (di > 0) { var tc = (-bb - Math.sqrt(di)) / (2 * aa); if (tc < tHit) continue; }
-        var px = tHit * ddx, pz = tHit, h = hAt(px, pz);
-        if (h < 0.0015) continue;
-        var gxp = (hAt(px + eps, pz) - hAt(px - eps, pz)) / (2 * eps), gzp = (hAt(px, pz + eps) - hAt(px, pz - eps)) / (2 * eps), nl = Math.sqrt(gxp * gxp + gzp * gzp + 1);
-        var nx = -gxp / nl, ny = 1 / nl, nzv = -gzp / nl, sun = Math.max(0, nx * Ls2[0] + ny * Ls2[1] + nzv * Ls2[2]);
-        var rho = Math.sqrt((px - cx) * (px - cx) + (pz - cz) * (pz - cz)), ao = lerp(0.72, 1, smooth(rr0, rr0 + 0.55, rho)), sk = (0.55 + 0.45 * ny) * ao;
-        var o4 = (y * wpx + x) * 4;
-        for (ch = 0; ch < 3; ch++) {
-          var ratio = (sunN[ch] * sun * Math.min(1, ao + 0.2) + SH[ch] * sk) / dn[ch];
-          ratio = lerp(ratio, 1, 0.62);                                       // light thrown into the shade by the sunlit snow round it
-          if (ch === 0) ratio *= lerp(1, 0.88, 1 - Math.min(1, sk)); else if (ch === 1) ratio *= lerp(1, 0.95, 1 - Math.min(1, sk));      // and the shade is bluish
-          var v = bd[o4 + ch] * ratio;
-          D[o4 + ch] = v > 236 ? 236 + (v - 236) * 19 / (v - 236 + 19) : v;
-        }
-        D[o4 + 3] = 255 * Math.min(1, h / 0.01);
-      }
-    }
-    var oc = document.createElement('canvas'); oc.width = wpx; oc.height = hpx; oc.getContext('2d').putImageData(out, 0, 0);
-    c.save(); c.filter = 'blur(' + Math.max(0.4, 0.45 * sc).toFixed(2) + 'px)'; c.drawImage(oc, X0 / sc, Y0 / sc, wpx / sc, hpx / sc); c.restore();
-    grow([[X0 / sc, Y0 / sc], [X1 / sc, Y1 / sc]]);
+    var Q = inner.concat(outer.reverse());
+    var sunRight = pr[0] * Lt.dir[0] + pr[2] * Lt.dir[2] > 0;
+    var lit = mix(look.snowLit, Lt.mist, PN.hz), dim = mix(mix(look.snowLit, look.snowShade, 0.55), Lt.mist, PN.hz);
+    var xl = Math.min.apply(null, Q.map(function (p) { return p[0]; })), xr = Math.max.apply(null, Q.map(function (p) { return p[0]; }));
+    var g = c.createLinearGradient(xl, 0, xr, 0);
+    g.addColorStop(0, rgb(sunRight ? dim : lit)); g.addColorStop(0.5, rgb(mix(lit, dim, 0.45))); g.addColorStop(1, rgb(sunRight ? lit : dim));
+    c.save(); c.filter = 'blur(1px)'; poly(c, Q); c.fillStyle = g; c.fill(); c.restore();
+    grow(Q);
   }
 
   // which pillar, end and so on is nearer: draw the farther first
