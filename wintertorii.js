@@ -460,26 +460,38 @@ function draw(c, G, place, cam, Lt, look) {
     // heap away from the path, and low domes along the tails (long away from the path, short toward it)
     var side = [-eb, ea];                                         // across the line of sight (a, b)
     rp();
-    var hi = sd * side[0] >= 0 ? 1 : -1, D = [];                  // the side away from the path stands higher (the reference)
+    var hi = sd * side[0] >= 0 ? 1 : -1, D = [];                  // the side away from the path (a little higher)
     function dome(a, b, r, h, sq) { D.push({ a: a, b: b, r: r, h: h, sq: sq || 1 }); }
-    dome(a0, 0, rs + pw * lerp(1.25, 1.45, rp()), pw * lerp(0.82, 0.9, rp()));
+    dome(a0, 0, rs + pw * lerp(1.25, 1.45, rp()), pw * lerp(0.8, 0.88, rp()));
+    // banked high against the post on BOTH sides (as seen), a little toward the eye
     [-1, 1].forEach(function (k) {
-      var dd = rs + pw * lerp(0.35, 0.55, rp()), back = -lerp(0.15, 0.4, rp());   // (a little toward the eye: banked against the post's front)
-      dome(a0 + (side[0] * k - ea * back) * dd, (side[1] * k - eb * back) * dd, pw * lerp(0.95, 1.15, rp()), pw * (k === hi ? lerp(0.9, 1.0, rp()) : lerp(0.5, 0.6, rp())));
+      var dd = rs + pw * lerp(0.3, 0.45, rp()), back = -lerp(0.15, 0.35, rp());
+      dome(a0 + (side[0] * k - ea * back) * dd, (side[1] * k - eb * back) * dd, pw * lerp(0.9, 1.05, rp()), pw * (k === hi ? lerp(1.25, 1.35, rp()) : lerp(1.1, 1.2, rp())));
     });
-    dome(a0 + sd * pw * lerp(1.3, 1.7, rp()), -eb * pw * 0.35 + (rp() - 0.5) * pw * 0.4, pw * lerp(1.4, 1.7, rp()), pw * lerp(0.5, 0.62, rp()));
-    for (var q3 = 0; q3 < 3; q3++) {                              // smaller lumps on its flanks
-      var an3 = rp() * TAU, d3 = rs + pw * lerp(0.7, 1.3, rp());
-      dome(a0 + Math.cos(an3) * d3, Math.sin(an3) * d3, pw * lerp(0.45, 0.65, rp()), pw * lerp(0.35, 0.55, rp()));
-    }
-    for (var q2 = 0; q2 < 3; q2++) {                              // the tail away from the path
-      var t2 = (q2 + 1) / 3, dist = pw * lerp(2.2, 3.8, t2), ang = (rp() - 0.5) * 0.9;
-      dome(a0 + sd * dist * Math.cos(ang), dist * Math.sin(ang) + (rp() - 0.5) * pw * 0.3, pw * lerp(1.1, 0.7, t2), pw * lerp(0.32, 0.12, t2));
-    }
-    dome(a0 - sd * pw * lerp(1.1, 1.4, rp()), (rp() - 0.5) * pw * 0.5, pw * lerp(0.9, 1.1, rp()), pw * lerp(0.28, 0.36, rp()));   // toward the path
-    for (q2 = 0; q2 < 2; q2++) {                                  // along the path, in front and behind
+    // a flank on each side running down from the post to the ground: away from the path long, toward it shorter (onto the
+    // path's floor, as in the reference)
+    [1, -1].forEach(function (o) {
+      var len = pw * (o > 0 ? lerp(2.6, 3.4, rp()) : lerp(2.0, 2.5, rp())), ang = (rp() - 0.5) * 0.5, n = 6;
+      for (var q = 1; q <= n; q++) {
+        var t = q / n, dist = rs + len * t, j = (rp() - 0.5) * pw * 0.35;
+        dome(a0 + o * sd * dist * Math.cos(ang) + j * 0.3, dist * Math.sin(ang) + j - eb * pw * 0.2, pw * lerp(0.95, 0.5, t) * lerp(0.85, 1.15, rp()), pw * lerp(0.85, 0.1, Math.pow(t, 0.8)) * lerp(0.85, 1.1, rp()));
+      }
+    });
+    dome(a0 + sd * pw * lerp(1.2, 1.6, rp()), -eb * pw * 0.35 + (rp() - 0.5) * pw * 0.4, pw * lerp(1.3, 1.6, rp()), pw * lerp(0.45, 0.58, rp()));
+    for (var q2 = 0; q2 < 2; q2++) {                              // along the path, in front and behind
       var sb = q2 ? 1 : -1;
-      dome(a0 + sd * pw * (rp() - 0.3) * 0.5, sb * pw * lerp(1.2, 1.6, rp()), pw * lerp(1.0, 1.2, rp()), pw * lerp(0.25, 0.35, rp()));
+      dome(a0 + sd * pw * (rp() - 0.3) * 0.5, sb * pw * lerp(1.1, 1.5, rp()), pw * lerp(0.9, 1.1, rp()), pw * lerp(0.3, 0.42, rp()));
+    }
+    // lumps over its surface (the contours the light picks out)
+    for (var q3 = 0; q3 < 5; q3++) {
+      var an3 = rp() * TAU, d3 = rs + pw * lerp(0.4, 1.8, Math.sqrt(rp()));
+      var hb = 0.95 * Math.exp(-d3 / (1.6 * pw));
+      dome(a0 + Math.cos(an3) * d3, Math.sin(an3) * d3, pw * lerp(0.6, 0.85, rp()), pw * (hb + lerp(0.1, 0.2, rp())));
+    }
+    // a scalloped rim: small lumps round its edge, each its own size
+    for (var q4 = 0; q4 < 8; q4++) {
+      var an4 = q4 / 8 * TAU + (rp() - 0.5) * 0.35, c4 = Math.cos(an4) * sd, d4 = rs + pw * (c4 > 0 ? lerp(2.0, 3.0, c4) : lerp(1.6, 2.1, -c4)) * lerp(0.8, 1.1, rp());
+      dome(a0 + Math.cos(an4) * d4, Math.sin(an4) * d4 * 0.85, pw * lerp(0.5, 0.8, rp()), pw * lerp(0.06, 0.13, rp()));
     }
     var kS = pw * 0.09;                                            // how soft the joins between domes are
     function smax(x, y) { var hh = clamp(0.5 + 0.5 * (x - y) / kS, 0, 1); return lerp(y, x, hh) + kS * hh * (1 - hh); }
@@ -497,7 +509,9 @@ function draw(c, G, place, cam, Lt, look) {
       h *= fsK; pileBase = h;
       // broad soft billows on it (no fine noise: it made spots)
       var env = Math.min(1, h / (0.15 * pw));
-      return Math.max(0, h + env * pw * fsK * 0.05 * n2(a / (0.55 * pw), b / (0.55 * pw), G.seed + 3 + sd));
+      var hn = h + env * pw * fsK * 0.07 * n2(a / (0.45 * pw), b / (0.45 * pw), G.seed + 3 + sd);
+      // its rim broken: the edge eaten in unevenly where the snow is thin
+      return Math.max(0, hn - pw * fsK * 0.05 * (0.6 + 0.4 * n2(a / (0.22 * pw), b / (0.22 * pw), G.seed + 7 + sd)) * (1 - Math.min(1, h / (0.25 * pw))));
     }
     // the height field on a grid round the foot: the ground (with the path cut into it) plus the pile
     var gPost = g0;
@@ -508,16 +522,16 @@ function draw(c, G, place, cam, Lt, look) {
       var a = A0 + ia * cell, b = B0 + jb * cell, gq = grd(a, b), p = pile(a, b), pb0 = pileBase;
       // not across the path's floor, but round a post that stands on it (its long tails go out over the wall)
       var rr2 = Math.max(0, Math.hypot(a - a0, b) - rs), sv2 = hi * ((a - a0) * side[0] + b * side[1]) / (Math.hypot(a - a0, b) || 1);
-      if (gq.fl > 0) { var fk = 1 - gq.fl * smooth(1.0 * pw, 2.6 * pw, rr2); p *= fk; pb0 *= fk; }
+      if (gq.fl > 0) { var fk = 1 - gq.fl * smooth(2.2 * pw, 3.4 * pw, rr2); p *= fk; pb0 *= fk; }
       // a post standing in a hollow (on the path's floor, below the untouched snow round it): the snow fills the hollow
       // round it first, so the pile rises from the level of the snow beside the path, as in the reference
       var hol = Math.max(0, gy0 - gPost);
       if (hol > 0) { var lift = hol * Math.exp(-Math.pow(rr2 / (1.3 * pw), 2)) * Math.min(1, fsK) * Math.min(1, p / (0.1 * pw) + 0.35); p += lift; pb0 += lift; }
       // right against the post: where the snow meets the sleeve, high on one side, sloping down across the front to the
       // other (as in the reference: a slant, not a ring)
-      if (fsK > 0) { var need = (Math.max(gPost, gy0) + (0.62 + 0.32 * sv2 + 0.06 * nth(Math.atan2(b, a - a0) * 3)) * pw * fsK - gq.h) * Math.exp(-Math.pow(rr2 / (0.45 * pw), 2)); if (need > p) { pb0 += need - p; p = need; } }
+      if (fsK > 0) { var need = (Math.max(gPost, gy0) + (0.92 + 0.06 * sv2 + 0.08 * nth(Math.atan2(b, a - a0) * 3)) * pw * fsK - gq.h) * Math.exp(-Math.pow(rr2 / (0.45 * pw), 2)); if (need > p) { pb0 += need - p; p = need; } }
       // and the slant itself, on top of the heap: higher on one side of the post, lower on the other
-      if (fsK > 0 && p > 0) { var sl2 = 0.24 * pw * fsK * sv2 * Math.exp(-Math.pow(rr2 / (0.6 * pw), 2)); p = Math.max(0, p + sl2); pb0 = Math.max(0, pb0 + sl2); }
+      if (fsK > 0 && p > 0) { var sl2 = 0.06 * pw * fsK * sv2 * Math.exp(-Math.pow(rr2 / (0.6 * pw), 2)); p = Math.max(0, p + sl2); pb0 = Math.max(0, pb0 + sl2); }
       var k = jb * N + ia; TH[k] = p; PB[k] = pb0; GG[k] = gq.h;
     }
     // drifted snow smooths over what lies under it: the pile and the ground beneath it are softened (the wall's lip and
@@ -566,7 +580,7 @@ function draw(c, G, place, cam, Lt, look) {
     if (w * h > 3e6 || w * h < 1) return;
     var im = new ImageData(w, h), D = im.data, any = 0;
     // the light of the reference: from the upper right, in front (camera space: x right, y up, z away)
-    var LR = norm([0.8, 0.62, -0.12]);
+    var LR = norm([0.55, 0.8, 0.3]);
     // the reference's own colours (measured on it: lit tops about (244, 245, 250), the shade about (185, 196, 214), the
     // creases about (162, 166, 186)), as bright as the scene's snow is now (dusk and night darker)
     // (each channel scaled by the scene's lit snow against its day colour (225, 234, 237): the same at day, the warm and
@@ -618,7 +632,7 @@ function draw(c, G, place, cam, Lt, look) {
         if (!isFinite(lap)) lap = 0;
         var crease = clamp(lap * pw * 0.08, 0, 0.7);
         var dl = nx * LR[0] + ny * LR[1] + nz * LR[2];
-        var f = smooth(0.12, 0.62, dl);                          // lit … shade, a soft painted edge between
+        var f = smooth(0.3, 0.82, dl);                          // lit … shade, a soft painted edge between
         var col = [0, 0, 0];
         for (var ch = 0; ch < 3; ch++) col[ch] = lerp(lerp(shC[ch], litC[ch], f), deep[ch], crease * 0.8);
         // against the post: a thin shade where it meets the sleeve
@@ -626,10 +640,10 @@ function draw(c, G, place, cam, Lt, look) {
         var cs = Math.exp(-rp2 / (0.06 * pw)) * 0.25 * (1 - f);
         for (ch = 0; ch < 3; ch++) col[ch] = lerp(col[ch], deep[ch], cs);
         // its thin edge lies in the lavender of the snow's shade (as the reference's drifts meet the ground)
-        var te = 1 - smooth(0, 0.1 * pw, thk);
-        for (ch = 0; ch < 3; ch++) col[ch] = lerp(col[ch], lerp(shC[ch], litC[ch], 0.4), te * 0.6);
+        var te = 1 - smooth(0, 0.22 * pw, thk);
+        for (ch = 0; ch < 3; ch++) col[ch] = lerp(col[ch], lerp(shC[ch], litC[ch], 0.25), te * 0.75);
         var gr = 1 + (ihash(i + X0 * 7, j + Y0 * 3) - 0.5) * 0.03;
-        var al = smooth(0.003, 0.04, thk);
+        var al = smooth(0.003, 0.03 + 0.05 * (0.5 + 0.5 * n2(pa / (0.12 * pw), pb / (0.12 * pw), G.seed + 21)), thk);   // (fully opaque wherever it is thicker than 8 cm)
         var kk = (j * w + i) * 4;
         for (ch = 0; ch < 3; ch++) D[kk + ch] = clamp(lerp(col[ch], mist[ch], hzk) * gr, 0, 255);
         D[kk + 3] = 255 * al; any++;
