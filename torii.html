@@ -94,9 +94,9 @@ var V_DEFAULTS = {
   gateWeather: 1, gateVivid: 0.5, gateSoft: 0.35, gateHaze: 1, gateShadow: 1, gateFootShade: 1, gateFootSnow: 1, gateAir: 0, gateDof: 0, gateArrange: false,
   gateH1: 1, gateH2: 0.88, gateH3: 0.66, gateH4: 0.6, gateH5: 0.55, gateH6: 0.5,
   // each gate's own (1 the front one): shown, moved across the path (m, + to the right looking up the path), moved along the path (m), turned (°, + its right end toward you), leaned (°, + its top toward you)
-  gate1Show: true, gate1Across: 0, gate1Along: 0, gate1Turn: 0, gate1Tilt: 0, gate2Show: true, gate2Across: 0, gate2Along: 0, gate2Turn: 0, gate2Tilt: 0,
-  gate3Show: true, gate3Across: 0, gate3Along: 0, gate3Turn: 0, gate3Tilt: 0, gate4Show: true, gate4Across: 0, gate4Along: 0, gate4Turn: 0, gate4Tilt: 0,
-  gate5Show: true, gate5Across: 0, gate5Along: 0, gate5Turn: 0, gate5Tilt: 0, gate6Show: true, gate6Across: 0, gate6Along: 0, gate6Turn: 0, gate6Tilt: 0,
+  gate1Show: true, gate1Size: 1, gate1Across: 0, gate1Along: 0, gate1Turn: 0, gate1Tilt: 0, gate2Show: true, gate2Size: 1, gate2Across: 0, gate2Along: 0, gate2Turn: 0, gate2Tilt: 0,
+  gate3Show: true, gate3Size: 1, gate3Across: 0, gate3Along: 0, gate3Turn: 0, gate3Tilt: 0, gate4Show: true, gate4Size: 1, gate4Across: 0, gate4Along: 0, gate4Turn: 0, gate4Tilt: 0,
+  gate5Show: true, gate5Size: 1, gate5Across: 0, gate5Along: 0, gate5Turn: 0, gate5Tilt: 0, gate6Show: true, gate6Size: 1, gate6Across: 0, gate6Along: 0, gate6Turn: 0, gate6Tilt: 0,
   gateSnowShow: true, gateSnow: 1, gateCrevice: 1, gatePlaster: 1, gateSnowVary: 0.6, gateFall: true, gateFallRate: 8, gatePowder: 1,
   colours: { snow: '#FAFAFC', mist: '#ffffff', bankEarth: '#4D4038', toriiRed: '#D8401E', toriiBlack: '#2A2523',
              hallPlaster: '#FFF8E8', hallTimber: '#F23A12', hallStone: '#A8A8A0', hallRed: '#F23A12', hallGreen: '#1FA67A', hallSoffit: '#E0360F', flame: '#FFAA5A' }
@@ -478,7 +478,10 @@ var SL = mk(), BASE = mk(), GATES = [], gateInfo = '';
 function gateShape(i) {
   var D = V.gateDia, clear = V.gateClear;
   // the pillars stand just outside the path: its half width, its wall's slope, a clear gap, the pillar's own radius
-  var span0 = 2 * (V.trailWidth / 2 + V.trailWall + clear), span = span0 / (1 - D);
+  // this gate's size (1 = the width that stands just outside the path): the whole gate scaled as one, width, height and every
+  // part with it (all its measures follow the width between the pillars)
+  var gk = V['gate' + (i + 1) + 'Size'] || 1;
+  var span0 = 2 * (V.trailWidth / 2 + V.trailWall + clear), span = span0 / (1 - D) * gk;
   // each gate its own height (the same width: it follows the path), shorter toward the shrine
   var hk = V.gateHeight * (V['gateH' + (i + 1)] || 1);
   return WinterTorii.build({ span: span, height: span * hk, dia: span * D, lean: V.gateLean, sori: V.gateSori * span * hk,
@@ -738,6 +741,7 @@ var G_PANEL = [
     return ['Gate ' + n + (n === 1 ? ' (the front one)' : ' from the front'), [
       { k: 'gate' + n + 'Show', t: 'Shown', chk: 1 },
       { k: 'gate' + n + 'Across', t: 'Moved across the path (m, + right, − left, looking up the path)', min: -5, max: 5, step: 0.05 },
+      { k: 'gate' + n + 'Size', t: 'Size (× the gate as it is: width, height and every part together)', min: 0.3, max: 2.5, step: 0.01 },
       { k: 'gate' + n + 'Along', t: 'Moved along the path (m, + toward the hall)', min: -70, max: 70, step: 0.1 },
       { k: 'gate' + n + 'Turn', t: 'Turned (°, + its right end toward you)', min: -30, max: 30, step: 0.05 },
       { k: 'gate' + n + 'Tilt', t: 'Leaned (°, + its top toward you)', min: -5, max: 5, step: 0.05 },
