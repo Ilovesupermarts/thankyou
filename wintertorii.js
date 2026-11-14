@@ -555,7 +555,9 @@ function draw(c, G, place, cam, Lt, look) {
     var THs = blurF(TH, pw * 0.07), PBs = blurF(PB, pw * 0.07), GGs = blurF(GG, pw * 0.45);
     for (var kq = 0; kq < N * N; kq++) {
       var w2 = smooth(0, 0.25 * pw, THs[kq]), base = lerp(GG[kq], GGs[kq], w2), top = Math.max(GG[kq], base + THs[kq]);
-      HT[kq] = top; TH[kq] = top - GG[kq]; PB[kq] = PBs[kq];
+      // (its thickness for the fade and the rim's tint: the pile's own smooth thickness, not its height above the ground,
+      // which jumps by the wall's height where the wall's foot runs under it and drew a straight line)
+      HT[kq] = top; TH[kq] = top > GG[kq] + 1e-4 ? Math.max(THs[kq], 0.0021) : 0; PB[kq] = PBs[kq];
       if (top > hMax) hMax = top; if (top < hMin) hMin = top;
     }
     function hs(i, j, s) { var v = Math.sin(i * 127.1 + j * 311.7 + s * 74.7) * 43758.5453; return v - Math.floor(v); }
@@ -617,11 +619,20 @@ function draw(c, G, place, cam, Lt, look) {
           prev = t; t += stp;
         }
         if (hit < 0) continue;
+        var buried = false;
+        // hidden behind the post? Only where the post stands above the snow: any part of it below the snow's surface
+        // (its foot, which goes down into the ground) is buried, and the snow there is painted over it
+        var ox = -pxC, oz = -pzC, qa = dx * dx + 1, qb = 2 * (ox * dx + oz), qc = ox * ox + oz * oz - rs * rs, disc = qb * qb - 4 * qa * qc;
+        if (disc > 0) {
+          var tc = (-qb - Math.sqrt(disc)) / (2 * qa);
+          if (tc > 0 && tc < hit) {
+            var hcv = at(HT, aa * tc + ab, ba * tc + bb);
+            if (hcv === null || eye + dY * tc > hcv + 0.004) continue;
+            hit = tc; var buried = true;                         // buried post: the snow at its face
+          }
+        }
         var pa = aa * hit + ab, pb = ba * hit + bb, thk = at(TH, pa, pb);
         if (!(thk > 0.002)) continue;
-        // hidden behind the post?
-        var ox = -pxC, oz = -pzC, qa = dx * dx + 1, qb = 2 * (ox * dx + oz), qc = ox * ox + oz * oz - rs * rs, disc = qb * qb - 4 * qa * qc;
-        if (disc > 0) { var tc = (-qb - Math.sqrt(disc)) / (2 * qa); if (tc > 0 && tc < hit) continue; }
         // the surface's direction (the grid's slope, the gate's a / b turned back to camera space)
         var ha = (at(HT, pa + eps, pb) - at(HT, pa - eps, pb)) / (2 * eps), hb = (at(HT, pa, pb + eps) - at(HT, pa, pb - eps)) / (2 * eps);
         if (!isFinite(ha)) ha = 0; if (!isFinite(hb)) hb = 0;
@@ -641,9 +652,9 @@ function draw(c, G, place, cam, Lt, look) {
         for (ch = 0; ch < 3; ch++) col[ch] = lerp(col[ch], deep[ch], cs);
         // its thin edge lies in the lavender of the snow's shade (as the reference's drifts meet the ground)
         var te = 1 - smooth(0, 0.22 * pw, thk);
-        for (ch = 0; ch < 3; ch++) col[ch] = lerp(col[ch], lerp(shC[ch], litC[ch], 0.25), te * 0.75);
+        for (ch = 0; ch < 3; ch++) col[ch] = lerp(col[ch], lerp(shC[ch], litC[ch], 0.6), te * 0.8);
         var gr = 1 + (ihash(i + X0 * 7, j + Y0 * 3) - 0.5) * 0.03;
-        var al = smooth(0.003, 0.03 + 0.05 * (0.5 + 0.5 * n2(pa / (0.12 * pw), pb / (0.12 * pw), G.seed + 21)), thk);   // (fully opaque wherever it is thicker than 8 cm)
+        var al = smooth(0.002, 0.05 + 0.07 * (0.5 + 0.5 * n2(pa / (0.12 * pw), pb / (0.12 * pw), G.seed + 21)), thk);   // (feathered into the ground over 5-12 cm; fully opaque wherever thicker)
         var kk = (j * w + i) * 4;
         for (ch = 0; ch < 3; ch++) D[kk + ch] = clamp(lerp(col[ch], mist[ch], hzk) * gr, 0, 255);
         D[kk + 3] = 255 * al; any++;
@@ -651,7 +662,7 @@ function draw(c, G, place, cam, Lt, look) {
     }
     if (!any) return;
     var cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').putImageData(im, 0, 0);
-    c.save(); c.filter = 'blur(' + (0.5 * PRD).toFixed(2) + 'px)'; c.imageSmoothingQuality = 'high';
+    c.save(); c.filter = 'blur(' + (1.0 * PRD).toFixed(2) + 'px)'; c.imageSmoothingQuality = 'high';
     c.drawImage(cv, X0, Y0, w / PRD, h / PRD); c.restore();
     grow([[X0, Y0], [X0 + w / PRD, Y0 + h / PRD]]);
   }
@@ -1048,7 +1059,7 @@ function draw(c, G, place, cam, Lt, look) {
     plaster(sd, shaft.H);
     c.restore();
     // the black sleeve at its foot (lacquer: a dull sheen) and its rim
-    var sl = drawCyl(a0, footY(a0), aN, G.nem, G.r0 * 1.07, G.radius(G.nem) * 1.07, BLACK, { occ: 1, spec: 0.12 });
+    var sl = drawCyl(a0, 0, aN, G.nem, G.r0 * 1.07, G.radius(G.nem) * 1.07, BLACK, { occ: 1, spec: 0.12 });
     inside(sl.H, function () {
       if (wea <= 0) return;
       // dust and dried salt near the snow, scuffs
