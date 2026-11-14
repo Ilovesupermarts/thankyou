@@ -213,19 +213,20 @@ function section(hd, q) {
 /* ---------------- drawing ---------------- */
 /* place: { x, z (m, camera space: where the gate's middle stands on the snow), fx, fz (the way it faces: along the path),
    tilt (radians, optional: the whole gate leaned about the line between its feet, + its top toward the face that greets
-   you, b < 0) }. Turning a gate is only a different fx, fz. */
+   you, b < 0), y0 (m, optional: how high the ground stands where its feet are, e.g. the rise the hall stands on) }.
+   Turning a gate is only a different fx, fz. */
 function frame(place, cam) {
   var fx = place.fx, fz = place.fz, rx = fz, rz = -fx, X = place.x, Z = place.z, eye = cam.eye, F = cam.F, cx = cam.W / 2, hy = cam.hy;
-  var tl = place.tilt || 0, ct = Math.cos(tl), st = Math.sin(tl);
-  function tw(a, y, b, x0, z0) { var y2 = ct * y + st * b, b2 = ct * b - st * y; return [x0 + a * rx + b2 * fx, y2, z0 + a * rz + b2 * fz]; }
+  var tl = place.tilt || 0, ct = Math.cos(tl), st = Math.sin(tl), gy = place.y0 || 0;
+  function tw(a, y, b, x0, z0, yy) { var y2 = ct * y + st * b, b2 = ct * b - st * y; return [x0 + a * rx + b2 * fx, y2 + yy, z0 + a * rz + b2 * fz]; }
   // a direction in camera space → the gate's own (a, y, b)
   function loc(vx, vy, vz) { var a = vx * rx + vz * rz, bw = vx * fx + vz * fz; return [a, ct * vy - st * bw, st * vy + ct * bw]; }
   return {
     // local (a, y, b) → camera [x, y (from the snow), z]
-    w: function (a, y, b) { return tw(a, y, b, X, Z); },
-    n: function (na, ny, nb) { return tw(na, ny, nb, 0, 0); },
+    w: function (a, y, b) { return tw(a, y, b, X, Z, gy); },
+    n: function (na, ny, nb) { return tw(na, ny, nb, 0, 0, 0); },
     loc: loc,
-    locP: function (q) { return loc(q[0] - X, q[1], q[2] - Z); },
+    locP: function (q) { return loc(q[0] - X, q[1] - gy, q[2] - Z); },
     p: function (q) { var z = Math.max(0.2, q[2]); return [cx + F * q[0] / z, hy - F * (q[1] - eye) / z]; },
     eye: [0, eye, 0], rx: rx, rz: rz, fx: fx, fz: fz
   };
@@ -892,8 +893,8 @@ function shadow(c, G, place, cam, Lt) {
   var T = frame(place, cam), S = solids(G);
   S.forEach(function (s) {
     var Q = s.pts.map(function (p) {
-      var q = T.w(p[0], p[1], p[2]), t = q[1] / L[1];
-      return T.p([q[0] - L[0] * t, 0, q[2] - L[2] * t]);
+      var q = T.w(p[0], p[1], p[2]), t = (q[1] - (place.y0 || 0)) / L[1];
+      return T.p([q[0] - L[0] * t, place.y0 || 0, q[2] - L[2] * t]);
     });
     poly(c, hull(Q)); c.fill();
   });
@@ -901,8 +902,8 @@ function shadow(c, G, place, cam, Lt) {
     for (var i = 0; i < hp.st.length - 1; i += 4) {
       var Q = [];
       for (var j = i; j <= Math.min(hp.st.length - 1, i + 4); j++) section(hp.hd, hp.st[j]).forEach(function (pp) {
-        var q = T.w(hp.st[j].a, hp.st[j].y + pp[1], pp[0]), t = q[1] / L[1];
-        Q.push(T.p([q[0] - L[0] * t, 0, q[2] - L[2] * t]));
+        var q = T.w(hp.st[j].a, hp.st[j].y + pp[1], pp[0]), t = (q[1] - (place.y0 || 0)) / L[1];
+        Q.push(T.p([q[0] - L[0] * t, place.y0 || 0, q[2] - L[2] * t]));
       });
       poly(c, hull(Q)); c.fill();
     }
