@@ -504,6 +504,18 @@ function snowAt(k) {
   }
   return out;
 }
+/* the snow's own height (m) at a point of the camera's ground, as the snow ground draws it: the rise the hall stands on
+   (winter scene's view) plus the path cut into it; fl: how far onto the path's trodden floor (1) … its walls and the
+   untouched snow (0). The drifts at the gates' feet sit on it. */
+var GROUND_T = null;
+function groundFn() {
+  var T = V.view === 'scene' ? TRAIL.T : (GROUND_T && GROUND_T.key === VIEW ? GROUND_T.T : (GROUND_T = { key: VIEW, T: WinterPath.build(pathOpts(VIEW.pts)) }).T);
+  var rise = V.view === 'scene' && TRAIL.hall && TRAIL.hall.ground ? TRAIL.hall.ground : null;
+  return function (x, z) {
+    var h = T.delta(x, z, 0, true), fl = T.Q.far ? 0 : T.Q.floor;
+    return { h: h + (rise ? Math.max(0, rise(x, z)) : 0), fl: fl };
+  };
+}
 function layer() { var L = mk(); L.cnv.width = Math.round(W * PR); L.cnv.height = Math.round(H * PR); L.c.setTransform(PR, 0, 0, PR, 0, 0); return L; }
 /* Each gate on a layer of its own (laid down a little soft), so the snow falling from a gate goes behind the nearer gates */
 function drawGates() {
@@ -519,7 +531,7 @@ function drawGates() {
   var wf = VIEW.dirCam(-0.94, -0.34);                          // the wind comes from the left of the winter scene (as the frosted trees' rime)
   var look = { red: hex(V.colours.toriiRed), black: hex(V.colours.toriiBlack), kasagiBlack: V.gateKasagiBlack, vivid: V.gateVivid,
                weather: V.gateWeather, haze: V.gateHaze * V.fieldHaze, hazeM: V.fieldHazeDist, footSnow: V.gateFootSnow,
-               snowLit: snowAt(1), snowShade: snowAt(0.25), snowRGB: hex(V.colours.snow), shadeRGB: SHADE, crevice: V.gateCrevice, windFrom: wf, pr: PR };
+               snowLit: snowAt(1), snowShade: snowAt(0.25), snowRGB: hex(V.colours.snow), shadeRGB: SHADE, crevice: V.gateCrevice, windFrom: wf, pr: PR, ground: groundFn() };
   var order = VIEW.gates.map(function (g) { return { g: g, i: g.i }; }).filter(function (o) { return o.g.z > 1; }).sort(function (a, b) { return b.g.z - a.g.z; });
   var zNear = order.length ? order[order.length - 1].g.z : 1;
   var info = [], tmp = layer();
