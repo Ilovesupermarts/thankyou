@@ -835,12 +835,12 @@ function axPlace(i) {
 // the two rings round gate i (CSS px): flat (turn) and upright (lean)
 function axRings(i) {
   var pl = axPlace(i); if (!pl) return null;
-  var G = gateShape(i), yc = G.Ht * 0.52, R = G.S * 0.8, rx = pl.fz, rz = -pl.fx, flat = [];
-  for (var k = 0; k <= 64; k++) {
-    var t = k / 64 * 2 * PI, ca = Math.cos(t), sa = Math.sin(t);
-    flat.push(axProj([pl.x + R * (ca * rx + sa * pl.fx), yc, pl.z + R * (ca * rz + sa * pl.fz)]));
-  }
-  var c = axProj([pl.x, yc, pl.z]), top = axProj([pl.x, yc + R * 0.95, pl.z]), ry = c[1] - top[1], rw = Math.max(18, ry * 0.32), up = [];
+  // (seen from the eye, 3 m up, a level ring round the gate's middle is almost edge-on: a line. So the rings are drawn
+  // open on the screen, as a gizmo: the flat one as wide as the gate, the upright one as tall)
+  var G = gateShape(i), yc = G.Ht * 0.52, R = G.S * 0.8, flat = [], k;
+  var c = axProj([pl.x, yc, pl.z]), sideP = axProj([pl.x + R * pl.fz, yc, pl.z - R * pl.fx]), fw = Math.max(40, Math.abs(sideP[0] - c[0])), fh = fw * 0.3;
+  for (k = 0; k <= 64; k++) { var t = k / 64 * 2 * PI; flat.push([c[0] + fw * Math.cos(t), c[1] + fh * Math.sin(t)]); }
+  var top = axProj([pl.x, yc + R * 0.95, pl.z]), ry = c[1] - top[1], rw = Math.max(18, ry * 0.32), up = [];
   for (k = 0; k <= 64; k++) { var u = k / 64 * 2 * PI; up.push([c[0] + rw * Math.sin(u), c[1] - ry * Math.cos(u)]); }
   return { pl: pl, G: G, flat: flat, up: up, c: c };
 }
@@ -870,7 +870,7 @@ function axDraw() {
   // the half of the flat ring behind the gate fainter, the front half (toward you) bold
   axx.lineCap = 'round';
   axx.lineWidth = 3; axx.strokeStyle = 'rgba(200,20,20,0.35)'; axx.beginPath(); R.flat.forEach(function (q, k) { k ? axx.lineTo(q[0], q[1]) : axx.moveTo(q[0], q[1]); }); axx.stroke();
-  var front = R.flat.slice(32, 65);
+  var front = R.flat.slice(0, 33);
   axx.lineWidth = AX.mode === 'turn' ? 6 : 4; axx.strokeStyle = '#d01818'; axx.beginPath(); front.forEach(function (q, k) { k ? axx.lineTo(q[0], q[1]) : axx.moveTo(q[0], q[1]); }); axx.stroke();
   axArrows(axx, front, '#d01818');
   axx.lineWidth = AX.mode === 'tilt' ? 6 : 4; axx.strokeStyle = '#1858d0'; axx.beginPath(); R.up.forEach(function (q, k) { k ? axx.lineTo(q[0], q[1]) : axx.moveTo(q[0], q[1]); }); axx.stroke();
@@ -926,10 +926,10 @@ axc.addEventListener('pointerup', axUp); axc.addEventListener('pointercancel', a
 document.getElementById('axopen').onclick = function () {
   AX.on = true; AX.sel = -1; AX.undo = [];
   axc.width = Math.round(W * PR); axc.height = Math.round(H * PR);
-  axc.style.display = 'block'; axbar.style.display = 'flex'; document.getElementById('sp').style.display = 'none'; axDraw();
+  axc.style.display = 'block'; axbar.style.display = 'flex'; document.getElementById('sp').style.display = 'none'; document.getElementById('msg').style.display = 'none'; axDraw();
 };
 document.getElementById('axdone').onclick = function () {
-  AX.on = false; AX.mode = null; axc.style.display = 'none'; axbar.style.display = 'none'; document.getElementById('sp').style.display = ''; axSync();
+  AX.on = false; AX.mode = null; axc.style.display = 'none'; axbar.style.display = 'none'; document.getElementById('sp').style.display = ''; document.getElementById('msg').style.display = ''; axSync();
 };
 document.getElementById('axundo').onclick = function () {
   var u = AX.undo.pop(); if (!u) return;
