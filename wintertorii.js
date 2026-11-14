@@ -140,7 +140,7 @@ function buildSnow(G, o) {
       var lim = 1;
       if (W0) lim = Math.min(lim, lerp(Math.max(0, W0.half * 0.95 - hd), 1, smooth(0.04, 0.45, t0)));
       if (W1) lim = Math.min(lim, lerp(Math.max(0, W1.half * 0.95 - hd), 1, smooth(0.04, 0.45, t1)));
-      st.push({ a: a, y: y, h: Math.max(0, h), w: n1(a / 0.7, sN + 21) * 0.5 + 0.5, wb: n1(a / 0.7, sN + 31) * 0.5 + 0.5, lim: lim });
+      st.push({ a: a, y: y, h: Math.max(0, h), w: n1(a / 0.7, sN + 21) * 0.5 + 0.5, wb: n1(a / 0.7, sN + 31) * 0.5 + 0.5, lim: lim, t0: t0, t1: t1 });
     }
     // smoothed along the beam (no steps or spikes), then the lips from the smoothed depth, broken and uneven: lumps, thicker
     // and thinner stretches, here and there a drip hanging off (a snow edge is never a clean line)
@@ -158,6 +158,12 @@ function buildSnow(G, o) {
       if (dr > 0.62) q.dF += q.h * 0.3 * Math.sqrt((dr - 0.62) / 0.38) * Math.min(1, q.ovF / 0.05);
       if (dr2 > 0.62) q.dB += q.h * 0.3 * Math.sqrt((dr2 - 0.62) / 0.38) * Math.min(1, q.ovB / 0.05);
       q.bmp = n1(a / 0.35, sN + 71) * 0.75 + n1(a / 0.17, sN + 75) * 0.25;
+      // toward a wall the snow narrows and rounds off (a drift pressed against it, never a slab cut off at the beam's full
+      // depth) and its lips stop hanging; toward a free end it narrows as it thins out
+      var w0 = W0 ? smooth(0, 0.35, q.t0) : smooth(0, 0.5, q.t0), w1 = W1 ? smooth(0, 0.35, q.t1) : smooth(0, 0.5, q.t1), ww = Math.min(w0, w1);
+      q.sh = lerp(W0 || W1 ? 0.55 : 0.5, 1, ww);
+      if (W0) { var k0 = smooth(0, 0.3, q.t0); q.dF *= k0; q.dB *= k0; }
+      if (W1) { var k1 = smooth(0, 0.3, q.t1); q.dF *= k1; q.dB *= k1; }
     });
     var hp = { grp: grp, hd: hd, st: st };
     if (W0 && W0.cyl) hp.cyl = { axis: W0.cyl, r: W0.half, side: 'start' };
@@ -466,61 +472,133 @@ function draw(c, G, place, cam, Lt, look) {
     return { col: mix(out, Lt.mist, PN.hz), dl: dl };
   }
   var fbF = zOf(0, G.Ht * 0.6, -1) < zOf(0, G.Ht * 0.6, 1) ? -1 : 1;        // the side of the gate facing the eye (local b)
-  var SNQ = {};
-  function heapQuads(hp) {
-    var C = hp.cyl;
-    var rings = hp.st.map(function (q) { return section(hp.hd, q).map(function (pp) {
-      var a = q.a;
-      var cl = false;
-      if (C) { var dd = Math.sqrt(Math.max(0, C.r * C.r - pp[0] * pp[0])), a2 = C.side === 'start' ? Math.max(a, C.axis + dd) : Math.min(a, C.axis - dd); cl = a2 !== a; a = a2; }
-      var pt = [a, q.y + pp[1], pp[0]]; pt.cl = cl; return pt;
-    }); });
-    var Kn = rings[0].length, out = { back: [], front: [] }, flip = 1, rr = rng(G.seed * 31 + hp.st.length * 7 + (hp.grp.length * 13));
-    var mi = Math.floor(rings.length / 2), cq = [rings[mi][9], rings[mi][10], rings[mi + 1 < rings.length ? mi + 1 : mi - 1][10], rings[mi + 1 < rings.length ? mi + 1 : mi - 1][9]];
-    var cn = newell(cq); if (cn[1] < 0) flip = -1;
-    for (var i = 0; i < rings.length - 1; i++) {
-      if (hp.st[i].h < 0.004 && hp.st[i + 1].h < 0.004) continue;
-      for (var kk = 0; kk < Kn - 1; kk++) {
-        var L4 = [rings[i][kk], rings[i][kk + 1], rings[i + 1][kk + 1], rings[i + 1][kk]];
-        // (faces pressed onto the pillar's round face are the snow's contact with it, inside: left out)
-        if ((L4[0].cl ? 1 : 0) + (L4[1].cl ? 1 : 0) + (L4[2].cl ? 1 : 0) + (L4[3].cl ? 1 : 0) >= 3) continue;
-        var nl = newell(L4); nl = [nl[0] * flip, nl[1] * flip, nl[2] * flip];
-        var m = [0, 0, 0]; L4.forEach(function (p) { m[0] += p[0] / 4; m[1] += p[1] / 4; m[2] += p[2] / 4; });
-        var mw = T.w(m[0], m[1], m[2]), nw = T.n(nl[0], nl[1], nl[2]);
-        if (!facing(nw, mw)) continue;
-        var thin = kk <= 3 || kk >= Kn - 5 ? 1 : 0.25, red = nl[1] < -0.3 ? 1 : 0;
-        var sc = snowShade(nw, mw, 1, thin, red), g = 1 + 0.018 * Math.sin(m[0] * 5.3 + hp.st.length) + 0.01 * Math.sin(m[0] * 13.1 + m[2] * 9);
-        var Q = L4.map(function (p) { return P(p[0], p[1], p[2]); });
-        (m[2] * fbF < -0.001 ? out.back : out.front).push({ Q: Q, k: kk, z: Math.hypot(mw[0], mw[1] - cam.eye, mw[2]), col: rgb([sc.col[0] * g, sc.col[1] * g, sc.col[2] * g]), dl: sc.dl });
+  /* ---- The snow is not built of faces: each heap is one smooth rounded body (G ≤ 0 inside, local metres): across the
+     beam a cushion (a rounded superellipse) domed on top and rounding over into a lip that curls under past the beam's
+     edges; along the beam its depth, reach and lip from the stations. Each pixel follows its line of sight from the eye
+     into the body, finds where it first meets the snow, and lights that point with the surface's true direction there:
+     so the shading is one soft gradient (no facets, no lines) and the outline is the body's own smooth outline. Worked
+     out once per gate (kept while nothing changes), at the screen's resolution, laid down a little soft. ---- */
+  var PRD = Math.max(1, look.pr || 1);
+  function bodyOfHeap(hp) {
+    var st = hp.st, n = st.length, a0 = st[0].a, a1 = st[n - 1].a, dA = (a1 - a0) / Math.max(1, n - 1), hd = hp.hd, C = hp.cyl;
+    var yMin = 1e9, yMax = -1e9, bMax = 0;
+    st.forEach(function (q) {
+      var sh = q.sh === undefined ? 1 : q.sh;
+      q.BF = hd * sh + q.ovF; q.BB = hd * sh + q.ovB; q.dr = (q.dF + q.dB) / 2;
+      yMin = Math.min(yMin, q.y - q.dr - 0.02); yMax = Math.max(yMax, q.y + q.h + 0.02); bMax = Math.max(bMax, q.BF, q.BB);
+    });
+    var Q = { y: 0, h: 0, BF: 0, BB: 0, dr: 0 };
+    function at(a) {
+      var f = (a - a0) / dA; if (f < 0 || f > n - 1) return false;
+      var i = Math.min(n - 2, Math.floor(f)), t = f - i, A = st[i], B = st[i + 1];
+      Q.y = A.y + (B.y - A.y) * t; Q.h = A.h + (B.h - A.h) * t; Q.BF = A.BF + (B.BF - A.BF) * t; Q.BB = A.BB + (B.BB - A.BB) * t; Q.dr = A.dr + (B.dr - A.dr) * t;
+      return true;
+    }
+    function shape(a, y, b) {                                        // the smooth body alone (for its surface's direction)
+      if (!at(a) || Q.h < 0.003) return 1;
+      var v = y - Q.y, bc = (Q.BB - Q.BF) / 2, Bw = Math.max(0.01, (Q.BF + Q.BB) / 2), vc = (Q.h - Q.dr) / 2, Hh = Math.max(0.004, (Q.h + Q.dr) / 2);
+      var X = Math.abs((b - bc) / Bw), Y = (v - vc) / Hh;
+      return Math.pow(X, 2.6) + Y * Y - 1;
+    }
+    function inSnow(a, y, b) {                                       // and where it is: not inside the beam or a pillar
+      if (C) { var da = a - C.axis; if (da * da + b * b < C.r * C.r) return 1; }
+      var g = shape(a, y, b);
+      if (g <= 0 && y < Q.y && Math.abs(b) < hd) return 1;
+      return g;
+    }
+    return { G: inSnow, shape: shape, box: [a0, a1, yMin, yMax, -bMax - 0.01, bMax + 0.01], hd: hd,
+             thin: function (a, y, b) { return Math.abs(b) > hd ? 1 : 0.25; }, beamY: function (a) { return at(a) ? Q.y : 0; } };
+  }
+  function bodyOfRim(sd) {
+    var crev = d(look, 'crevice', 1); if (!G.snow || crev <= 0) return null;
+    var yR = G.nem + 0.012, ax = sd * G.axis(yR), rIn = G.radius(G.nem), rOut = rIn * 1.1;
+    var axw = T.w(ax, yR, 0), ex = -axw[0], ez = -axw[2], ea = ex * T.rx + ez * T.rz, eb = ex * T.fx + ez * T.fz;
+    var rp = rng(G.seed * 41 + (sd + 3) * 7), k1 = rp() * 6.3, k2 = rp() * 6.3, H0 = 0.05 * crev * G.snow.amt;
+    var rc = (rIn + rOut) / 2 + 0.012, Bw = (rOut - rIn) / 2 + 0.03;
+    function shape(a, y, b) {
+      var da = a - ax, rho = Math.sqrt(da * da + b * b), v = y - yR, phi = Math.atan2(b, da);
+      var h = H0 * (1 + 0.35 * Math.sin(phi * 3 + k1) + 0.2 * Math.sin(phi * 7 + k2)), dr = h * 0.35;
+      var vc = (h - dr) / 2, Hh = Math.max(0.003, (h + dr) / 2), X = Math.abs((rho - rc) / Bw), Y = (v - vc) / Hh;
+      return Math.pow(X, 2.6) + Y * Y - 1;
+    }
+    function inRim(a, y, b) {
+      var da = a - ax, rho = Math.sqrt(da * da + b * b);
+      if (rho < rIn) return 1;
+      if (da * ea + b * eb < 0) return 1;                              // behind the pillar: never laid over it
+      var g = shape(a, y, b);
+      if (g <= 0 && y < yR && rho < rOut) return 1;
+      return g;
+    }
+    return { G: inRim, shape: shape, box: [ax - rOut - 0.06, ax + rOut + 0.06, yR - 0.05, yR + H0 * 1.8 + 0.03, -rOut - 0.06, rOut + 0.06], hd: 0,
+             thin: function () { return 0.6; }, ring: true, step: 0.005 };
+  }
+  function ihash(i, j) { var h = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return h - Math.floor(h); }
+  function renderBody(S) {
+    var bx = S.box, X0 = 1e9, Y0 = 1e9, X1 = -1e9, Y1 = -1e9;
+    for (var i0 = 0; i0 < 2; i0++) for (var j0 = 2; j0 < 4; j0++) for (var k0 = 4; k0 < 6; k0++) {
+      var pp = P(bx[i0], bx[j0], bx[k0]); X0 = Math.min(X0, pp[0]); X1 = Math.max(X1, pp[0]); Y0 = Math.min(Y0, pp[1]); Y1 = Math.max(Y1, pp[1]);
+    }
+    X0 = Math.max(0, Math.floor(X0 - 2)); Y0 = Math.max(0, Math.floor(Y0 - 2)); X1 = Math.min(cam.W, Math.ceil(X1 + 2)); Y1 = Math.min(cam.H, Math.ceil(Y1 + 2));
+    if (X1 <= X0 || Y1 <= Y0) return null;
+    var w = Math.ceil((X1 - X0) * PRD), h = Math.ceil((Y1 - Y0) * PRD);
+    if (w * h > 4e6) return null;
+    var imF = new ImageData(w, h), imB = new ImageData(w, h), DF = imF.data, DB = imB.data, nF = 0, nB = 0;
+    // the eye in the gate's own (a, y, b)
+    var ox = -place.x, oz = -place.z, aO = ox * T.rx + oz * T.rz, bO = ox * T.fx + oz * T.fz, yO = cam.eye;
+    var lo = [bx[0], bx[2], bx[4]], hi = [bx[1], bx[3], bx[5]], eps = 0.006;
+    for (var j = 0; j < h; j++) {
+      var sy = Y0 + (j + 0.5) / PRD, dY = -(sy - cam.hy) / cam.F;
+      for (var i = 0; i < w; i++) {
+        var sx = X0 + (i + 0.5) / PRD, dxc = (sx - cam.W / 2) / cam.F;
+        // (the line of sight (dxc, dY, 1) in the gate's own a and b)
+        var dAa = dxc * T.rx + T.rz, dBb = dxc * T.fx + T.fz;
+        var O = [aO, yO, bO], Dd = [dAa, dY, dBb], t0 = 0, t1 = 1e9;
+        for (var ax3 = 0; ax3 < 3; ax3++) {
+          if (Math.abs(Dd[ax3]) < 1e-9) { if (O[ax3] < lo[ax3] || O[ax3] > hi[ax3]) { t0 = 1; t1 = 0; break; } continue; }
+          var ta = (lo[ax3] - O[ax3]) / Dd[ax3], tb = (hi[ax3] - O[ax3]) / Dd[ax3];
+          if (ta > tb) { var tt = ta; ta = tb; tb = tt; }
+          if (ta > t0) t0 = ta; if (tb < t1) t1 = tb;
+        }
+        if (t0 >= t1) continue;
+        var L = Math.sqrt(dAa * dAa + dY * dY + dBb * dBb), stp = (S.step || 0.018) / L, t = t0, prev = t0, g = S.G(aO + dAa * t, yO + dY * t, bO + dBb * t), hit = -1;
+        while (t < t1) {
+          if (g <= 0) { var tl = prev, th2 = t; for (var q = 0; q < 7; q++) { var tm = (tl + th2) / 2; if (S.G(aO + dAa * tm, yO + dY * tm, bO + dBb * tm) <= 0) th2 = tm; else tl = tm; } hit = th2; break; }
+          prev = t; t += stp; g = S.G(aO + dAa * t, yO + dY * t, bO + dBb * t);
+        }
+        if (hit < 0) continue;
+        var pa = aO + dAa * hit, py = yO + dY * hit, pb = bO + dBb * hit;
+        // the surface's direction from the smooth body
+        var gx = S.shape(pa + eps, py, pb) - S.shape(pa - eps, py, pb), gy = S.shape(pa, py + eps, pb) - S.shape(pa, py - eps, pb), gz = S.shape(pa, py, pb + eps) - S.shape(pa, py, pb - eps);
+        var nl = Math.sqrt(gx * gx + gy * gy + gz * gz) || 1, nw = T.n(gx / nl, gy / nl, gz / nl), pw = T.w(pa, py, pb);
+        if (nw[0] * (0 - pw[0]) + nw[1] * (cam.eye - pw[1]) + nw[2] * (0 - pw[2]) < 0) { nw = [-nw[0], -nw[1], -nw[2]]; }
+        var sc = snowShade(nw, pw, 1, S.thin(pa, py, pb), gy / nl < -0.3 ? 1 : 0), col = sc.col;
+        // a little darker where it sits on the beam (the light cut off in the corner), fine grain, a few glints
+        var ao = 1;
+        if (!S.ring) { var vv = py - S.beamY(pa); if (Math.abs(pb) < S.hd + 0.03 && vv < 0.05) ao = 0.9 + 0.1 * Math.max(0, vv) / 0.05; }
+        var gr = 1 + (ihash(i + X0 * 7, j + Y0 * 3) - 0.5) * 0.035;
+        var sp = sc.dl > 0.3 && ihash(i * 3 + 1, j * 5 + 2) < 0.004 ? 28 : 0;
+        var back = S.ring ? false : pb * fbF < -0.001, Dt = back ? DB : DF, k = (j * w + i) * 4;
+        Dt[k] = clamp(col[0] * ao * gr + sp, 0, 255); Dt[k + 1] = clamp(col[1] * ao * gr + sp, 0, 255); Dt[k + 2] = clamp(col[2] * ao * gr + sp, 0, 255); Dt[k + 3] = 255;
+        if (back) nB++; else nF++;
       }
     }
-    return out;
+    function pic(im, nn) {
+      if (!nn) return null;
+      var cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').putImageData(im, 0, 0);
+      return { cv: cv, x: X0, y: Y0, w: w / PRD, h: h / PRD };
+    }
+    return { front: pic(imF, nF), back: pic(imB, nB) };
   }
-  function paintQuads(L) {
-    // whole rows (each a strip along the beam) back to front, so where neighbouring rows overlap the edge between them is
-    // the same all along (sorted face by face, the order flipped from one slice to the next and drew a fine hatching)
-    var rz = {}, rn = {};
-    L.forEach(function (q) { rz[q.k] = (rz[q.k] || 0) + q.z; rn[q.k] = (rn[q.k] || 0) + 1; });
-    L.sort(function (a, b) { var A = rz[a.k] / rn[a.k], B = rz[b.k] / rn[b.k]; return B - A || b.z - a.z; });
-    c.lineJoin = 'round'; c.lineWidth = 0.6;
-    // (each face grown a fraction of a pixel about its middle so neighbours overlap: an outline round each face, in its own
-    // colour, drew a fine hatching where neighbouring faces differ a little)
-    L.forEach(function (q) {
-      var cx = 0, cy = 0; q.Q.forEach(function (p) { cx += p[0] / 4; cy += p[1] / 4; });
-      var E = q.Q.map(function (p) { return [p[0] + (p[0] > cx ? 0.5 : -0.5), p[1] + (p[1] > cy ? 0.5 : -0.5)]; });
-      poly(c, E); c.fillStyle = q.col; c.fill(); grow(q.Q);
-    });
-    // glints: the sun catching a crystal here and there on the lit snow
-    var rr = rng(G.seed * 53 + L.length);
-    L.forEach(function (q) {
-      if (q.dl < 0.3 || rr() > 0.12) return;
-      var a = q.Q[0], b = q.Q[2], t = rr(), x = lerp(a[0], b[0], t), y = lerp(a[1], b[1], rr());
-      c.fillStyle = 'rgba(255,255,250,' + lerp(0.35, 0.8, rr()).toFixed(2) + ')'; c.fillRect(x, y, 0.8, 0.8);
-    });
+  function lay(P2) {
+    if (!P2) return;
+    c.save(); c.filter = 'blur(' + (0.45 * PRD).toFixed(2) + 'px)'; c.imageSmoothingQuality = 'high';
+    c.drawImage(P2.cv, P2.x, P2.y, P2.w, P2.h); c.restore();
+    grow([[P2.x, P2.y], [P2.x + P2.w, P2.y + P2.h]]);
   }
-  if (G.snow) G.snow.heaps.forEach(function (hp) { SNQ[hp.grp] = heapQuads(hp); });
-  function snowBack(g) { if (SNQ[g]) paintQuads(SNQ[g].back); }
-  function snowFront(g) { if (SNQ[g]) paintQuads(SNQ[g].front); }
+  var SNQ = {};
+  if (G.snow) G.snow.heaps.forEach(function (hp) { SNQ[hp.grp] = renderBody(bodyOfHeap(hp)); });
+  function snowBack(g) { if (SNQ[g]) lay(SNQ[g].back); }
+  function snowFront(g) { if (SNQ[g]) lay(SNQ[g].front); }
   /* snow on a pillar: the windward side plastered in broken patches (it sticks where the wind drives it), and a ring of it
      on the black sleeve's rim (a crevice) */
   function plaster(sd, aShaftH) {
@@ -552,40 +630,12 @@ function draw(c, G, place, cam, Lt, look) {
       var xs = Q.map(function (q) { return q[0]; }), x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
       var gq = c.createLinearGradient(Lp[M >> 1][0], 0, Rp[M >> 1][0], 0);
       gq.addColorStop(0, rgb(cA)); gq.addColorStop(1, rgb(cB, 0.9));
-      c.save(); c.filter = 'blur(0.5px)'; poly(c, Q); c.fillStyle = gq; c.fill(); c.restore(); grow(Q);
+      c.save(); c.filter = 'blur(' + (0.9 * PRD).toFixed(2) + 'px)'; poly(c, Q); c.fillStyle = gq; c.fill(); c.restore(); grow(Q);
     }
   }
   function rimSnow(sd) {
-    if (!G.snow) return;
-    var crev = d(look, 'crevice', 1); if (crev <= 0) return;
-    var yR = G.nem + 0.012, ax = sd * G.axis(yR), rIn = G.radius(G.nem), rOut = rIn * 1.1, axw = T.w(ax, yR, 0);
-    var vd = norm([-axw[0], 0, -axw[2]]), rp = rng(G.seed * 41 + (sd + 3) * 7), st = [], M = 18;
-    for (var i = 0; i <= M; i++) {
-      var phi = -1.7 + 3.4 * i / M, dirW = [vd[0] * Math.cos(phi) - vd[2] * Math.sin(phi), vd[2] * Math.cos(phi) + vd[0] * Math.sin(phi)];
-      // that direction in the gate's own (a, b)
-      var da = dirW[0] * T.rx + dirW[1] * T.rz, db = dirW[0] * T.fx + dirW[1] * T.fz;
-      st.push({ da: da, db: db, h: 0 });
-    }
-    var k1 = rp() * 6.3, k2 = rp() * 6.3;
-    st.forEach(function (q, i) { var u = i / M; q.h = (0.045 + 0.018 * Math.sin(u * 5.1 + k1) + 0.01 * Math.sin(u * 11.7 + k2)) * crev * G.snow.amt; });
-    var rings = st.map(function (q) {
-      var mid = (rIn + rOut) / 2, hw = (rOut - rIn) / 2 + 0.01, ov = 0.025, out = [];
-      [[-hw, 0], [-hw, q.h * 0.7], [-hw * 0.3, q.h], [hw * 0.4, q.h * 0.75], [hw + ov, q.h * 0.2], [hw + ov * 0.7, -q.h * 0.4]].forEach(function (pp) {
-        out.push([ax + q.da * (mid + pp[0]), yR + pp[1], q.db * (mid + pp[0])]);
-      });
-      return out;
-    });
-    var L = [];
-    for (var i2 = 0; i2 < rings.length - 1; i2++) for (var kk = 0; kk < rings[i2].length - 1; kk++) {
-      var L4 = [rings[i2][kk], rings[i2][kk + 1], rings[i2 + 1][kk + 1], rings[i2 + 1][kk]], nl = newell(L4);
-      var m = [0, 0, 0]; L4.forEach(function (p) { m[0] += p[0] / 4; m[1] += p[1] / 4; m[2] += p[2] / 4; });
-      var mw = T.w(m[0], m[1], m[2]), nw = T.n(nl[0], nl[1], nl[2]);
-      if (!facing(nw, mw)) { nw = [-nw[0], -nw[1], -nw[2]]; if (!facing(nw, mw)) continue; }
-      if (nl[1] < 0 && nw[1] > 0) nw = [-nw[0], -nw[1], -nw[2]];
-      var sc = snowShade(nw, mw, 0.95, kk >= 4 ? 1 : 0.3, 0);
-      L.push({ Q: L4.map(function (p) { return P(p[0], p[1], p[2]); }), k: kk, z: Math.hypot(mw[0], mw[1] - cam.eye, mw[2]), col: rgb(sc.col), dl: sc.dl });
-    }
-    paintQuads(L);
+    var B = bodyOfRim(sd); if (!B) return;
+    var R = renderBody(B); if (R) { lay(R.front); lay(R.back); }
   }
 
   // 1. the undersides of the two upper beams (seen from below: drawn first, the rest lies over them)

@@ -232,7 +232,7 @@ function drawGates() {
   var wf = VIEW.dirCam(-0.94, -0.34);                          // the wind comes from the left of the winter scene (as the frosted trees' rime)
   var look = { red: hex(V.colours.toriiRed), black: hex(V.colours.toriiBlack), kasagiBlack: V.gateKasagiBlack, vivid: V.gateVivid,
                weather: V.gateWeather, haze: V.gateHaze * V.fieldHaze, hazeM: V.fieldHazeDist, footSnow: V.gateFootSnow,
-               snowLit: snowAt(1), snowShade: snowAt(0.25), snowRGB: hex(V.colours.snow), shadeRGB: SHADE, crevice: V.gateCrevice, windFrom: wf };
+               snowLit: snowAt(1), snowShade: snowAt(0.25), snowRGB: hex(V.colours.snow), shadeRGB: SHADE, crevice: V.gateCrevice, windFrom: wf, pr: PR };
   var order = VIEW.gates.map(function (g, i) { return { g: g, i: i }; }).filter(function (o) { return o.g.z > 1; }).sort(function (a, b) { return b.g.z - a.g.z; });
   var info = [], tmp = layer();
   GATES = [];
