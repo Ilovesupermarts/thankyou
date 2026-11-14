@@ -485,9 +485,12 @@ var V_DEFAULTS = {
   // plumsnow.js (one soft ridge along each limb, white on top, slate blue on its front): on, how far down the wood's front it
   // wraps, its lumps, how dark its front face and crease
   plumShow: true, plumSnowNew: true, plumSnowCover: 0.3, plumSnowLumps: 1, plumSnowShade: 1,
-  // the falling snow (from winter2.html; step 11)
-  flakes: 334, sizeFar: 0.9, sizeNear: 4.6, farBlur: 7.1, nearBlur: 0.65, fallSpeed: 0.6, flakeSway: 3.9, frontShare: 0.17,
-  bokeh: 6, backlight: 0.6,
+  // step 11: the snowfall in depth (section 14): on; how many flakes near (1.2-10 m), in the middle (10-90 m) and far
+  // (90-2500 m); their real size (cm); the smallest drawn (px) and how faint a flake smaller than that is; the lens's
+  // focus (m) and opening (cm, more = more depth of field); the air they fade into (m); nearer than sfFront m they pass in
+  // front of the text; fall speed and sway; caught by the light (backlight); fallSpeed: the snow the plum branches shed
+  sfShow: true, sfNear: 70, sfMid: 700, sfFar: 2600, sfSize: 1.5, sfMin: 2.2, sfFarShow: 0.9, sfFocus: 40, sfAperture: 1.2,
+  sfHaze: 2600, sfTone: 0.5, sfFront: 2.5, sfSpeed: 1, sfSway: 1, fallSpeed: 0.6, backlight: 0.6,
   // step 9: the 3D torii and stone lanterns (wintertorii.js), on the path, as tuned in torii.html (the user's values from
   // that page). gateShow / lantShow off: the flat block-in shapes come back.
   gateShow: true,
@@ -1834,7 +1837,7 @@ function drawNightSky(c, t) {
    the bottom are not part of the new scene and were taken out.)
    ============================================================ */
 var WS = { bKey: '', branches: [], puffs: [], petals: [], shedTimer: 3, petalTimer: 2,
-           blooms: [], flakeSpr: [], warmSpr: null, flakes: [], filled: false, bokeh: [], gusts: [], gustTimer: 4, field: [],
+           blooms: [], flakeSpr: [], warmSpr: null, gusts: [], gustTimer: 4, field: [],
            wood: '', woodLit: '', petal: '', petalDk: '', lights: [] };
 
 /* ============================================================
@@ -2297,18 +2300,23 @@ function umeDraw(c, T) {
 var WIN_LEVELS = 8, WIN_QMAX = 2.4, WIN_R0 = 10;
 function bakeFlakes() {
   var C = cols(), core = light(C.snow), rim = light(mix(mix(lit(C.snow, 0, 0.4, 1, 0), [150, 140, 180], 0.3), C.snow, 0.4)), RS = 2;
-  WS.flakeSpr = [];
+  WS.flakeSpr = []; WS.flakeSprTone = [[], []];
+  // the far flakes' tones (half way and all the way to snow in shade, seen against the bright sky: distant snowfall reads grey)
+  var dim = scale(shadeColour(), 0.86);
   for (var i = 0; i < WIN_LEVELS; i++) {
+    for (var dk = 0; dk < 3; dk++) {
+    var cc = dk ? mix(core, dim, dk / 2) : core, rc = dk ? mix(rim, scale(dim, 0.95), dk / 2) : rim;
     var b = i / (WIN_LEVELS - 1) * WIN_QMAX * WIN_R0, pad = b * 2.2 + 2;
     var side = Math.ceil((WIN_R0 + pad) * 2 * RS), cnv = document.createElement('canvas');
     cnv.width = cnv.height = side;
     var c = cnv.getContext('2d');
     if (b > 0.05) c.filter = 'blur(' + (b * RS * 0.6).toFixed(2) + 'px)';
     var g = c.createRadialGradient(side / 2, side / 2, 0, side / 2, side / 2, WIN_R0 * RS);
-    g.addColorStop(0, rgb(core, 1)); g.addColorStop(0.65, rgb(mix(core, rim, 0.15), 1)); g.addColorStop(1, rgb(rim, 0.9));
+    g.addColorStop(0, rgb(cc, 1)); g.addColorStop(0.65, rgb(mix(cc, rc, 0.15), 1)); g.addColorStop(1, rgb(rc, 0.9));
     c.fillStyle = g;
     c.beginPath(); c.arc(side / 2, side / 2, WIN_R0 * RS, 0, TAU); c.fill();
-    WS.flakeSpr.push({ cnv: cnv, half: side / (2 * RS) });
+    (dk ? WS.flakeSprTone[dk - 1] : WS.flakeSpr).push({ cnv: cnv, half: side / (2 * RS) });
+    }
   }
   var wc = document.createElement('canvas'); wc.width = wc.height = 64;
   var w = wc.getContext('2d'), wg = w.createRadialGradient(32, 32, 0, 32, 32, 32), fl = C.flame;
@@ -2316,84 +2324,94 @@ function bakeFlakes() {
   w.fillStyle = wg; w.fillRect(0, 0, 64, 64);
   WS.warmSpr = wc;
 }
-function flake(c, x, y, rad, blurPx) {
+function flake(c, x, y, rad, blurPx, set) {
   var lv = Math.round(clamp(blurPx / Math.max(0.3, rad) / WIN_QMAX, 0, 1) * (WIN_LEVELS - 1));
-  var S0 = WS.flakeSpr[lv], h = S0.half * rad / WIN_R0;
+  var S0 = (set || WS.flakeSpr)[lv], h = S0.half * rad / WIN_R0;
   c.drawImage(S0.cnv, x - h, y - h, h * 2, h * 2);
 }
-function nearZ() { return 1 - V.frontShare; }
-function makeFlake(prefill) {
-  var z = Math.pow(Math.random(), 1.15);
-  return { z: z, x: rnd(-0.1, 1.1) * W, y: prefill ? rnd(-0.05, 0.95) * H : rnd(-30, -8),
-           vy: lerp(14, 72, z) * rnd(0.8, 1.2), vx: 0, sw: lerp(4, 22, z) * rnd(0.6, 1.3), sf: rnd(0.5, 1.4), ph: rnd(0, TAU),
-           s: rnd(0.75, 1.25) };
+/* Step 11: THE SNOWFALL IN DEPTH. Every flake has its own distance in metres (D), seen through the scene's camera
+   (eye on the horizon line, the mountains' lens, lakeLens()): its size on the screen is its real size × F / D, it falls
+   and drifts with the wind (slower on the screen the farther it is), and it comes down onto the snow ground where that
+   lies at its distance (the line eye·F/D below the horizon), so far flakes stop in the distance and near ones fall past
+   the bottom of the screen. Three depth bands, each its own count: near (1.2-10 m), middle (10-90 m), far (90-2500 m).
+   They are drawn between the scene's elements by distance (behind the hill, between the hill and the hall, behind the
+   frosted trees, between the torii and lanterns, in front of everything, and the nearest in front of the text), so the
+   hill, the hall, the trees and the gates stand in the snowfall rather than in front of a curtain of it.
+   Depth of field: a lens focused at sfFocus m with an opening of sfAperture cm: each flake is blurred by its circle of
+   confusion (aperture · F · |1/D − 1/focus|), spread into a softer, fainter disc; near ones become big soft flakes,
+   far ones soft specks. Flakes smaller than a pixel are drawn at sfMin px and fainter (sfFarShow); far ones fade into
+   the air (sfHaze m). Caught by the light: in front of the sun they glow (backlight). */
+var SNOWF = { b: [[], [], []], filled: false, F: 0 };
+var SF_RANGE = [[1.2, 10], [10, 90], [90, 2500]];
+function sfMake(band, prefill) {
+  var R = SF_RANGE[band], D = R[0] * Math.pow(R[1] / R[0], Math.random());
+  var f = { D: D, x: rnd(-40, W + 40), y: 0, d: rnd(0.55, 1.45), v: rnd(0.7, 1.3), sw: rnd(0.06, 0.3), sf: rnd(0.35, 1.2),
+            ph: rnd(0, TAU), vx: 0, fade: -1 };
+  var yG = H * V.horizonLine + V.eyeHeight * SNOWF.F / D;
+  f.y = prefill ? rnd(-10, Math.min(H + 10, yG)) : -rnd(6, 40);
+  return f;
 }
-function flakeRad(f) { return lerp(V.sizeFar, V.sizeNear, Math.pow(f.z, 1.6)) * f.s; }
-function flakeBlur(f) { return lerp(V.farBlur, V.nearBlur, Math.pow(f.z, 0.8)); }
-function backY(f) { var hy = H * V.horizonLine; return hy + (H - hy) * (0.08 + 0.8 * clamp(f.z / nearZ(), 0, 1)); }
-function updateFlakes(t, dt) {
-  var F = WS.flakes, nz = nearZ(), wk = V.wind;
-  while (F.length < V.flakes) F.push(makeFlake(!WS.filled));
-  if (F.length > V.flakes) F.length = V.flakes;
-  WS.filled = true;
-  for (var i = 0; i < F.length; i++) {
-    var f = F[i];
-    if (f.fade !== undefined) { f.fade -= dt / 1.2; if (f.fade <= 0) F[i] = makeFlake(false); continue; }
-    var depth = 0.35 + 0.65 * f.z;
-    f.vx += ((fieldAt(f.x) * 130 + 6 * wk) * depth - f.vx) * (1 - Math.exp(-dt * 1.4));
-    f.x += (f.vx + Math.sin(t * f.sf + f.ph) * f.sw * V.flakeSway) * dt;
-    f.y += f.vy * V.fallSpeed * dt;
-    if (f.z >= nz) {
-      if (f.y > H + 12) F[i] = makeFlake(false);
-    } else if (f.y >= backY(f)) f.fade = 1;
-    if (f.x < -40) f.x += W + 80; else if (f.x > W + 40) f.x -= W + 80;
-  }
-  var Bk = WS.bokeh;
-  while (Bk.length < V.bokeh) Bk.push({ x: rnd(0, W), y: Bk.ready ? rnd(-80, -40) : rnd(0, H), r: rnd(14, 30),
-                                       vy: rnd(28, 50), sw: rnd(10, 30), sf: rnd(0.2, 0.5), ph: rnd(0, TAU), a: rnd(0.16, 0.3) });
-  if (Bk.length > V.bokeh) Bk.length = V.bokeh;
-  Bk.ready = true;
-  for (var b = 0; b < Bk.length; b++) {
-    var B = Bk[b];
-    B.y += B.vy * V.fallSpeed * dt;
-    B.x += (fieldAt(B.x) * 160 + Math.sin(t * B.sf + B.ph) * B.sw) * dt;
-    if (B.y > H + 40) { B.y = rnd(-80, -40); B.x = rnd(0, W); }
-  }
-}
-function drawFlakes(c, from, to) {
-  var F = WS.flakes, bl = V.backlight;
-  var sunOn = bl > 0 && !isNight() && SUN.show ? (1 - sunOccl) * COND_SUN[SUN.condition] : 0, P = sunPlace();
-  var lamps = bl > 0 ? nightLights() : 0, LL = WS.lights;
-  c.setTransform(PR, 0, 0, PR, 0, 0);
-  for (var i = 0; i < F.length; i++) {
-    var f = F[i];
-    if (f.z < from || f.z >= to) continue;
-    var a = lerp(0.45, 0.95, f.z) * (f.fade === undefined ? 1 : f.fade), rad = flakeRad(f), blr = flakeBlur(f);
-    c.globalAlpha = a;
-    flake(c, f.x, f.y, rad, blr);
-    // caught by the light: in front of the sun, or near a lantern after dark
-    var g = 0, warm = false;
-    if (sunOn > 0) { var ds = Math.hypot(f.x - P.x, f.y - P.y) / (P.R * 9); g = sunOn * Math.exp(-ds * ds) * 0.8; }
-    if (lamps > 0) {
-      for (var j = 0; j < LL.length; j++) {
-        var Lj = LL[j], dl = Math.hypot(f.x - Lj.x, f.y - Lj.y) / (Lj.r * 5);
-        if (dl < 1.5) { var gl = lamps * Math.exp(-dl * dl * 2); if (gl > g) { g = gl; warm = true; } }
-      }
+function sfMotionK(D) { return SNOWF.F / (D + 6); }    // px per metre for the motion (near flakes calmed a little, so they do not streak)
+function sfUpdate(t, dt) {
+  SNOWF.F = lakeLens();
+  var want = [V.sfNear, V.sfMid, V.sfFar], hy = H * V.horizonLine, eye = V.eyeHeight, fs = V.sfSpeed, sway = V.sfSway;
+  for (var b = 0; b < 3; b++) {
+    var L = SNOWF.b[b], n = Math.max(0, Math.round(want[b] || 0));
+    while (L.length < n) L.push(sfMake(b, !SNOWF.filled));
+    if (L.length > n) L.length = n;
+    for (var i = 0; i < L.length; i++) {
+      var f = L[i];
+      if (f.fade >= 0) { f.fade -= dt / 0.6; if (f.fade <= 0) L[i] = sfMake(b, false); continue; }
+      var k = sfMotionK(f.D), wm = fieldAt(f.x) * 1.2;              // the wind here (m/s), gusts included
+      f.vx += (wm * k - f.vx) * (1 - Math.exp(-dt * 1.2));
+      f.x += (f.vx + Math.cos(t * f.sf + f.ph) * f.sw * f.sf * k * sway) * dt;
+      f.y += 0.9 * f.v * fs * k * dt;
+      var yG = hy + eye * SNOWF.F / f.D;
+      if (yG < H + 20) { if (f.y >= yG) { f.y = yG; f.fade = 1; } }
+      else if (f.y > H + 30) L[i] = sfMake(b, false);
+      if (f.x < -40) f.x += W + 80; else if (f.x > W + 40) f.x -= W + 80;
     }
-    if (g * bl > 0.03) {
-      c.globalCompositeOperation = 'lighter';
-      c.globalAlpha = clamp(g * bl * a, 0, 1);
-      var rr = (rad + blr) * 1.6;
-      if (warm) c.drawImage(WS.warmSpr, f.x - rr, f.y - rr, rr * 2, rr * 2);
-      else flake(c, f.x, f.y, rad * 1.2, blr + 1);
-      c.globalCompositeOperation = 'source-over';
+  }
+  SNOWF.filled = true;
+}
+/* The flakes from lo to hi metres away, onto c. */
+function sfDraw(c, lo, hi) {
+  if (!V.sfShow || !WS.flakeSpr.length || !(hi > lo)) return;
+  var F = SNOWF.F || lakeLens(), bl = V.backlight;
+  var sunOn = bl > 0 && !isNight() && SUN.show ? (1 - sunOccl) * COND_SUN[SUN.condition] : 0, P = sunPlace();
+  var A = V.sfAperture / 100, fi = 1 / Math.max(0.5, V.sfFocus), mn = V.sfMin, sz = V.sfSize / 100, hz = V.sfHaze;
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  for (var b = 0; b < 3; b++) {
+    var R = SF_RANGE[b]; if (R[1] <= lo || R[0] >= hi) continue;
+    var L = SNOWF.b[b];
+    for (var i = 0; i < L.length; i++) {
+      var f = L[i]; if (f.D < lo || f.D >= hi) continue;
+      var dpx = sz * f.d * F / f.D, a = 0.92;
+      if (dpx < mn) { a *= Math.max(V.sfFarShow, dpx / mn); dpx = mn; }
+      var coc = A * F * Math.abs(1 / f.D - fi), r0 = dpx / 2, Rr = Math.sqrt(r0 * r0 + coc * coc / 4);
+      a *= Math.max(0.14, Math.pow(r0 / Rr, 1.3));                  // the light of a blurred flake spread over its disc
+      if (hz > 0) a *= Math.exp(-f.D / hz);
+      if (f.fade >= 0) a *= f.fade;
+      if (a < 0.01) continue;
+      var soft = Rr * Math.min(1, coc / (2 * Rr)) * 1.2 + 0.3;
+      var w = Math.round(2 * V.sfTone * clamp((f.D - 15) / 105, 0, 1));   // far flakes toward the tone of snow in shade
+      c.globalAlpha = a;
+      flake(c, f.x, f.y, Rr, soft, w ? WS.flakeSprTone[w - 1] : WS.flakeSpr);
+      if (sunOn > 0) {
+        var ds = Math.hypot(f.x - P.x, f.y - P.y) / (P.R * 9), g = sunOn * Math.exp(-ds * ds) * 0.8 * bl;
+        if (g > 0.03) {
+          c.globalCompositeOperation = 'lighter'; c.globalAlpha = clamp(g * a, 0, 1);
+          flake(c, f.x, f.y, Rr * 1.2, soft + 1);
+          c.globalCompositeOperation = 'source-over';
+        }
+      }
     }
   }
   c.globalAlpha = 1;
+  c.setTransform(1, 0, 0, 1, 0, 0);
 }
 function drawBack(c, t, branchesOnly) {
   if (!WS.flakeSpr.length) return;
-  if (!branchesOnly) drawFlakes(c, -1, nearZ());
   for (var i = 0; i < WS.branches.length; i++) umeDraw(c, WS.branches[i]);
   c.setTransform(PR, 0, 0, PR, 0, 0);
   for (i = 0; i < WS.puffs.length; i++) {
@@ -2413,14 +2431,6 @@ function drawBack(c, t, branchesOnly) {
   c.globalAlpha = 1;
   c.setTransform(PR, 0, 0, PR, 0, 0);
 }
-function drawNear(c) {
-  if (!WS.flakeSpr.length) return;
-  drawFlakes(c, nearZ(), 2);
-  c.setTransform(PR, 0, 0, PR, 0, 0);
-  for (var i = 0; i < WS.bokeh.length; i++) { var B = WS.bokeh[i]; c.globalAlpha = B.a; flake(c, B.x, B.y, B.r, B.r * WIN_QMAX); }
-  c.globalAlpha = 1;
-}
-
 /* ============================================================
    14b. THE BLOCK-IN (step 0) — every element of the reference picture
    as a plain flat shape at its place, back to front, so the layout and
@@ -3851,7 +3861,7 @@ function drawShadows() {                                      // after the hall:
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(S.shadow.cnv, S.shadow.x, S.shadow.y); ctx.globalCompositeOperation = 'source-over';
 }
-function draw(t, dt) {                                        // the gates and the lanterns, farthest first
+function draw(t, dt, between) {                               // the gates and the lanterns, farthest first (between(hi, lo): what lies between two of them, in metres)
   if (!on()) return;
   S.clock += dt;
   stepSnow(dt);
@@ -3859,7 +3869,10 @@ function draw(t, dt) {                                        // the gates and t
   S.gates.forEach(function (G) { items.push({ z: G.z, G: G }); });
   S.lants.forEach(function (L) { items.push({ z: L.z, L: L }); });
   items.sort(function (a, b) { return b.z - a.z; });
+  var prevZ = items.length ? items[0].z : 0;
   items.forEach(function (it) {
+    if (between && it.z < prevZ) { between(prevZ, it.z); ctx.setTransform(1, 0, 0, 1, 0, 0); }
+    prevZ = it.z;
     if (it.L) { lantDraw(ctx, it.L, S.clock); return; }
     var G = it.G;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -3868,7 +3881,12 @@ function draw(t, dt) {                                        // the gates and t
   });
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
-return { start: start, step: step, draw: draw, drawShadows: drawShadows, busy: function () { return !!S.job; }, state: function () { return S; },
+function span() {                                             // how far the nearest and the farthest gate or lantern stand (m), or null
+  if (!on()) return null;
+  var zs = []; S.gates.forEach(function (G) { if (G.pic) zs.push(G.z); }); S.lants.forEach(function (L) { zs.push(L.z); });
+  return zs.length ? { near: Math.min.apply(null, zs), far: Math.max.apply(null, zs) } : null;
+}
+return { start: start, step: step, draw: draw, drawShadows: drawShadows, span: span, busy: function () { return !!S.job; }, state: function () { return S; },
          spawnAll: function (n) { S.gates.forEach(function (G) { for (var i = 0; i < (n || 1); i++) spawn(G); }); } };
 })();
 /* ============================================================
@@ -3936,6 +3954,8 @@ window.winterLab = {
   hall: function () { return HALL; },
   torii: function () { return TORII.state(); },   // (checks: the gates and lanterns, step 9)
   toriiSpawn: function (n) { TORII.spawnAll(n); },
+  snow: function () { return { S: SNOWF, spr: WS.flakeSpr.length, dim: WS.flakeSprTone ? WS.flakeSprTone[1].length : 0 }; },   // (checks: the snowfall)
+  snowOn: function (c, lo, hi) { sfDraw(c, lo, hi); },
   places: function () { return frostPlaces(); },   // (checks: where each frosted tree stands now)
   lake: function () { return { span: LAKEW.shore ? lakeSpan() : null, top: LAKEW.top, info: lakeInfo }; },   // (checks: the strip of water drawn)
   trail: function () { return TRAIL; },
@@ -4188,7 +4208,7 @@ function rebuildAll() {
   buildSky();
   dirty = {};
   // (the plum branches and the flakes' sprites, 'sprites', are cheap and nearest: they come straight after the mountains)
-  stages = V.blockIn && !V.plumShow ? ['mtn', 'hill', 'field', 'hall', 'frost', 'pines', 'lake', 'torii'] : ['mtn', 'sprites', 'hill', 'field', 'hall', 'frost', 'pines', 'lake', 'torii'];   // (step 10: the plum branches show with the block-in too)   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
+  stages = V.blockIn && !V.plumShow && !V.sfShow ? ['mtn', 'hill', 'field', 'hall', 'frost', 'pines', 'lake', 'torii'] : ['mtn', 'sprites', 'hill', 'field', 'hall', 'frost', 'pines', 'lake', 'torii'];   // (step 10: the plum branches show with the block-in too)   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -4398,7 +4418,7 @@ function frame(now) {
   for (var i = 0; i < WS.branches.length; i++) umeSway(WS.branches[i], t, dt);
   umeUpdatePuffs(dt);
   umeUpdatePetals(t, dt);
-  if (!V.blockIn) updateFlakes(t, dt);                 // (the snowfall is not drawn while the block-in shows: step 11)
+  if (V.sfShow) sfUpdate(t, dt);                       // step 11: the snowfall in depth (14)
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
@@ -4414,6 +4434,8 @@ function frame(now) {
     // then every element still to be built as a plain flat shape at its place in the reference (section 14b)
     drawMountains(dt);
     drawFrontClouds(t, dt);
+    var sfH = pagodaDist(), sfL = hallDist(), sfT = TORII.span(), sfFr = V.sfFront;
+    sfDraw(ctx, sfH, 1e9);                             // step 11: the snow falling beyond the hill and the pagoda
     drawHill();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawBlockIn(ctx, 'back');
@@ -4421,16 +4443,21 @@ function frame(now) {
     drawGroundFog();                                   // the depth fog on the ground, row by row (14g)
     mistFrame(t, dt);                                  // step 4: the drifting fog, both layers (14f) …
     drawMist(0);                                       // … the one behind the hall, over the hill's foot and the pagoda
+    sfDraw(ctx, sfL, sfH);                             // the snow falling between the hill and the hall
     drawHall();                                        // step 5: the shrine hall and the firs beside it (7c)
     TORII.drawShadows();                               // step 9: the torii's and lanterns' shadows on the snow (14i)
     drawMist(1);                                       // … the one in front of the hall and its firs
+    var sfA = sfT ? Math.min(sfT.far, sfL) : sfL, sfB = sfT ? Math.min(sfT.near, sfA) : sfA;
+    sfDraw(ctx, sfA, sfL);                             // the snow between the hall and the farthest torii
     drawFrost(t, dt);                                  // the frosted trees right of the hall (14e)
-    TORII.draw(t, dt);                                 // step 9: the torii and stone lanterns on the path (14i)
+    TORII.draw(t, dt, function (hi, lo) { sfDraw(ctx, lo, hi); });   // step 9: the torii and stone lanterns on the path (14i), the snow between them
     drawPines(t, dt);                                  // step 7: the right bank's roped pines and firs (14d)
+    sfDraw(ctx, sfFr, sfB);                            // the snow nearer than the nearest torii or lantern
     drawBlockIn(ctx, 'front');
-    if (V.plumShow) { drawBack(ctx, t, true); ctx.setTransform(1, 0, 0, 1, 0, 0); }   // step 10: the plum branches, the snow they shed and their petals (the snowfall is step 11)
-    // (nothing is drawn on the two side canvases while the block-in shows: they are cleared once, not every frame)
-    if (sideDirty) { sideDirty = false; nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height); }
+    if (V.plumShow) { drawBack(ctx, t, true); ctx.setTransform(1, 0, 0, 1, 0, 0); }   // step 10: the plum branches, the snow they shed and their petals
+    // #dynNear: the nearest flakes, in front of the text (cleared once when nothing is drawn on it)
+    if (V.sfShow) { nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height); sfDraw(nctx, 0, sfFr); sideDirty = true; }
+    else if (sideDirty) { sideDirty = false; nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height); }
     requestAnimationFrame(frame);
     return;
   }
@@ -4444,11 +4471,12 @@ function frame(now) {
   drawHall();                                          // step 5: the shrine hall and the firs beside it (7c)
   drawPines(t, dt);                                    // step 7: the right bank's roped pines and firs (14d)
   // the snow behind the text and table, the plum branches, the snow they shed and the petals
+  sfDraw(ctx, V.sfFront, 1e9);
   drawBack(ctx, t);
-  // #dynNear: the nearest flakes and the big soft ones
+  // #dynNear: the nearest flakes
   nctx.setTransform(1, 0, 0, 1, 0, 0);
   nctx.clearRect(0, 0, cvN.width, cvN.height);
-  drawNear(nctx);
+  sfDraw(nctx, 0, V.sfFront);
   // (#dynGround: nothing is drawn on it, so it is not cleared every frame any more)
   sideDirty = true;                                    // (#dynNear was drawn on: clear it if the block-in comes back)
   requestAnimationFrame(frame);
@@ -4804,7 +4832,7 @@ var G = [
     { btn: 'forgetPictures', label: 'Throw the kept pictures away' },
     { o: 'V', k: 'loadBudget', label: 'Loading: drawing work a frame (ms)', min: 8, max: 40, step: 1, re: 'live', note: 'How much of each frame the slow pictures (hill, snow ground, hall, pines) take while they bake. More = they are ready sooner, but the sun, clouds and water move less smoothly meanwhile. It was 8.' } ] },
   { name: 'Block-in (step 0)', note: 'Every element as a plain flat shape where it stands in the reference, to agree the layout before anything is painted. The reference picture can be laid over the scene to compare (its wind chime is painted out).', ctls: [
-    { chk: 'V', k: 'blockIn', label: 'Show the block-in', re: 'block', note: 'Off: only what is built so far (the sky; Fuji, the plum branches and the snowfall as they came from winter2.html).' },
+    { chk: 'V', k: 'blockIn', label: 'Show the block-in', re: 'block', note: 'Off: only what is built so far (the sky; Fuji, the plum branches and the snowfall).' },
     { chk: 'V', k: 'blockLabels', label: 'Names on the shapes', re: 'live' },
     { o: 'V', k: 'refOverlay', label: 'Reference picture over the scene', min: 0, max: 1, step: 0.05, re: 'live', note: '0 hidden, 1 the reference alone.' } ] },
   { name: 'Layout: sky and land', ctls: [
@@ -5037,17 +5065,23 @@ var G = [
     { o: 'V', k: 'snowSparkle', label: 'Glints', min: 0, max: 2, step: 0.05, re: 'sprites' },
     { o: 'V', k: 'branchDust', label: 'Dusting along the twigs', min: 0, max: 1.5, step: 0.05, re: 'sprites' },
     { chk: 'V', k: 'branchForks', label: 'Snow caught in the forks', re: 'sprites' } ] },
-  { name: 'Falling snow (step 11)', note: 'From winter2.html.', ctls: [
-    { o: 'V', k: 'flakes', label: 'Flakes', min: 0, max: 900, step: 1, re: 'live' },
-    { o: 'V', k: 'sizeFar', label: 'Size far', min: 0.2, max: 3, step: 0.05, re: 'live' },
-    { o: 'V', k: 'sizeNear', label: 'Size near', min: 1, max: 10, step: 0.1, re: 'live' },
-    { o: 'V', k: 'farBlur', label: 'Blur far', min: 0, max: 10, step: 0.1, re: 'live' },
-    { o: 'V', k: 'nearBlur', label: 'Blur near', min: 0, max: 4, step: 0.05, re: 'live' },
-    { o: 'V', k: 'fallSpeed', label: 'Speed', min: 0.1, max: 2.5, step: 0.05, re: 'live' },
-    { o: 'V', k: 'flakeSway', label: 'Sway', min: 0, max: 5, step: 0.05, re: 'live' },
-    { o: 'V', k: 'frontShare', label: 'Share in front of the text', min: 0, max: 0.6, step: 0.01, re: 'live' },
-    { o: 'V', k: 'bokeh', label: 'Big soft flakes', min: 0, max: 20, step: 1, re: 'live' },
-    { o: 'V', k: 'backlight', label: 'Caught by the light', min: 0, max: 2, step: 0.05, re: 'live', note: 'In front of the sun, and near the lamps after dark.' } ] },
+  { name: 'Falling snow (step 11)', note: 'Every flake has its own distance: it is drawn as large as it is at that distance, falls and drifts more slowly the farther it is, comes down onto the snow at its distance, and passes behind or in front of the hill, the hall, the trees and the gates by where it is. Depth of field: a lens focused at a distance; flakes nearer or farther are spread into soft discs.', ctls: [
+    { chk: 'V', k: 'sfShow', label: 'Show the snowfall', re: 'live' },
+    { o: 'V', k: 'sfNear', label: 'Flakes near (1.2-10 m)', min: 0, max: 400, step: 1, re: 'live' },
+    { o: 'V', k: 'sfMid', label: 'Flakes in the middle (10-90 m)', min: 0, max: 1500, step: 1, re: 'live' },
+    { o: 'V', k: 'sfFar', label: 'Flakes far (90-2500 m: the background)', min: 0, max: 3000, step: 1, re: 'live' },
+    { o: 'V', k: 'sfSize', label: 'Flake size (cm)', min: 0.3, max: 4, step: 0.05, re: 'live' },
+    { o: 'V', k: 'sfMin', label: 'Smallest flake drawn (px)', min: 0.4, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'sfFarShow', label: 'How much the flakes smaller than that show', min: 0, max: 1, step: 0.01, re: 'live' },
+    { o: 'V', k: 'sfTone', label: 'Far flakes: grey of snow in shade (so they show against the bright sky)', min: 0, max: 1, step: 0.01, re: 'live' },
+    { o: 'V', k: 'sfHaze', label: 'Fade into the air beyond (m)', min: 0, max: 5000, step: 10, re: 'live', note: '0: no fading.' },
+    { o: 'V', k: 'sfFocus', label: 'Depth of field: focus (m)', min: 1, max: 600, step: 0.5, re: 'live' },
+    { o: 'V', k: 'sfAperture', label: 'Depth of field: strength (lens opening, cm)', min: 0, max: 6, step: 0.05, re: 'live', note: '0: everything sharp.' },
+    { o: 'V', k: 'sfFront', label: 'Nearer than this (m) they pass in front of the text', min: 0, max: 10, step: 0.1, re: 'live' },
+    { o: 'V', k: 'sfSpeed', label: 'Fall speed', min: 0.1, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'sfSway', label: 'Sway', min: 0, max: 4, step: 0.05, re: 'live' },
+    { o: 'V', k: 'backlight', label: 'Caught by the light', min: 0, max: 2, step: 0.05, re: 'live', note: 'In front of the sun.' },
+    { o: 'V', k: 'fallSpeed', label: 'Snow shed by the plum branches: fall speed', min: 0.1, max: 2.5, step: 0.05, re: 'live' } ] },
 ];
 var CONDS = [['clear', '快晴 Clear'], ['sunny', '晴れ Sunny'], ['partly', '晴れ時々曇り Sun and cloud'], ['thin', '薄曇り Thin cloud'],
              ['cloudy', '曇り Cloudy'], ['mist', '霞 Mist'], ['snow', '雪 Snow']];
