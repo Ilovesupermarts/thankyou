@@ -20,8 +20,8 @@
 -->
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #d4dae6; font: 14px/1.35 system-ui, sans-serif; }
-  canvas#c { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; }
-  #sp { position: fixed; right: 10px; top: 10px; width: 330px; max-height: calc(100vh - 20px); overflow: auto; background: rgba(255,255,255,0.92);
+  canvas#c { position: fixed; left: 0; top: 0; width: 100%; height: 100%; }   /* (100%, not 100vh: on a tablet's Chrome 100vh is the taller viewport with the address bar hidden, which stretched the whole scene; newwinter.html's canvases are 100% too) */
+  #sp { position: fixed; right: 10px; top: 10px; width: 330px; max-height: calc(100% - 20px); overflow: auto; background: rgba(255,255,255,0.92);
         border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.25); padding: 0 12px 12px; }
   #sp.min { width: auto; } #sp.min .body { display: none; }
   #sp .head { position: sticky; top: 0; background: rgba(255,255,255,0.97); padding: 10px 0 6px; display: flex; gap: 6px; align-items: center; }
@@ -32,7 +32,7 @@
   #sp label span { float: right; color: #666; font-variant-numeric: tabular-nums; }
   #sp input[type=range] { width: 100%; height: 26px; }
   #sp select { width: 100%; font: inherit; padding: 4px; }
-  #ax { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; display: none; touch-action: none; }
+  #ax { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: none; touch-action: none; }
   #axbar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); display: none; gap: 8px; align-items: center;
            background: rgba(255,255,255,0.95); padding: 8px 10px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); font-size: 15px; }
   #axbar button { font: inherit; padding: 10px 16px; border-radius: 8px; border: 1px solid #aab; background: #f4f5f9; }
