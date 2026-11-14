@@ -427,83 +427,79 @@ function draw(c, G, place, cam, Lt, look) {
      wind has drifted it against the post, lit as the snow ground is (the sun's side brighter), its edge soft */
   var fsK = d(look, 'footSnow', 1);
   function footSnow(a0) {
-    if (fsK <= 0 || !look.snowLit) return;
-    var rr0 = G.r0 * 1.04, fc = T.w(a0, 0, 0), vd = norm([-fc[0], 0, -fc[2]]);
-    var pb = T.p(fc), pt = T.p([fc[0], 1, fc[2]]), pn = T.p([fc[0] + vd[0] * 0.5, 0, fc[2] + vd[2] * 0.5]);
-    var ppm = pb[1] - pt[1], bx = pb[0], by = pb[1];
-    if (!(ppm > 1) || !isFinite(bx + by)) return;
-    var rpx = ppm * rr0, dyM = Math.max(0.6, (pn[1] - by) * 2);            // pixels the ground moves down per metre toward you
-    var kn = [], q;
-    for (q = 0; q < 12; q++) kn.push(r());
-    function nz(t) { t = Math.max(-1, Math.min(1, t)); var x = (t + 1) / 2 * 11, i = Math.min(10, Math.floor(x)), f = x - i, u = f * f * (3 - 2 * f); return lerp(kn[i], kn[i + 1], u); }
-    // the pillar stands IN a drift: the snow climbs its black sleeve to an uneven crest (about a third of a metre), then
-    // slopes down and away on both sides, wide enough to lie across the path's wall beside it, and dissolves into the ground
-    var htM = (0.34 + 0.16 * r()) * fsK, wdM = (0.7 + 0.35 * r()) * fsK;
-    var reach = rpx + wdM * ppm, ry = Math.max(2.5, wdM * dyM * 1.4 + rpx * 0.22), N = 48, top = [], bot = [], i, dx, u, t;
-    for (i = 0; i <= N; i++) {
-      t = -1 + 2 * i / N; dx = t * reach; u = Math.max(0, (Math.abs(dx) - rpx * 0.95) / (reach - rpx * 0.95));      // 0 on the pillar, 1 at the skirt's edge
-      var prof = 1 - u * u * (3 - 2 * u), lump = 0.8 + 0.4 * nz(t * 0.95) + 0.18 * (nz(t * 3.1 + 0.4) - 0.5);
-      var hh = htM * ppm * prof * (u < 0.02 ? lump : lump * 0.85 + 0.15);
-      top.push([bx + dx, by + ry * 0.35 * (1 - prof) - hh]);
-      bot.push([bx + dx, by + ry * Math.sqrt(Math.max(0, 1 - t * t)) * 0.9]);
+    if (fsK <= 0 || !look.fieldCnv) return;
+    var rr0 = G.r0 * 1.04, fc = T.w(a0, 0, 0), F = cam.F, W0 = cam.W / 2, hy = cam.hy, eye = cam.eye, sc = look.pr || 1;
+    var cx = fc[0], cz = fc[2], y0 = fc[1];
+    if (!(cz > 1)) return;
+    /* A real drift round the pillar: a height field on the ground (a peak against the post, concave slopes, long low tails
+       to the left and right, lumps), seen through the camera pixel by pixel (the line of sight is followed to the surface).
+       Each pixel it covers takes the ground picture's own pixel at that place and is lit by the slope it lies on (sun on the
+       side that faces it, the sky's blue in the shade), so it is the same snow, with the same grain, and where it thins to
+       nothing it IS the ground: no outline, no seam. The pillar stays in front of the half of the drift behind it. */
+    var rg = rng(Math.round(cx * 977 + cz * 331 + a0 * 7919) + 5), kn = [], q;
+    for (q = 0; q < 16; q++) kn.push(rg());
+    function nzA(t) { t = (t % 1 + 1) % 1; var x = t * 15, i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return lerp(kn[i], kn[(i + 1) % 16], u); }
+    var hash = function (i, j) { var n = Math.sin(i * 127.1 + j * 311.7 + cx * 3.1) * 43758.5453; return n - Math.floor(n); };
+    function vn(x, z) { var i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j, ux = fx * fx * (3 - 2 * fx), uz = fz * fz * (3 - 2 * fz);
+      return lerp(lerp(hash(i, j), hash(i + 1, j), ux), lerp(hash(i, j + 1), hash(i + 1, j + 1), ux), uz); }
+    var H0 = (0.95 + 0.2 * rg()) * fsK, R0 = (1.05 + 0.2 * rg()) * Math.max(0.6, fsK), tailL = 1.8 + 1.4 * rg(), tailR = 1.8 + 1.4 * rg(), Rmax = R0 * (1 + Math.max(tailL, tailR)) + rr0;
+    function hAt(x, z) {
+      var dx = x - cx, dz = z - cz, rho = Math.sqrt(dx * dx + dz * dz); if (rho >= Rmax) return 0;
+      var th = Math.atan2(dz, dx), ct = Math.cos(th);
+      // reach in this direction: round about, with long tails along the screen's left-right line and uneven lobes
+      var Rr = R0 * (0.78 + 0.5 * nzA(th / TAU) + 0.8 * Math.pow(Math.max(0, ct), 5) * tailR + 0.8 * Math.pow(Math.max(0, -ct), 5) * tailL);
+      var s = Math.max(0, (rho - rr0 * 0.6) / Math.max(0.05, Rr - rr0 * 0.6)); if (s >= 1) return 0;
+      var hh = H0 * Math.pow(1 - s, 2.3) * (0.88 + 0.24 * vn(x * 3.1, z * 3.1)) * (0.9 + 0.2 * nzA(th / TAU + 0.31));
+      return hh * Math.min(1, 0.35 + 3 * s);                                  // the plateau against the post
     }
-    var pad = 6, xl = bx - reach - pad, xr = bx + reach + pad, yt = by - htM * ppm * 1.7 - pad, yb = by + ry + pad, Wc = Math.ceil(xr - xl), Hc = Math.ceil(yb - yt), sc = look.pr || 1;
-    var oc = document.createElement('canvas'); oc.width = Math.ceil(Wc * sc); oc.height = Math.ceil(Hc * sc);
-    var o = oc.getContext('2d'); o.setTransform(sc, 0, 0, sc, -xl * sc, -yt * sc);
-    var sunRight = Lt.dir[0] < 0;                                           // the sun is to the left of the winter scene's view
-    var lit = mix(look.snowLit, Lt.mist, PN.hz), sh = mix(look.snowShade, Lt.mist, PN.hz), dim = mix(mix(look.snowLit, look.snowShade, 0.4), Lt.mist, PN.hz);
-    o.beginPath(); top.forEach(function (p, k) { if (k) o.lineTo(p[0], p[1]); else o.moveTo(p[0], p[1]); });
-    for (i = N; i >= 0; i--) o.lineTo(bot[i][0], bot[i][1]);
-    o.closePath();
-    // the ground's own colour along the skirt's rim (read from the snow ground picture), so the drift melts into it
-    var rim = [], gAt = look.ground, k2;
-    for (k2 = 0; k2 <= 8; k2++) {
-      var tt = -1 + k2 / 4, gc = gAt ? gAt(bx + tt * reach, by + ry * 0.85) : null;
-      rim.push(gc || (tt * (sunRight ? 1 : -1) > 0 ? dim : lit));
+    var Hm = H0 * 1.3 + 0.05, tB = rr0, k;
+    // the screen box that can hold it
+    var sxs = [], sys = [], xs = [cx - Rmax, cx + Rmax], zs = [Math.max(1, cz - Rmax), cz + Rmax], hs = [0, Hm];
+    xs.forEach(function (x) { zs.forEach(function (z) { hs.forEach(function (h) { sxs.push(W0 + F * x / z); sys.push(hy - F * (y0 + h - eye) / z); }); }); });
+    var X0 = Math.floor(Math.min.apply(null, sxs) * sc) - 2, X1 = Math.ceil(Math.max.apply(null, sxs) * sc) + 2, Y0 = Math.floor(Math.min.apply(null, sys) * sc) - 2, Y1 = Math.ceil(Math.max.apply(null, sys) * sc) + 2;
+    var fcv = look.fieldCnv; X0 = Math.max(0, X0); Y0 = Math.max(0, Y0); X1 = Math.min(fcv.width, X1); Y1 = Math.min(fcv.height, Y1);
+    var wpx = X1 - X0, hpx = Y1 - Y0; if (wpx < 4 || hpx < 4 || wpx * hpx > 4e6) return;
+    var bd = fcv.getContext('2d').getImageData(X0, Y0, wpx, hpx).data, out = new ImageData(wpx, hpx), D = out.data;
+    var Ls2 = Lt.dir, sunN = [SN[0] * Lt.sun[0] * 1.25, SN[1] * Lt.sun[1] * 1.25, SN[2] * Lt.sun[2] * 1.25], fl = Math.max(0.02, Ls2[1]), eps = 0.03, x, y, ch;
+    var dn = [sunN[0] * fl + SH[0], sunN[1] * fl + SH[1], sunN[2] * fl + SH[2]];
+    for (y = 0; y < hpx; y++) {
+      var sy = (Y0 + y + 0.5) / sc, ddy = -(sy - hy) / F; if (ddy >= -1e-4) continue;
+      var tg = (eye - y0) / -ddy, tt = (eye - y0 - Hm) / -ddy;
+      for (x = 0; x < wpx; x++) {
+        var ddx = ((X0 + x + 0.5) / sc - W0) / F;
+        // too far from the drift to meet it?
+        var gx = tg * ddx - cx, gz = tg - cz, reach = Rmax + (tg - tt) * Math.sqrt(ddx * ddx + 1);
+        if (gx * gx + gz * gz > reach * reach) continue;
+        // follow the line of sight down to the surface
+        var tlo = Math.max(tt, cz - Rmax), thi = Math.min(tg, cz + Rmax), tHit = -1, st = (thi - tlo) / 110, t, hx;
+        if (thi <= tlo) continue;
+        for (k = 1; k <= 110; k++) {
+          t = tlo + st * k; hx = hAt(t * ddx, t);
+          if (eye + t * ddy - y0 - hx <= 0) { var lo = tlo + st * (k - 1), hi = t, m, j; for (j = 0; j < 9; j++) { m = (lo + hi) / 2; if (eye + m * ddy - y0 - hAt(m * ddx, m) <= 0) hi = m; else lo = m; } tHit = hi; break; }
+        }
+        if (tHit < 0) continue;
+        // the pillar is in front of the part of the drift that lies behind it
+        var aa = ddx * ddx + 1, bb = -2 * (ddx * cx + cz), cc = cx * cx + cz * cz - rr0 * rr0, di = bb * bb - 4 * aa * cc;
+        if (di > 0) { var tc = (-bb - Math.sqrt(di)) / (2 * aa); if (tc < tHit) continue; }
+        var px = tHit * ddx, pz = tHit, h = hAt(px, pz);
+        if (h < 0.0015) continue;
+        var gxp = (hAt(px + eps, pz) - hAt(px - eps, pz)) / (2 * eps), gzp = (hAt(px, pz + eps) - hAt(px, pz - eps)) / (2 * eps), nl = Math.sqrt(gxp * gxp + gzp * gzp + 1);
+        var nx = -gxp / nl, ny = 1 / nl, nzv = -gzp / nl, sun = Math.max(0, nx * Ls2[0] + ny * Ls2[1] + nzv * Ls2[2]);
+        var rho = Math.sqrt((px - cx) * (px - cx) + (pz - cz) * (pz - cz)), ao = lerp(0.72, 1, smooth(rr0, rr0 + 0.55, rho)), sk = (0.55 + 0.45 * ny) * ao;
+        var o4 = (y * wpx + x) * 4;
+        for (ch = 0; ch < 3; ch++) {
+          var ratio = (sunN[ch] * sun * Math.min(1, ao + 0.2) + SH[ch] * sk) / dn[ch];
+          ratio = lerp(ratio, 1, 0.62);                                       // light thrown into the shade by the sunlit snow round it
+          if (ch === 0) ratio *= lerp(1, 0.88, 1 - Math.min(1, sk)); else if (ch === 1) ratio *= lerp(1, 0.95, 1 - Math.min(1, sk));      // and the shade is bluish
+          var v = bd[o4 + ch] * ratio;
+          D[o4 + ch] = v > 236 ? 236 + (v - 236) * 19 / (v - 236 + 19) : v;
+        }
+        D[o4 + 3] = 255 * Math.min(1, h / 0.01);
+      }
     }
-    var gh = o.createLinearGradient(bx - reach, 0, bx + reach, 0);
-    for (k2 = 0; k2 <= 8; k2++) gh.addColorStop(k2 / 8, rgb(mix(rim[k2], lit, 0.18)));
-    o.fillStyle = gh; o.fill();
-    o.save(); o.clip();
-    var gv = o.createLinearGradient(0, by - htM * ppm * 1.2, 0, by + ry);    // lit on the crest the sky and sun reach, the ground's own tone at the rim
-    gv.addColorStop(0, rgb(mix(lit, [255, 255, 255], 0.3), 0.75)); gv.addColorStop(0.45, rgb(lit, 0.38)); gv.addColorStop(1, rgb(lit, 0));
-    o.fillStyle = gv; o.fillRect(xl, yt, Wc, Hc);
-    // the sun's side of the drift brighter, the far side a little shaded
-    var gs = o.createLinearGradient(bx - reach, 0, bx + reach, 0);
-    gs.addColorStop(0, rgb(sunRight ? [255, 255, 255] : sh, sunRight ? 0.18 : 0.2)); gs.addColorStop(0.5, rgb(sh, 0)); gs.addColorStop(1, rgb(sunRight ? sh : [255, 255, 255], sunRight ? 0.2 : 0.18));
-    o.fillStyle = gs; o.fillRect(xl, yt, Wc, Hc);
-    // soft rounded lumps across the slope
-    for (i = 0; i < 8; i++) {
-      var lx = bx + (r() * 2 - 1) * reach * 0.85, ly = by - htM * ppm * (0.1 + 0.5 * r()) + (r() - 0.2) * ry * 0.6, lr = reach * lerp(0.07, 0.17, r());
-      var gl = o.createRadialGradient(lx, ly, 0, lx, ly, lr); gl.addColorStop(0, rgb(i & 1 ? [255, 255, 255] : sh, i & 1 ? 0.3 : 0.12)); gl.addColorStop(1, rgb(i & 1 ? [255, 255, 255] : sh, 0));
-      o.fillStyle = gl; o.fillRect(lx - lr, ly - lr, lr * 2, lr * 2);
-    }
-    o.restore();
-    // the crest: a lit rounded ridge where the snow climbs the black, fading out along the slope (no outline round the drift)
-    o.save(); o.lineCap = 'round'; o.lineJoin = 'round'; o.beginPath();
-    top.forEach(function (p, k) { if (k) o.lineTo(p[0], p[1] + 0.4); else o.moveTo(p[0], p[1] + 0.4); });
-    var gc2 = o.createLinearGradient(bx - reach, 0, bx + reach, 0), hc = rgb(mix(lit, [255, 255, 255], 0.5), 0.5);
-    gc2.addColorStop(0, rgb(lit, 0)); gc2.addColorStop(0.3, rgb(lit, 0)); gc2.addColorStop(0.42, hc); gc2.addColorStop(0.58, hc); gc2.addColorStop(0.7, rgb(lit, 0)); gc2.addColorStop(1, rgb(lit, 0));
-    o.strokeStyle = gc2; o.lineWidth = Math.max(1, ppm * 0.035); o.stroke(); o.restore();
-    // fine grain like the ground's, so the drift is not a smooth plate
-    var gw = Math.max(1, Math.ceil(Wc * sc)), gh2 = Math.max(1, Math.ceil(Hc * sc)), id = o.getImageData ? null : null, gn = document.createElement('canvas');
-    gn.width = gw; gn.height = gh2; var gx2 = gn.getContext('2d'), gd2 = gx2.createImageData(gw, gh2), v, kk;
-    for (kk = 0; kk < gd2.data.length; kk += 4) { v = r() < 0.5 ? 255 : 90; gd2.data[kk] = v; gd2.data[kk + 1] = v; gd2.data[kk + 2] = Math.min(255, v + 10); gd2.data[kk + 3] = r() < 0.5 ? 0 : (v > 200 ? 46 : 26); }
-    gx2.putImageData(gd2, 0, 0);
-    o.save(); o.globalCompositeOperation = 'source-atop'; o.setTransform(1, 0, 0, 1, 0, 0); o.drawImage(gn, 0, 0); o.restore();
-    // dissolve the rim into the ground (only its far ends and its lowest edge; the part against the pillar stays solid)
-    o.globalCompositeOperation = 'destination-out';
-    var gx = o.createLinearGradient(bx - reach, 0, bx + reach, 0);
-    gx.addColorStop(0, 'rgba(0,0,0,1)'); gx.addColorStop(0.07, 'rgba(0,0,0,0.9)'); gx.addColorStop(0.16, 'rgba(0,0,0,0.5)'); gx.addColorStop(0.27, 'rgba(0,0,0,0.1)'); gx.addColorStop(0.34, 'rgba(0,0,0,0)');
-    gx.addColorStop(0.66, 'rgba(0,0,0,0)'); gx.addColorStop(0.73, 'rgba(0,0,0,0.1)'); gx.addColorStop(0.84, 'rgba(0,0,0,0.5)'); gx.addColorStop(0.93, 'rgba(0,0,0,0.9)'); gx.addColorStop(1, 'rgba(0,0,0,1)');
-    o.fillStyle = gx; o.fillRect(xl, yt, Wc, Hc);
-    var gy = o.createLinearGradient(0, by, 0, by + ry);
-    gy.addColorStop(0, 'rgba(0,0,0,0)'); gy.addColorStop(0.5, 'rgba(0,0,0,0.04)'); gy.addColorStop(0.8, 'rgba(0,0,0,0.4)'); gy.addColorStop(1, 'rgba(0,0,0,1)');
-    o.fillStyle = gy; o.fillRect(xl, by, Wc, Hc);
-    o.globalCompositeOperation = 'source-over';
-    o.globalCompositeOperation = 'source-over';
-    c.save(); c.filter = 'blur(' + Math.max(0.3, 0.35 * sc).toFixed(2) + 'px)'; c.drawImage(oc, xl, yt, Wc, Hc); c.restore();
-    grow([[xl, yt], [xr, yt], [xr, yb], [xl, yb]]);
+    var oc = document.createElement('canvas'); oc.width = wpx; oc.height = hpx; oc.getContext('2d').putImageData(out, 0, 0);
+    c.save(); c.filter = 'blur(' + Math.max(0.4, 0.45 * sc).toFixed(2) + 'px)'; c.drawImage(oc, X0 / sc, Y0 / sc, wpx / sc, hpx / sc); c.restore();
+    grow([[X0 / sc, Y0 / sc], [X1 / sc, Y1 / sc]]);
   }
 
   // which pillar, end and so on is nearer: draw the farther first

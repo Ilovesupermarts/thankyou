@@ -467,7 +467,7 @@ function stepField(ms) {
   if (!FJ) return;
   if (!FJ.step(ms)) return;
   var q = FIELD; FIELD = FIELDN; FIELDN = q; FJ = null; fieldOK = true; fieldMs = performance.now() - FT0;
-  composeBase();
+  drawGates();                                  // the gates' feet are cut from the ground's picture, so they wait for it (this lays the base too)
 }
 
 /* ============================================================
@@ -530,7 +530,7 @@ function drawGates() {
   var wf = VIEW.dirCam(-0.94, -0.34);                          // the wind comes from the left of the winter scene (as the frosted trees' rime)
   var look = { red: hex(V.colours.toriiRed), black: hex(V.colours.toriiBlack), kasagiBlack: V.gateKasagiBlack, vivid: V.gateVivid,
                weather: V.gateWeather, haze: V.gateHaze * V.fieldHaze, hazeM: V.fieldHazeDist, footSnow: V.gateFootSnow,
-               ground: groundSampler(),
+               fieldCnv: null,
                snowLit: snowAt(1), snowShade: snowAt(0.25), snowRGB: hex(V.colours.snow), shadeRGB: SHADE, crevice: V.gateCrevice, windFrom: wf, pr: PR };
   var order = VIEW.gates.map(function (g) { return { g: g, i: g.i }; }).filter(function (o) { return o.g.z > 1; }).sort(function (a, b) { return b.g.z - a.g.z; });
   var zNear = order.length ? order[order.length - 1].g.z : 1;
@@ -556,6 +556,13 @@ function drawGates() {
         s.save(); s.translate(x, y); s.scale(1, ry / rx); s.translate(-x, -y); s.fillStyle = g; s.fillRect(x - rx, y - rx, rx * 2, rx * 2); s.restore();
       });
     }
+  });
+  composeBase();                                     // the ground with every gate's shadow, so the gates' snow can be cut from what is really on screen there
+  look.fieldCnv = BASE.cnv;
+  order.forEach(function (o) {
+    var back = 1 - zNear / o.g.z, air = V.gateAir * back, dof = V.gateDof * back;
+    look.hazeAdd = air;
+    var G = gateShape(o.i), hzv = clamp((1 - Math.exp(-Math.pow(o.g.z / V.fieldHazeDist, 1.6))) * V.fieldHaze + air, 0, 1);
     tmp.c.setTransform(1, 0, 0, 1, 0, 0); tmp.c.clearRect(0, 0, tmp.cnv.width, tmp.cnv.height); tmp.c.setTransform(PR, 0, 0, PR, 0, 0);
     var box = WinterTorii.draw(tmp.c, G, o.g, cam, Lt, look);
     var Lg = layer(); Lg.c.setTransform(1, 0, 0, 1, 0, 0);
