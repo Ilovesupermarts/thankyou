@@ -1038,17 +1038,34 @@
     draw: drawSolidKoi
   };
 
-  function drawSolidKoi(ctx, k, s) {
-    var L = k.L, out = k.outline(), tail = k.tail();
+  function koiParts(k, s) {
     var fl = 0.32 * s.fins * (k.finAmp || 1);
-    var fins = [
-      k.fin(0.2, 1, 0.24, 0.95, fl * Math.sin(k.finPhase)),
-      k.fin(0.2, -1, 0.24, 0.95, fl * Math.sin(k.finPhase + 0.6)),
-      k.fin(0.52, 1, 0.13, 0.8, fl * 0.7 * Math.sin(k.finPhase + 1.3)),
-      k.fin(0.52, -1, 0.13, 0.8, fl * 0.7 * Math.sin(k.finPhase + 1.9))
-    ];
-    // shadow on the pond floor
-    if (s.shadow > 0) {
+    return {
+      out: k.outline(), tail: k.tail(),
+      fins: [
+        k.fin(0.2, 1, 0.24, 0.95, fl * Math.sin(k.finPhase)),
+        k.fin(0.2, -1, 0.24, 0.95, fl * Math.sin(k.finPhase + 0.6)),
+        k.fin(0.52, 1, 0.13, 0.8, fl * 0.7 * Math.sin(k.finPhase + 1.3)),
+        k.fin(0.52, -1, 0.13, 0.8, fl * 0.7 * Math.sin(k.finPhase + 1.9))
+      ]
+    };
+  }
+  /* The koi's shadow on the pond floor, filled flat (no blur filter: the
+     pond lays all the shadows on one small picture and scales it up, which
+     softens them). */
+  function drawKoiShadow(ctx, k, s) {
+    var P = koiParts(k, s), L = k.L;
+    ctx.translate(L * 0.035 * s.shadow, L * 0.075 * s.shadow);
+    ctx.fillStyle = 'rgba(176, 72, 22, ' + (0.16 + 0.04 * s.shadow).toFixed(3) + ')';
+    ctx.beginPath(); smoothClosed(ctx, P.out); tailPath(ctx, P.tail);
+    P.fins.forEach(function (F) { finPath(ctx, F); });
+    ctx.fill();
+  }
+
+  function drawSolidKoi(ctx, k, s) {
+    var L = k.L, parts = koiParts(k, s), out = parts.out, tail = parts.tail, fins = parts.fins;
+    // (the pond draws the shadows itself, on their own small picture)
+    if (false) {
       ctx.save();
       ctx.translate(L * 0.035 * s.shadow, L * 0.075 * s.shadow);
       ctx.filter = 'blur(' + (L * 0.035 * s.shadow).toFixed(1) + 'px)';
@@ -1146,7 +1163,7 @@
     this.W = r.width || 800; this.H = r.height || 600;
     var dpr = Math.min(this.s.maxDpr || 2, window.devicePixelRatio || 1);
     this.canvas.width = Math.round(this.W * dpr); this.canvas.height = Math.round(this.H * dpr);
-    this.off.width = this.canvas.width; this.off.height = this.canvas.height;
+    this.off.width = 64; this.off.height = 64;   // (the little picture for diving koi: grows when needed)
     this.dpr = dpr;
     this.hw = this.W / 2; this.hh = this.H / 2;        // the canvas's middle
     this.shape();
@@ -1337,23 +1354,57 @@
     }
   };
 
+  /* The depth each koi is drawn at: deeper is smaller and fainter. */
+  Pond.prototype.depthLook = function (k, s) {
+    var z = k.z, gone = clamp((z - 1) / 0.5, 0, 1);
+    var zd = clamp((z - k.zHome) / (1 - k.zHome), 0, 1) + gone * 0.5;
+    var up = clamp((k.zHome - z) / (k.zHome + 0.12), 0, 1);
+    k.dGone = gone; k.dZd = zd; k.dUp = up;
+    k.dSc = up > 0 ? 1 + 0.05 * up : 1 - (1 - s.deepSize) * zd;
+    k.dShadow = s.shadow * (1 + 0.4 * up - 0.7 * zd);
+  };
+  /* All the koi's shadows on one SMALL picture (about 1/8 of the pond's
+     size), laid down once, scaled up smooth: the scaling is the blur. (A
+     blur filter on every koi, every frame, was what made it stutter.) */
+  Pond.prototype.drawShadows = function (ctx, fish, s) {
+    if (!(s.shadow > 0)) return;
+    var blur = this.L * 0.035 * s.shadow;
+    var sc = clamp(1 / Math.max(1, blur * 0.8), 0.1, 0.6);
+    var sw = Math.ceil(this.W * sc) + 2, sh = Math.ceil(this.H * sc) + 2;
+    var can = this.shCan || (this.shCan = document.createElement('canvas'));
+    var c2 = this.shCtx || (this.shCtx = can.getContext('2d'));
+    if (can.width !== sw || can.height !== sh) { can.width = sw; can.height = sh; }
+    else { c2.setTransform(1, 0, 0, 1, 0, 0); c2.clearRect(0, 0, sw, sh); }
+    for (var i = 0; i < fish.length; i++) {
+      var k = fish[i];
+      if (k.dGone >= 1 || k.dShadow <= 0.001) continue;
+      var c = k.P[9], se = Object.create(s); se.shadow = k.dShadow;
+      c2.setTransform(sc, 0, 0, sc, this.hw * sc, this.hh * sc);
+      c2.translate(c.x, c.y); c2.scale(k.dSc, k.dSc); c2.translate(-c.x, -c.y);
+      drawKoiShadow(c2, k, se);
+    }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(can, 0, 0, sw, sh, 0, 0, sw / sc * this.dpr, sh / sc * this.dpr);
+    ctx.restore();
+  };
+
   /* Each koi at its own depth — deeper is smaller, blurrier and fainter;
      the deepest are drawn first, so nearer koi pass over. */
   Pond.prototype.drawPool = function (ctx, look, s) {
     var oc = this.offCtx, dpr = this.dpr, hw = this.hw, hh = this.hh, fish = this.fish.slice();
     fish.sort(function (a, b) { return b.z - a.z; });
+    for (var i = 0; i < fish.length; i++) this.depthLook(fish[i], s);
+    this.drawShadows(ctx, fish, s);
     this.drawFood(ctx, true);
-    for (var i = 0; i < fish.length; i++) {
+    for (i = 0; i < fish.length; i++) {
       // measured from the koi's own cruising depth: every koi that is
       // just cruising is drawn at full size, sharp and solid
-      var k = fish[i], z = k.z;
-      var gone = clamp((z - 1) / 0.5, 0, 1);
-      var zd = clamp((z - k.zHome) / (1 - k.zHome), 0, 1) + gone * 0.5;
+      var k = fish[i], zd = k.dZd, gone = k.dGone, sc = k.dSc;
       if (gone >= 1) continue;
-      var up = clamp((k.zHome - z) / (k.zHome + 0.12), 0, 1);
-      var sc = up > 0 ? 1 + 0.05 * up : 1 - (1 - s.deepSize) * zd;
       var se = Object.create(s);
-      se.shadow = s.shadow * (1 + 0.4 * up - 0.7 * zd);
+      se.shadow = 0;
       var c = k.P[9];
       if (zd < 0.01) {           // not diving: drawn straight onto the pond
         ctx.save();
@@ -1362,22 +1413,25 @@
         ctx.restore();
         continue;
       }
-      // diving: drawn on its own layer, then laid down blurred and faded;
-      // only the square around the koi is cleared and copied
-      var half = k.L * 0.95, bx = Math.max(0, Math.floor((hw + c.x - half) * dpr)), by = Math.max(0, Math.floor((hh + c.y - half) * dpr));
-      var bw = Math.min(this.off.width - bx, Math.ceil(half * 2 * dpr)), bh = Math.min(this.off.height - by, Math.ceil(half * 2 * dpr));
-      if (bw <= 0 || bh <= 0) continue;
+      // diving: the blur is made by drawing the koi SMALL on a little
+      // picture and scaling it up smooth (no blur filter: it is far
+      // too slow), then laying it down faded
+      var blur = s.deepBlur * zd * dpr * k.sizeK * (this.L / 83);
+      var r = Math.max(1, blur * 2.4), half = k.L * 0.95;
+      var bw = Math.ceil(half * 2 * dpr);                    // the square in device pixels
+      var sw = Math.max(2, Math.ceil(bw / r));
+      if (this.off.width < sw || this.off.height < sw) { this.off.width = Math.max(this.off.width, sw); this.off.height = Math.max(this.off.height, sw); }
       oc.setTransform(1, 0, 0, 1, 0, 0);
-      oc.clearRect(bx, by, bw, bh);
-      oc.setTransform(dpr, 0, 0, dpr, 0, 0);
-      oc.translate(hw + c.x, hh + c.y); oc.scale(sc, sc); oc.translate(-c.x, -c.y);
+      oc.clearRect(0, 0, sw, sw);
+      var kk = sw / (half * 2);                             // little-picture pixels per CSS pixel
+      oc.setTransform(kk, 0, 0, kk, 0, 0);
+      oc.translate(half, half); oc.scale(sc, sc); oc.translate(-c.x, -c.y);
       oc.save(); look.draw(oc, k, se); oc.restore();
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      var blur = s.deepBlur * zd * dpr * k.sizeK * (this.L / 83);
-      if (blur > 0.15) ctx.filter = 'blur(' + blur.toFixed(2) + 'px)';
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
       ctx.globalAlpha = (1 - s.deepFade * Math.min(zd, 1)) * (1 - gone);
-      ctx.drawImage(this.off, bx, by, bw, bh, bx, by, bw, bh);
+      ctx.drawImage(this.off, 0, 0, sw, sw, Math.round((hw + c.x - half) * dpr), Math.round((hh + c.y - half) * dpr), bw, bw);
       ctx.restore();
     }
     this.drawFood(ctx, false);
