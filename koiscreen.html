@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#FFFDF9">
+<title>Koi Pond Screen Lab</title>
+
+<!-- ============================================================
+     koiscreen.html — test bed for a calm screen: the whole screen is a
+     pond of koi seen from above, as on the start button (to take the
+     place of the Pong game later, when asked).
+
+     The koi are drawn by koipond.js (a copy of koi.js grown for a whole
+     screen; the start button's koi.js is not touched). The water is the
+     start button's: pale warm cream, an amber tint toward the edge, two
+     layers of soft light turning slowly, the koi's warm shadows on the
+     floor.
+
+     Tap the water: food pellets scatter there; koi that notice come
+     over, rise and take them one by one.
+
+     The panel: the mix of varieties (how many of each), and the
+     settings. "Copy values" gives the numbers to move into the app.
+     Values are kept in this browser under koiScreen-1.
+
+     Not part of the app: not linked from index.html and not in the
+     service worker's ASSETS list.
+     ============================================================ -->
+
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #FFFDF9; }
+  body { -webkit-user-select: none; user-select: none; touch-action: none; }
+
+  /* ---------- the water (the start button's pond, the whole screen) ---------- */
+  .water { position: fixed; inset: 0; overflow: hidden; pointer-events: none; background: #FFFDF9; }
+  .water-depth {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 75% 75% at 50% 42%,
+      rgba(255, 253, 249, 0.55) 0%,
+      rgba(253, 232, 218, 0.40) 58%,
+      rgba(240, 125, 64, 0.16) 100%);
+  }
+  .water-light {
+    position: absolute; inset: -40%;
+    opacity: 0.24;
+    will-change: transform;
+    animation: lightTurn 450s linear infinite;
+  }
+  .water-light.l2 { animation-duration: 680s; animation-direction: reverse; }
+  @keyframes lightTurn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  #pond { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ---------- panel ---------- */
+  .kp-panel {
+    position: fixed; top: 16px; right: 16px; z-index: 10;
+    width: 340px; max-width: calc(100% - 32px);
+    max-height: calc(100% - 32px); overflow-y: auto;
+    background: rgba(255, 253, 249, 0.96);
+    border: 1px solid rgba(120, 90, 80, 0.18); border-radius: 18px;
+    box-shadow: 0 10px 40px rgba(68, 52, 48, 0.14);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: #6A5550; touch-action: pan-y;
+  }
+  .kp-panel.collapsed .kp-body { display: none; }
+  .kp-panel.hidden { display: none; }
+  .kp-head {
+    position: sticky; top: 0; z-index: 1; cursor: move;
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 12px; background: rgba(255, 253, 249, 0.98);
+    border-bottom: 1px solid rgba(120, 90, 80, 0.12); border-radius: 18px 18px 0 0;
+    touch-action: none;
+  }
+  .kp-title { flex: 1; font-weight: 600; color: #3E2E2A; }
+  .kp-btn {
+    border: 1px solid rgba(120, 90, 80, 0.3); background: transparent; border-radius: 999px;
+    padding: 5px 11px; font: inherit; color: #6A5550; cursor: pointer;
+  }
+  .kp-btn.on { background: #B04A5A; border-color: #B04A5A; color: #FFFDF9; }
+  .kp-body { padding: 8px 14px 14px; }
+  .kp-group { margin: 14px 0 4px; font-weight: 600; color: #3E2E2A; }
+  .kp-note { font-size: 11px; color: #9A8580; margin: 2px 0 6px; }
+  .kp-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 4px; }
+  .kp-kind {
+    display: grid; grid-template-columns: 26px 1fr; grid-template-rows: auto auto; gap: 0 8px; align-items: center;
+    border: 1px solid rgba(120, 90, 80, 0.25); background: #fff; border-radius: 12px; padding: 6px 8px;
+  }
+  .kp-kind.on { border-color: #B04A5A; box-shadow: 0 0 0 2px rgba(176, 74, 90, 0.15); }
+  .kp-kind .sw { grid-row: 1 / 3; width: 26px; height: 14px; border-radius: 7px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1) inset; }
+  .kp-kind b { color: #3E2E2A; font-weight: 600; font-size: 12px; line-height: 1.25; }
+  .kp-kind small { display: block; font-size: 10px; color: #9A8580; line-height: 1.2; }
+  .kp-count { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+  .kp-count button {
+    width: 26px; height: 26px; border-radius: 50%; border: 1px solid rgba(120, 90, 80, 0.3);
+    background: #fff; font: 15px/1 sans-serif; color: #6A5550; cursor: pointer; padding: 0;
+  }
+  .kp-count span { min-width: 18px; text-align: center; font-variant-numeric: tabular-nums; color: #3E2E2A; font-weight: 600; }
+  .kp-row { display: grid; grid-template-columns: 1fr 52px; gap: 0 8px; align-items: center; margin: 5px 0; }
+  .kp-row label { grid-column: 1 / 3; font-size: 12px; color: #8A7570; }
+  .kp-row input[type=range] { width: 100%; }
+  .kp-row output { text-align: right; font-variant-numeric: tabular-nums; }
+  .kp-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .kp-info { font-size: 11px; color: #9A8580; margin-top: 8px; }
+  .kp-copy { width: 100%; height: 120px; margin-top: 8px; font: 11px/1.4 monospace; display: none; }
+  .kp-show {
+    position: fixed; top: 16px; right: 16px; z-index: 10; display: none;
+    width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(120, 90, 80, 0.25);
+    background: rgba(255, 253, 249, 0.8); font-size: 20px; color: #6A5550; cursor: pointer;
+  }
+  .kp-show.shown { display: block; }
+</style>
+</head>
+<body>
+
+<div class="water" aria-hidden="true">
+  <div class="water-depth" id="waterDepth"></div>
+  <div class="water-light" id="light1"></div>
+  <div class="water-light l2" id="light2"></div>
+</div>
+<canvas id="pond"></canvas>
+
+<button class="kp-show" id="kpShow" type="button" aria-label="Show settings">⚙</button>
+<div class="kp-panel" id="kpPanel">
+  <div class="kp-head" id="kpHead">
+    <span class="kp-title">Koi pond</span>
+    <button class="kp-btn" id="kpFold" type="button">Fold</button>
+    <button class="kp-btn" id="kpHide" type="button">Hide</button>
+  </div>
+  <div class="kp-body" id="kpBody"></div>
+</div>
+
+<script src="koipond.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     1. VALUES (kept under koiScreen-1)
+     ============================================================ */
+  var STORE = 'koiScreen-1';
+  var KINDS = [
+    { id: 'kohaku',   name: 'Kohaku 紅白',        note: 'white with red',             sw: 'linear-gradient(90deg,#FFF8F1 0 35%,#E04A2C 35% 65%,#FFF8F1 65%)' },
+    { id: 'ogon',     name: 'Yamabuki ogon 山吹黄金', note: 'metallic gold',          sw: '#F3B640' },
+    { id: 'showa',    name: 'Showa 昭和',          note: 'black, red and white',       sw: 'linear-gradient(90deg,#2B2523 0 30%,#D9472B 30% 60%,#FFF6EE 60% 75%,#2B2523 75%)' },
+    { id: 'tancho',   name: 'Tancho 丹頂',         note: 'white, one red crown',       sw: 'radial-gradient(circle at 25% 50%,#D93F28 0 4px,#FFFAF5 4.5px)' },
+    { id: 'sanke',    name: 'Sanke 三色',          note: 'white, red, black spots',    sw: 'linear-gradient(90deg,#FFF8F1 0 20%,#E04A2C 20% 50%,#2A2321 50% 60%,#FFF8F1 60%)' },
+    { id: 'platinum', name: 'Platinum ogon',      note: 'shining silver-white',       sw: '#E6EAEC' },
+    { id: 'asagi',    name: 'Asagi 浅黄',          note: 'blue-grey net, red sides',   sw: 'linear-gradient(180deg,#D9663A 0 22%,#9AAAB8 22% 78%,#D9663A 78%)' },
+    { id: 'shiro',    name: 'Shiro utsuri 白写り',  note: 'ink black on white',         sw: 'linear-gradient(90deg,#27211F 0 30%,#FFF8F1 30% 55%,#27211F 55% 75%,#FFF8F1 75%)' },
+    { id: 'bekko',    name: 'Bekko 鼈甲',          note: 'white, small black spots',   sw: 'radial-gradient(circle at 45% 40%,#2A2321 0 2px,transparent 2.5px),radial-gradient(circle at 70% 60%,#2A2321 0 2px,transparent 2.5px),#FFF9F3' },
+    { id: 'goshiki',  name: 'Goshiki 五色',        note: 'red over dark netted grey',  sw: 'linear-gradient(90deg,#6A727C 0 25%,#C8402A 25% 60%,#6A727C 60%)' }
+  ];
+  var DEFAULTS = {
+    mix: { kohaku: 2, ogon: 1, showa: 1, tancho: 1, sanke: 1, platinum: 1, asagi: 1, shiro: 1, bekko: 1, goshiki: 1 },
+    seed: 1,
+    length: 0.16, sizeVary: 0.2, girth: 0.9,
+    speed: 1.2, wave: 1.2, fins: 0.8, roam: 0.8, edge: 0.6,
+    eventEvery: 5, airShare: 0.45, airMax: 2, deepTime: 10, deepSize: 0.57, deepBlur: 3, deepFade: 0.35,
+    shadow: 1.75,
+    foodCount: 6, foodSpread: 0.4, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
+    light: 0.24, lightSpeed: 1, tint: 1,
+    maxDpr: 2
+  };
+  var V = JSON.parse(JSON.stringify(DEFAULTS));
+  try {
+    var saved = JSON.parse(localStorage.getItem(STORE) || 'null');
+    if (saved) for (var k in saved) if (k in V) V[k] = saved[k];
+    if (saved && saved.mix) { V.mix = {}; KINDS.forEach(function (K) { V.mix[K.id] = +saved.mix[K.id] || 0; }); }
+  } catch (e) {}
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(V)); } catch (e) {} }
+
+  // the koi list from the mix (varieties interleaved, so the same kind is not all in a row)
+  function kindList() {
+    var out = [], left = {}, more = true;
+    KINDS.forEach(function (K) { left[K.id] = V.mix[K.id] || 0; });
+    while (more) {
+      more = false;
+      KINDS.forEach(function (K) { if (left[K.id] > 0) { out.push(K.id); left[K.id]--; more = true; } });
+    }
+    return out.length ? out : ['kohaku'];
+  }
+  function koiSettings() {
+    var o = {};
+    for (var k in V) if (k !== 'mix') o[k] = V[k];
+    o.kinds = kindList();
+    return o;
+  }
+
+  /* ============================================================
+     2. THE WATER
+     The start button's two layers of soft light, spread over the whole
+     screen: many soft spots, each layer turning slowly about its own
+     point (in opposite directions).
+     ============================================================ */
+  function lightLayer(el, seed, ox, oy) {
+    var s = seed, r = function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    var u = Math.min(innerWidth, innerHeight), g = [];
+    for (var i = 0; i < 46; i++) {
+      var x = (r() * 100).toFixed(1), y = (r() * 100).toFixed(1), rad = Math.round(u * (0.05 + r() * 0.07)), a = (0.6 + r() * 0.4).toFixed(2);
+      g.push('radial-gradient(circle at ' + x + '% ' + y + '%, rgba(255,255,255,' + a + ') 0, rgba(255,255,255,0) ' + rad + 'px)');
+    }
+    el.style.background = g.join(',');
+    el.style.transformOrigin = ox + ' ' + oy;
+  }
+  function applyWater() {
+    document.getElementById('waterDepth').style.opacity = V.tint;
+    ['light1', 'light2'].forEach(function (id, i) {
+      var el = document.getElementById(id);
+      el.style.opacity = V.light;
+      el.style.animationDuration = ((i ? 680 : 450) / Math.max(0.05, V.lightSpeed)).toFixed(0) + 's';
+    });
+  }
+  lightLayer(document.getElementById('light1'), 11, '38%', '42%');
+  lightLayer(document.getElementById('light2'), 29, '62%', '58%');
+  applyWater();
+
+  /* ============================================================
+     3. THE POND
+     ============================================================ */
+  var canvas = document.getElementById('pond');
+  var pond = KoiScreen.create(canvas, koiSettings());
+  pond.start();
+  // tap the water: food
+  canvas.addEventListener('pointerdown', function (e) { e.preventDefault(); pond.feed(e.clientX, e.clientY); });
+
+  /* ============================================================
+     4. THE PANEL
+     ============================================================ */
+  var body = document.getElementById('kpBody');
+  var CTL = [
+    { g: 'The koi' },
+    { k: 'length', l: 'Koi length (share of the screen’s shorter side)', min: 0.06, max: 0.35, step: 0.005, re: 'set' },
+    { k: 'sizeVary', l: 'Sizes differ by (±, share)', min: 0, max: 0.5, step: 0.01, re: 'set' },
+    { k: 'girth', l: 'Plumpness', min: 0.6, max: 1.4, step: 0.01, re: 'set' },
+    { k: 'seed', l: 'Patterns and places (another number: other koi)', min: 1, max: 50, step: 1, re: 'reset' },
+    { g: 'How they swim' },
+    { k: 'speed', l: 'Swimming speed', min: 0.3, max: 3, step: 0.05, re: 'set' },
+    { k: 'wave', l: 'How much the body bends', min: 0.3, max: 2, step: 0.05, re: 'set' },
+    { k: 'fins', l: 'Fin and tail movement', min: 0, max: 2, step: 0.05, re: 'set' },
+    { k: 'roam', l: 'How far each swim goes (share of the pond)', min: 0.2, max: 1.6, step: 0.05, re: 'set' },
+    { k: 'edge', l: 'They turn back this far from the screen edge (× length)', min: 0.2, max: 2, step: 0.05, re: 'set' },
+    { g: 'Diving and coming up for air' },
+    { k: 'eventEvery', l: 'A koi dives or comes up about every (s, 0 = never)', min: 0, max: 20, step: 0.5, re: 'set' },
+    { k: 'airShare', l: 'Share that come up for air (the rest dive)', min: 0, max: 1, step: 0.05, re: 'set' },
+    { k: 'airMax', l: 'At most this many at the surface at once', min: 1, max: 6, step: 1, re: 'set' },
+    { k: 'deepTime', l: 'Time swimming about down deep (s)', min: 2, max: 30, step: 1, re: 'set' },
+    { k: 'deepSize', l: 'Size at the deepest', min: 0.3, max: 1, step: 0.01, re: 'set' },
+    { k: 'deepBlur', l: 'Blur at the deepest', min: 0, max: 8, step: 0.1, re: 'set' },
+    { k: 'deepFade', l: 'Fade at the deepest', min: 0, max: 0.9, step: 0.01, re: 'set' },
+    { k: 'shadow', l: 'Shadows on the pond floor', min: 0, max: 3, step: 0.05, re: 'set' },
+    { g: 'Feeding (tap the water)' },
+    { k: 'foodCount', l: 'Pellets per tap', min: 1, max: 20, step: 1, re: 'set' },
+    { k: 'foodSpread', l: 'How widely they scatter (× length)', min: 0.05, max: 1.5, step: 0.05, re: 'set' },
+    { k: 'feedNear', l: 'Koi notice it from (share of the screen)', min: 0.1, max: 1.5, step: 0.05, re: 'set' },
+    { k: 'feedJoin', l: 'Chance a koi comes to eat', min: 0, max: 1, step: 0.05, re: 'set' },
+    { k: 'foodLife', l: 'Uneaten pellets sink after (s)', min: 5, max: 120, step: 1, re: 'set' },
+    { g: 'The water' },
+    { k: 'light', l: 'Light on the water', min: 0, max: 0.6, step: 0.01, re: 'water' },
+    { k: 'lightSpeed', l: 'How fast the light turns', min: 0.1, max: 4, step: 0.05, re: 'water' },
+    { k: 'tint', l: 'Warm amber toward the edge', min: 0, max: 2, step: 0.05, re: 'water' },
+    { k: 'maxDpr', l: 'Sharpness (device pixels per pixel, lower is lighter work)', min: 1, max: 3, step: 0.5, re: 'set' }
+  ];
+
+  function mixPanel() {
+    var h = document.createElement('div');
+    h.className = 'kp-group'; h.textContent = 'Varieties in the pond';
+    body.appendChild(h);
+    var n = document.createElement('div'); n.className = 'kp-note'; n.id = 'kpMixNote';
+    body.appendChild(n);
+    var grid = document.createElement('div'); grid.className = 'kp-kinds';
+    KINDS.forEach(function (K) {
+      var t = document.createElement('div'); t.className = 'kp-kind';
+      t.innerHTML = '<span class="sw" style="background:' + K.sw + '"></span><span><b>' + K.name + '</b><small>' + K.note + '</small></span>' +
+        '<span class="kp-count" style="grid-column:2"><button type="button" data-d="-1">−</button><span></span><button type="button" data-d="1">+</button></span>';
+      var num = t.querySelector('.kp-count span');
+      function show() { num.textContent = V.mix[K.id] || 0; t.classList.toggle('on', (V.mix[K.id] || 0) > 0); }
+      t.querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var total = kindList().length, d = +b.getAttribute('data-d'), now = V.mix[K.id] || 0;
+          if (d > 0 && total >= 30) return;
+          if (d < 0 && (now === 0 || (total <= 1 && now === 1))) return;
+          V.mix[K.id] = now + d; show(); mixNote(); save();
+          pond.set(koiSettings()); pond.reset();
+        });
+      });
+      show();
+      grid.appendChild(t);
+    });
+    body.appendChild(grid);
+    mixNote();
+  }
+  function mixNote() { document.getElementById('kpMixNote').textContent = kindList().length + ' koi (up to 30). Each koi’s pattern is its own.'; }
+
+  mixPanel();
+  var inputs = {};
+  CTL.forEach(function (c) {
+    if (c.g) { var h = document.createElement('div'); h.className = 'kp-group'; h.textContent = c.g; body.appendChild(h); return; }
+    var row = document.createElement('div'); row.className = 'kp-row';
+    row.innerHTML = '<label>' + c.l + '</label><input type="range" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '"><output></output>';
+    var inp = row.querySelector('input'), out = row.querySelector('output');
+    inp.value = V[c.k]; out.textContent = V[c.k];
+    inp.addEventListener('input', function () {
+      V[c.k] = +inp.value; out.textContent = inp.value; save();
+      if (c.re === 'water') applyWater();
+      else { var o = {}; o[c.k] = V[c.k]; pond.set(o); if (c.re === 'reset') pond.reset(); }
+    });
+    inputs[c.k] = { inp: inp, out: out };
+    body.appendChild(row);
+  });
+  var foot = document.createElement('div'); foot.className = 'kp-foot';
+  foot.innerHTML = '<button class="kp-btn" type="button" id="kpCopy">Copy values</button>' +
+                   '<button class="kp-btn" type="button" id="kpNew">New koi</button>' +
+                   '<button class="kp-btn" type="button" id="kpReset">Back to defaults</button>';
+  body.appendChild(foot);
+  var ta = document.createElement('textarea'); ta.className = 'kp-copy'; ta.readOnly = true; body.appendChild(ta);
+  var info = document.createElement('div'); info.className = 'kp-info'; body.appendChild(info);
+
+  document.getElementById('kpCopy').addEventListener('click', function () {
+    var txt = 'KOI_SCREEN = ' + JSON.stringify(V, null, 2) + ';';
+    ta.value = txt; ta.style.display = 'block'; ta.select();
+    var btn = this;
+    function done() { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy values'; }, 1200); }
+    try { navigator.clipboard.writeText(txt).then(done, function () { document.execCommand('copy'); done(); }); }
+    catch (e) { try { document.execCommand('copy'); done(); } catch (e2) {} }
+  });
+  document.getElementById('kpNew').addEventListener('click', function () { pond.reset(); });
+  document.getElementById('kpReset').addEventListener('click', function () {
+    if (!confirm('Put every setting back to its default?')) return;
+    V = JSON.parse(JSON.stringify(DEFAULTS)); save(); location.reload();
+  });
+
+  setInterval(function () {
+    var i = pond.info();
+    info.textContent = i.koi + ' koi · ' + i.eating + ' eating · ' + i.food + ' pellets on the water · koi ' + Math.round(i.length) + ' px long · ' + i.fps.toFixed(0) + ' frames a second';
+  }, 500);
+
+  // fold, hide, drag by the title bar
+  var panel = document.getElementById('kpPanel'), showBtn = document.getElementById('kpShow');
+  document.getElementById('kpFold').addEventListener('click', function () { panel.classList.toggle('collapsed'); });
+  document.getElementById('kpHide').addEventListener('click', function () { panel.classList.add('hidden'); showBtn.classList.add('shown'); });
+  showBtn.addEventListener('click', function () { panel.classList.remove('hidden'); showBtn.classList.remove('shown'); });
+  (function () {
+    var head = document.getElementById('kpHead'), sx, sy, px, py, on = false;
+    head.addEventListener('pointerdown', function (e) {
+      if (e.target.tagName === 'BUTTON') return;
+      on = true; sx = e.clientX; sy = e.clientY;
+      var r = panel.getBoundingClientRect(); px = r.left; py = r.top;
+      head.setPointerCapture(e.pointerId);
+    });
+    head.addEventListener('pointermove', function (e) {
+      if (!on) return;
+      panel.style.left = Math.max(0, Math.min(innerWidth - 60, px + e.clientX - sx)) + 'px';
+      panel.style.top = Math.max(0, Math.min(innerHeight - 40, py + e.clientY - sy)) + 'px';
+      panel.style.right = 'auto';
+    });
+    head.addEventListener('pointerup', function () { on = false; });
+  })();
+
+  window.koiLab = { V: V, pond: pond };
+})();
+</script>
+</body>
+</html>
