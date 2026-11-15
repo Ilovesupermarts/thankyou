@@ -159,7 +159,7 @@
     length: 0.16, sizeVary: 0.2, girth: 0.9,
     speed: 1.2, wave: 1.2, fins: 0.8, roam: 0.8, edge: 0.6,
     eventEvery: 5, airShare: 0.45, airMax: 2, deepTime: 10, deepSize: 0.57, deepBlur: 3, deepFade: 0.35,
-    shadow: 1.75,
+    shadow: 1.75, shadowOpacity: 1, shadowFeather: 1,
     foodCount: 6, foodSpread: 0.4, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
     light: 0.24, lightSpeed: 1, tint: 1,
     maxDpr: 2
@@ -258,6 +258,8 @@
     { k: 'deepBlur', l: 'Blur at the deepest', min: 0, max: 8, step: 0.1, re: 'set' },
     { k: 'deepFade', l: 'Fade at the deepest', min: 0, max: 0.9, step: 0.01, re: 'set' },
     { k: 'shadow', l: 'Shadows on the pond floor', min: 0, max: 3, step: 0.05, re: 'set' },
+    { k: 'shadowOpacity', l: 'Shadow opacity (1 = as it was)', min: 0, max: 2.5, step: 0.05, re: 'set' },
+    { k: 'shadowFeather', l: 'Shadow feathering: how far its edge softens out (1 = as it was)', min: 0, max: 3, step: 0.05, re: 'set' },
     { g: 'Feeding (tap the water)' },
     { k: 'foodCount', l: 'Pellets per tap', min: 1, max: 20, step: 1, re: 'set' },
     { k: 'foodSpread', l: 'How widely they scatter (× length)', min: 0.05, max: 1.5, step: 0.05, re: 'set' },

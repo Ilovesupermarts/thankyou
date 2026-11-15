@@ -1092,10 +1092,14 @@
   /* The koi's shadow on the pond floor, filled flat (no blur filter: the
      pond lays all the shadows on one small picture and scales it up, which
      softens them). */
+  // the panel's shadow opacity (a multiplier, 1 = as it was) and feather
+  // (a multiplier on how far the shadow's edge softens out, 1 = as it was)
+  function shadowOp(s) { return s.shadowOpacity == null ? 1 : s.shadowOpacity; }
+  function shadowFe(s) { return s.shadowFeather == null ? 1 : s.shadowFeather; }
   function drawKoiShadow(ctx, k, s) {
     var P = koiParts(k, s), L = k.L;
     ctx.translate(L * 0.035 * s.shadow, L * 0.075 * s.shadow);
-    ctx.fillStyle = 'rgba(176, 72, 22, ' + (0.16 + 0.04 * s.shadow).toFixed(3) + ')';
+    ctx.fillStyle = 'rgba(176, 72, 22, ' + Math.min(1, (0.16 + 0.04 * s.shadow) * shadowOp(s)).toFixed(3) + ')';
     ctx.beginPath(); smoothClosed(ctx, P.out); tailPath(ctx, P.tail);
     P.fins.forEach(function (F) { finPath(ctx, F); });
     ctx.fill();
@@ -1391,7 +1395,7 @@
       var a = 1 - sink;
       if (shadows) {
         ctx.beginPath(); ctx.arc(f.x + L * 0.03 * s.shadow * (1 - sink * 0.6), f.y + L * 0.06 * s.shadow * (1 - sink * 0.6), rad * 1.3, 0, TAU);
-        ctx.fillStyle = 'rgba(176, 72, 22, ' + (0.13 * a).toFixed(3) + ')'; ctx.fill();
+        ctx.fillStyle = 'rgba(176, 72, 22, ' + Math.min(1, 0.13 * a * shadowOp(s)).toFixed(3) + ')'; ctx.fill();
         continue;
       }
       ctx.save();
@@ -1444,8 +1448,8 @@
   Pond.prototype.drawShadows = function (ctx, fish, s) {
     if (!(s.shadow > 0)) return;
     var dpr = this.dpr;
-    var sig = this.L * 0.035 * s.shadow * SHADOW_SOFT;       // the shadows' blur, CSS pixels
-    var sc = clamp(SMALL_SIG / Math.max(0.5, sig), 0.06, 0.5);     // small-picture pixels per CSS pixel
+    var sig = this.L * 0.035 * s.shadow * SHADOW_SOFT * shadowFe(s);       // the shadows' blur, CSS pixels
+    var sc = clamp(SMALL_SIG / Math.max(0.5, sig), 0.06, 1);     // small-picture pixels per CSS pixel
     var pad = Math.ceil(sig * sc * 3) + 2;
     var sw = Math.ceil(this.W * sc) + pad * 2, sh = Math.ceil(this.H * sc) + pad * 2;
     var A = smallCanvas(this, 'shA', sw, sh), B = smallCanvas(this, 'shB', sw, sh), c2 = A._ctx;
