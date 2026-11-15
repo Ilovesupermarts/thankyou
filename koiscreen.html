@@ -53,6 +53,8 @@
   .water-light.l2 { animation-duration: 680s; animation-direction: reverse; }
   @keyframes lightTurn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   #pond { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  /* the rocks along the bottom (the pond's edge): over the koi, taps pass through */
+  #rocks { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
 
   /* ---------- panel ---------- */
   .kp-panel {
@@ -121,6 +123,7 @@
   <canvas class="water-light l2" id="light2"></canvas>
 </div>
 <canvas id="pond"></canvas>
+<canvas id="rocks"></canvas>
 
 <button class="kp-show" id="kpShow" type="button" aria-label="Show settings">⚙</button>
 <div class="kp-panel" id="kpPanel">
@@ -162,6 +165,7 @@
     shadow: 1.75, shadowOpacity: 1, shadowFeather: 1,
     foodCount: 6, foodSpread: 0.4, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
     light: 0.24, lightSpeed: 1, tint: 1,
+    rkShow: 1, rkHeight: 0.16, rkVary: 0.3, rkOverlap: 0.3, rkSink: 0.25, rkPebbles: 1, rkSeed: 1, rkKoi: 0.55, rkShade: 0.35, rkTone: 0.15,
     maxDpr: 2
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
@@ -234,6 +238,107 @@
   canvas.addEventListener('pointerdown', function (e) { e.preventDefault(); pond.feed(e.clientX, e.clientY); });
 
   /* ============================================================
+     3b. THE ROCKS ALONG THE BOTTOM (the pond's edge)
+     The user's own rock drawings (koi-rocks/rock01 … rock14.webp, cut
+     out of their vector sheet: each rock with its own shading and
+     shadow). Big rocks stand side by side along the bottom edge, partly
+     below it, each its own size and way round; small stones lie in
+     front. Drawn once on a canvas of their own over the koi (so a koi
+     near the edge swims under them), again only when the screen or a
+     rock setting changes. The pond's edge moves up by rkKoi × their
+     height, so the koi turn back there.
+     ============================================================ */
+  var ROCK_N = 14, ROCK_BIG = 8;              // rock01-08: the big and middle ones; 09-14: small stones
+  // each rock's height on the user's sheet (pixels at 600 dpi): the small
+  // stones keep their true size beside the big ones (a pebble blown up
+  // past its own picture would show blocks)
+  var ROCK_SHEET_H = [1121, 780, 798, 497, 298, 424, 302, 300, 248, 180, 180, 85, 95, 62];
+  var rockImg = [], rocksLoaded = 0;
+  for (var ri = 1; ri <= ROCK_N; ri++) {
+    var im = new Image();
+    im.onload = function () { if (++rocksLoaded === ROCK_N) drawRocks(); };
+    im.src = 'koi-rocks/rock' + (ri < 10 ? '0' : '') + ri + '.webp';
+    rockImg.push(im);
+  }
+  // the visible outline's height of each picture is its height less the
+  // soft shadow's margin; sizes are worked out from the picture's height
+  function rockRng(seed) { var s = seed >>> 0; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+  function layRocks(W, H) {
+    var r = rockRng(V.rkSeed * 7919 + 3), hRow = V.rkHeight * H, out = [], x = -hRow * 0.3, last = -1, order = [];
+    function next() {
+      if (!order.length) { for (var i = 0; i < ROCK_BIG; i++) order.push(i); for (i = order.length - 1; i > 0; i--) { var j = Math.floor(r() * (i + 1)), q = order[i]; order[i] = order[j]; order[j] = q; } }
+      var k = order.pop(); if (k === last && order.length) { var k2 = order.pop(); order.push(k); k = k2; }
+      last = k; return k;
+    }
+    var top = 0, n = 0;
+    while (x < W + hRow * 0.3) {
+      var k = next(), im = rockImg[k];
+      var h = hRow * (1 + (r() * 2 - 1) * V.rkVary), w = h * im.width / im.height;
+      // flat stones look too long laid flat: keep their width near the others'
+      if (w > hRow * 2.2) { w = hRow * 2.2; h = w * im.height / im.width; }
+      var y = H - h * (1 - V.rkSink * (0.6 + r() * 0.8));
+      out.push({ im: im, x: x, y: y, w: w, h: h, flip: r() < 0.5, back: true });
+      top += y; n++;
+      x += w * (1 - V.rkOverlap * (0.7 + r() * 0.6));
+    }
+    // small stones in front, along the foot of the big ones
+    var pn = Math.round(V.rkPebbles * W / hRow * 1.2);
+    for (var p = 0; p < pn; p++) {
+      var kp = ROCK_BIG + Math.floor(r() * (ROCK_N - ROCK_BIG)), imp = rockImg[kp];
+      var hp = hRow * ROCK_SHEET_H[kp] / 790 * (0.8 + r() * 0.5), wp = hp * imp.width / imp.height;
+      out.push({ im: imp, x: r() * (W + wp) - wp, y: H - hp * (0.55 + r() * 0.6), w: wp, h: hp, flip: r() < 0.5, back: false });
+    }
+    return { list: out, top: n ? top / n : H, hRow: hRow };
+  }
+  var rocksCv = document.getElementById('rocks');
+  function drawRocks() {
+    var W = innerWidth, H = innerHeight, dpr = Math.min(V.maxDpr || 2, window.devicePixelRatio || 1);
+    rocksCv.width = Math.round(W * dpr); rocksCv.height = Math.round(H * dpr);
+    var c = rocksCv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+    if (!V.rkShow || rocksLoaded < ROCK_N) { pond.set({ bottomIn: 0 }); return; }
+    var L = layRocks(W, H);
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+    function lay(ctx, R) {
+      ctx.save();
+      if (R.flip) { ctx.translate(R.x + R.w, R.y); ctx.scale(-1, 1); ctx.drawImage(R.im, 0, 0, R.w, R.h); }
+      else ctx.drawImage(R.im, R.x, R.y, R.w, R.h);
+      ctx.restore();
+    }
+    // the shade the rocks cast on the water along their edge: their
+    // outline, blurred, in the koi shadows' warm colour (drawn once)
+    if (V.rkShade > 0) {
+      var sc = document.createElement('canvas'); sc.width = rocksCv.width; sc.height = rocksCv.height;
+      var sx = sc.getContext('2d'); sx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      L.list.forEach(function (R) { if (R.back) lay(sx, R); });
+      sx.setTransform(1, 0, 0, 1, 0, 0);
+      sx.globalCompositeOperation = 'source-in'; sx.fillStyle = 'rgb(150, 70, 30)'; sx.fillRect(0, 0, sc.width, sc.height);
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+      c.filter = 'blur(' + (L.hRow * 0.12 * dpr).toFixed(1) + 'px)';
+      c.globalAlpha = V.rkShade;
+      c.drawImage(sc, 0, -L.hRow * 0.06 * dpr);
+      c.restore();
+    }
+    // the rocks: big ones first, then the small stones in front
+    var rk = document.createElement('canvas'); rk.width = rocksCv.width; rk.height = rocksCv.height;
+    var rx = rk.getContext('2d'); rx.setTransform(dpr, 0, 0, dpr, 0, 0); rx.imageSmoothingQuality = 'high';
+    L.list.forEach(function (R) { lay(rx, R); });
+    // warmed a little toward the water's cream (the drawings are cool greys)
+    if (V.rkTone > 0) {
+      rx.setTransform(1, 0, 0, 1, 0, 0);
+      rx.globalCompositeOperation = 'source-atop'; rx.globalAlpha = V.rkTone;
+      rx.fillStyle = 'rgb(240, 190, 140)'; rx.fillRect(0, 0, rk.width, rk.height);
+    }
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(rk, 0, 0); c.restore();
+    // the koi turn back this far into the rocks
+    pond.set({ bottomIn: Math.max(0, (H - L.top) * V.rkKoi) });
+  }
+  window.addEventListener('resize', function () {
+    if (rocksCv.width !== Math.round(innerWidth * Math.min(V.maxDpr || 2, window.devicePixelRatio || 1)) ||
+        rocksCv.height !== Math.round(innerHeight * Math.min(V.maxDpr || 2, window.devicePixelRatio || 1))) drawRocks();
+  });
+
+  /* ============================================================
      4. THE PANEL
      ============================================================ */
   var body = document.getElementById('kpBody');
@@ -270,6 +375,17 @@
     { k: 'light', l: 'Light on the water', min: 0, max: 0.6, step: 0.01, re: 'water' },
     { k: 'lightSpeed', l: 'How fast the light turns', min: 0.1, max: 4, step: 0.05, re: 'water' },
     { k: 'tint', l: 'Warm amber toward the edge', min: 0, max: 2, step: 0.05, re: 'water' },
+    { g: 'Rocks along the bottom (the pond’s edge)' },
+    { k: 'rkShow', l: 'Show the rocks (1 = on, 0 = off)', min: 0, max: 1, step: 1, re: 'rocks' },
+    { k: 'rkHeight', l: 'How tall the big rocks are (share of the screen’s height)', min: 0.05, max: 0.35, step: 0.005, re: 'rocks' },
+    { k: 'rkVary', l: 'Sizes differ by (±, share)', min: 0, max: 0.6, step: 0.01, re: 'rocks' },
+    { k: 'rkOverlap', l: 'How much neighbours overlap (share of a rock’s width)', min: -0.2, max: 0.6, step: 0.01, re: 'rocks' },
+    { k: 'rkSink', l: 'How far they sit below the screen’s edge (share of their height)', min: 0, max: 0.6, step: 0.01, re: 'rocks' },
+    { k: 'rkPebbles', l: 'Small stones in front (how many)', min: 0, max: 3, step: 0.05, re: 'rocks' },
+    { k: 'rkSeed', l: 'Arrangement (another number lays them out another way)', min: 1, max: 99, step: 1, re: 'rocks' },
+    { k: 'rkKoi', l: 'Koi turn back this far into the rocks (share of their height; 0 = at the screen’s edge)', min: 0, max: 1.2, step: 0.05, re: 'rocks' },
+    { k: 'rkShade', l: 'Shade on the water along the rocks', min: 0, max: 1, step: 0.05, re: 'rocks' },
+    { k: 'rkTone', l: 'Rocks warmed toward the water’s colour', min: 0, max: 0.6, step: 0.01, re: 'rocks' },
     { k: 'maxDpr', l: 'Sharpness (device pixels per pixel, lower is lighter work)', min: 1, max: 3, step: 0.5, re: 'set' }
   ];
 
@@ -314,7 +430,8 @@
     inp.addEventListener('input', function () {
       V[c.k] = +inp.value; out.textContent = inp.value; save();
       if (c.re === 'water') applyWater();
-      else { var o = {}; o[c.k] = V[c.k]; pond.set(o); if (c.re === 'reset') pond.reset(); }
+      else if (c.re === 'rocks') drawRocks();
+      else { var o = {}; o[c.k] = V[c.k]; pond.set(o); if (c.re === 'reset') pond.reset(); if (c.k === 'maxDpr') drawRocks(); }
     });
     inputs[c.k] = { inp: inp, out: out };
     body.appendChild(row);
