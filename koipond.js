@@ -200,7 +200,7 @@
   // the shadows' softness against the old blur filter's (calibrated by
   // comparing the two at the same moment) and the largest little picture
   // a diving koi is drawn on (device pixels across)
-  var SHADOW_SOFT = 1, DIVE_MAX = 300, SMALL_SIG = 1.2;
+  var SHADOW_SOFT = 0.5, SMALL_SIG = 1.2, DIVE_SIG = 2;
   // how far apart two koi are in depth, counting the depth each is
   // heading for (so one coming back up already counts as at that depth)
   function depthGap(a, b) {
@@ -1434,7 +1434,7 @@
      full size for every koi it was what made the pond stutter. */
   function blurInto(src, dst, w, h, sigma) {
     var x = dst._ctx;
-    if (sigma > 0.3) x.filter = 'blur(' + sigma.toFixed(2) + 'px)';
+    if (sigma > 0.6) x.filter = 'blur(' + sigma.toFixed(2) + 'px)';
     x.drawImage(src, 0, 0, w, h, 0, 0, w, h);
     x.filter = 'none';
   }
@@ -1489,28 +1489,39 @@
         ctx.restore();
         continue;
       }
-      // diving: drawn on a little picture (smaller the blurrier it is, so
-      // about 1.2 of its pixels to the blur), softened with a real blur,
-      // then scaled up and laid down faded. The blur in device pixels is
-      // the same as the old blur filter's.
+      // diving: drawn on a little picture that fits the koi's own outline
+      // (body, fins, tail), smaller only as much as its blur hides (so a koi
+      // just under the surface keeps all its detail), softened there with a
+      // real blur, then scaled up and laid down faded. The blur in device
+      // pixels is the old blur filter's.
       var blur = s.deepBlur * zd * dpr * k.sizeK * (this.L / 83);
-      var half = k.L * 1.35;                                 // the whole koi, tail and fins too
-      var full = half * 2 * dpr;                             // that square in device pixels
-      var q = Math.max(1, blur / SMALL_SIG, full / DIVE_MAX);       // how many times smaller it is drawn
-      var sig = blur / q, pad = Math.ceil(sig * 3) + 2;
-      var inner = Math.ceil(full / q), n = inner + pad * 2;
-      var A = smallCanvas(this, 'dvA', n, n), B = smallCanvas(this, 'dvB', n, n), ac = A._ctx;
-      var kk = inner / (half * 2);                           // little-picture pixels per CSS pixel
-      ac.setTransform(kk, 0, 0, kk, pad, pad);
-      ac.translate(half, half); ac.scale(sc, sc); ac.translate(-c.x, -c.y);
+      var q = Math.max(1, blur / DIVE_SIG);                  // how many times smaller it is drawn
+      // (shrinking and scaling back up softens it by about half a small pixel: take that off the blur)
+      var sig = Math.sqrt(Math.max(0, (blur / q) * (blur / q) - (q > 1 ? 0.25 : 0)));
+      var bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9, P = k.P, Lk = k.L, j2;
+      for (j2 = 0; j2 < P.length; j2++) {
+        if (P[j2].x < bx0) bx0 = P[j2].x; if (P[j2].x > bx1) bx1 = P[j2].x;
+        if (P[j2].y < by0) by0 = P[j2].y; if (P[j2].y > by1) by1 = P[j2].y;
+      }
+      var tt = P[P.length - 1], tT = k.T[P.length - 1], tx = tt.x + tT.x * Lk * 0.42, ty = tt.y + tT.y * Lk * 0.42;
+      bx0 = Math.min(bx0, tx); bx1 = Math.max(bx1, tx); by0 = Math.min(by0, ty); by1 = Math.max(by1, ty);
+      var fm = Lk * 0.45;                                    // the fins and tail reach this far round the spine
+      bx0 = c.x + (bx0 - fm - c.x) * sc; bx1 = c.x + (bx1 + fm - c.x) * sc;
+      by0 = c.y + (by0 - fm - c.y) * sc; by1 = c.y + (by1 + fm - c.y) * sc;
+      var pad = Math.ceil(sig * 3) + 2;
+      var iw = Math.ceil((bx1 - bx0) * dpr / q), ih = Math.ceil((by1 - by0) * dpr / q);
+      var nw = iw + pad * 2, nh = ih + pad * 2;
+      var A = smallCanvas(this, 'dvA', nw, nh), B = smallCanvas(this, 'dvB', nw, nh), ac = A._ctx;
+      var kk = dpr / q;                                      // little-picture pixels per CSS pixel
+      ac.setTransform(kk, 0, 0, kk, pad - bx0 * kk, pad - by0 * kk);
+      ac.translate(c.x, c.y); ac.scale(sc, sc); ac.translate(-c.x, -c.y);
       ac.save(); look.draw(ac, k, se); ac.restore();
-      blurInto(A, B, n, n, sig);
+      blurInto(A, B, nw, nh, sig);
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
       ctx.globalAlpha = (1 - s.deepFade * Math.min(zd, 1)) * (1 - gone);
-      var qs = full / inner;                                 // device pixels per little-picture pixel
-      ctx.drawImage(B, 0, 0, n, n, (hw + c.x - half) * dpr - pad * qs, (hh + c.y - half) * dpr - pad * qs, n * qs, n * qs);
+      ctx.drawImage(B, 0, 0, nw, nh, (hw + bx0) * dpr - pad * q, (hh + by0) * dpr - pad * q, nw * q, nh * q);
       ctx.restore();
     }
     this.drawFood(ctx, false);
