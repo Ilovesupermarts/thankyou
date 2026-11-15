@@ -54,7 +54,7 @@
   @keyframes lightTurn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   #pond { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* the rocks along the bottom (the pond's edge): over the koi, taps pass through */
-  #rocks { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+  #rocks, #rockShade { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
 
   /* ---------- panel ---------- */
   .kp-panel {
@@ -122,6 +122,7 @@
   <canvas class="water-light" id="light1"></canvas>
   <canvas class="water-light l2" id="light2"></canvas>
 </div>
+<canvas id="rockShade"></canvas>
 <canvas id="pond"></canvas>
 <canvas id="rocks"></canvas>
 
@@ -165,7 +166,7 @@
     shadow: 1.75, shadowOpacity: 1, shadowFeather: 1,
     foodCount: 6, foodSpread: 0.4, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
     light: 0.24, lightSpeed: 1, tint: 1,
-    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkKoi: 0.55, rkShade: 0.35, rkTone: 0.1,
+    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, lapEvery: 1.4, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
     maxDpr: 2
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
@@ -190,6 +191,7 @@
     var o = {};
     for (var k in V) if (k !== 'mix') o[k] = V[k];
     o.kinds = kindList();
+    o.floorGap = V.rkGap;
     return o;
   }
 
@@ -250,7 +252,8 @@
      of another it casts a soft shadow on it. Drawn once on a canvas of
      their own over the koi (so a koi near the edge swims under them),
      again only when the screen or a rock setting changes. The pond's edge
-     moves up by rkKoi × their height, so the koi turn back there.
+     gets their outline (rockFloor): the koi turn away rkGap × their length
+     above it (they never swim under the rocks), and waves break on it.
      ============================================================ */
   var ROCK_N = 4;
   var rockImg = [], rocksLoaded = 0;
@@ -313,7 +316,7 @@
     var sum = 0; for (cx = 0; cx < gw; cx++) sum += H - top[cx] * G;
     // drawing order: higher on the screen = farther back
     list.sort(function (p, q) { return (p.cy + p.h * 0.5 + p.z * band * 0.3) - (q.cy + q.h * 0.5 + q.z * band * 0.3); });
-    return { list: list, band: band, depth: sum / gw, inside: inside, G: G, gw: gw, gh: gh };
+    return { list: list, band: band, depth: sum / gw, inside: inside, G: G, gw: gw, gh: gh, top: top.slice() };
   }
   function placeRock(ctx, R) {
     ctx.translate(R.cx, R.cy); ctx.rotate(R.rot); if (R.flip) ctx.scale(-1, 1);
@@ -353,7 +356,24 @@
     }
     return c;
   }
-  var rocksCv = document.getElementById('rocks'), rockTimer = 0;
+  // yw: the rocks' top, column by column, a little smoothed (the waves
+  // break on it); y: the line the koi keep to: in each column the highest
+  // rock within a koi's reach either way, then smoothed (never lower than
+  // a rock top near it, so no part of a koi swims over a rock)
+  function rockFloor(L) {
+    var G = L.G, n = L.top.length, raw = [], i, d;
+    for (i = 0; i < n; i++) raw[i] = L.top[i] * G;
+    var kl = (pond.info().length || 100) * (1 + V.sizeVary);
+    function avg(src, rad) {
+      var out = [], R = Math.max(1, Math.round(rad / G));
+      for (i = 0; i < n; i++) { var s = 0, c = 0; for (d = -R; d <= R; d++) { var j = i + d; if (j >= 0 && j < n) { s += src[j]; c++; } } out[i] = s / c; }
+      return out;
+    }
+    var mn = [], Rm = Math.max(1, Math.round(kl * 0.45 / G));
+    for (i = 0; i < n; i++) { var m = raw[i]; for (d = -Rm; d <= Rm; d++) { var j2 = i + d; if (j2 >= 0 && j2 < n) m = Math.min(m, raw[j2]); } mn[i] = m; }
+    return { g: G, y: avg(mn, kl * 0.3), yw: avg(raw, kl * 0.05), ys: avg(avg(raw, kl * 0.6), kl * 0.6) };
+  }
+  var rocksCv = document.getElementById('rocks'), shadeCv = document.getElementById('rockShade'), rockTimer = 0, rocksPlaced = false;
   function drawRocks() {
     clearTimeout(rockTimer);
     rockTimer = setTimeout(drawRocksNow, 60);     // (sliders: once they pause)
@@ -363,7 +383,7 @@
     rocksCv.width = Math.round(W * dpr); rocksCv.height = Math.round(H * dpr);
     var c = rocksCv.getContext('2d');
     c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, rocksCv.width, rocksCv.height);
-    if (!V.rkShow || rocksLoaded < ROCK_N) { pond.set({ bottomIn: 0 }); return; }
+    if (!V.rkShow || rocksLoaded < ROCK_N) { shadeCv.width = shadeCv.width; pond.set({ bottomIn: 0, floor: null }); return; }
     var L = layRocks(W, H);
     function sheet() { var s = document.createElement('canvas'); s.width = rocksCv.width; s.height = rocksCv.height; return s; }
     // the rocks, back to front, each casting a soft shadow on those behind it
@@ -401,16 +421,22 @@
       lx.fillStyle = 'rgb(240, 190, 140)'; lx.fillRect(0, 0, lay.width, lay.height); lx.restore();
     }
     // the shade the rocks cast on the water along their edge
+    // (on a layer of its own under the koi and the waves, so the foam lies on it)
+    var shc = shadeCv.getContext('2d');
+    shadeCv.width = rocksCv.width; shadeCv.height = rocksCv.height;
     if (V.rkShade > 0) {
       var sc = sheet(), sx2 = sc.getContext('2d');
       sx2.drawImage(lay, 0, 0);
       sx2.globalCompositeOperation = 'source-in'; sx2.fillStyle = 'rgb(150, 70, 30)'; sx2.fillRect(0, 0, sc.width, sc.height);
-      c.save(); c.filter = 'blur(' + (L.band * 0.1 * dpr).toFixed(1) + 'px)'; c.globalAlpha = V.rkShade;
-      c.drawImage(sc, 0, -L.band * 0.05 * dpr); c.restore();
+      shc.save(); shc.filter = 'blur(' + (L.band * 0.1 * dpr).toFixed(1) + 'px)'; shc.globalAlpha = V.rkShade;
+      shc.drawImage(sc, 0, -L.band * 0.05 * dpr); shc.restore();
     }
     c.drawImage(lay, 0, 0);
-    // the koi turn back this far into the rocks
-    pond.set({ bottomIn: Math.max(0, L.depth * V.rkKoi) });
+    // the rocks' outline for the pond: the koi keep away from it (they never
+    // swim under the rocks) and the waves break on it
+    pond.set({ bottomIn: 0, floor: rockFloor(L), floorGap: V.rkGap });
+    // (the first time: the koi were placed before the rocks were there; place them again, clear of them)
+    if (!rocksPlaced) { rocksPlaced = true; pond.reset(); }
   }
   window.addEventListener('resize', function () {
     if (rocksCv.width !== Math.round(innerWidth * Math.min(V.maxDpr || 2, window.devicePixelRatio || 1)) ||
@@ -465,7 +491,11 @@
     { k: 'rkMossStrength', l: 'How strong the moss', min: 0, max: 2, step: 0.05, re: 'rocks' },
     { k: 'rkDepth', l: 'Shadows of rocks on the rocks behind them', min: 0, max: 1, step: 0.05, re: 'rocks' },
     { k: 'rkSeed', l: 'Arrangement (another number lays them out another way)', min: 1, max: 99, step: 1, re: 'rocks' },
-    { k: 'rkKoi', l: 'Koi turn back this far into the rocks (share of their height; 0 = at the screen’s edge)', min: 0, max: 1.2, step: 0.05, re: 'rocks' },
+    { k: 'rkGap', l: 'Koi turn away this far from the rocks (× koi length)', min: 0, max: 1.5, step: 0.05, re: 'set' },
+    { k: 'lapEvery', l: 'Waves lapping at the rocks: about every (s, 0 = none)', min: 0, max: 8, step: 0.1, re: 'set' },
+    { k: 'lapStrength', l: 'How strong the waves and their foam', min: 0, max: 2, step: 0.05, re: 'set' },
+    { k: 'lapSpeed', l: 'How fast the waves run', min: 0.3, max: 3, step: 0.05, re: 'set' },
+    { k: 'koiWake', l: 'Waves from koi swimming near the rocks', min: 0, max: 2, step: 0.05, re: 'set' },
     { k: 'rkShade', l: 'Shade on the water along the rocks', min: 0, max: 1, step: 0.05, re: 'rocks' },
     { k: 'rkTone', l: 'Rocks warmed toward the water’s colour', min: 0, max: 0.6, step: 0.01, re: 'rocks' },
     { k: 'maxDpr', l: 'Sharpness (device pixels per pixel, lower is lighter work)', min: 1, max: 3, step: 0.5, re: 'set' }
@@ -513,7 +543,7 @@
       V[c.k] = +inp.value; out.textContent = inp.value; save();
       if (c.re === 'water') applyWater();
       else if (c.re === 'rocks') drawRocks();
-      else { var o = {}; o[c.k] = V[c.k]; pond.set(o); if (c.re === 'reset') pond.reset(); if (c.k === 'maxDpr') drawRocks(); }
+      else { var o = {}; o[c.k === 'rkGap' ? 'floorGap' : c.k] = V[c.k]; pond.set(o); if (c.re === 'reset') pond.reset(); if (c.k === 'maxDpr' || c.k === 'length' || c.k === 'sizeVary') drawRocks(); }
     });
     inputs[c.k] = { inp: inp, out: out };
     body.appendChild(row);
