@@ -41,8 +41,11 @@
       rgba(253, 232, 218, 0.40) 58%,
       rgba(240, 125, 64, 0.16) 100%);
   }
+  /* (each light layer is a small bitmap drawn once in the script and scaled
+     up: soft patches lose nothing, and the turning costs the graphics chip
+     almost nothing) */
   .water-light {
-    position: absolute; inset: -40%;
+    position: absolute; left: 50%; top: 50%;   /* (size and margins set in the script: a square as wide as the screen's diagonal, turning about the screen's middle) */
     opacity: 0.24;
     will-change: transform;
     animation: lightTurn 450s linear infinite;
@@ -114,8 +117,8 @@
 
 <div class="water" aria-hidden="true">
   <div class="water-depth" id="waterDepth"></div>
-  <div class="water-light" id="light1"></div>
-  <div class="water-light l2" id="light2"></div>
+  <canvas class="water-light" id="light1"></canvas>
+  <canvas class="water-light l2" id="light2"></canvas>
 </div>
 <canvas id="pond"></canvas>
 
@@ -194,13 +197,20 @@
      ============================================================ */
   function lightLayer(el, seed, ox, oy) {
     var s = seed, r = function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-    var u = Math.min(innerWidth, innerHeight), g = [];
+    var u = Math.min(innerWidth, innerHeight), k = 0.2;        // drawn at a fifth of the size
+    var side = Math.ceil(Math.hypot(innerWidth, innerHeight)) + 2;   // as wide as the diagonal: covers the screen however it turns
+    var w = Math.ceil(side * k), h = w;
+    el.width = w; el.height = h;
+    el.style.width = side + 'px'; el.style.height = side + 'px';
+    el.style.marginLeft = el.style.marginTop = (-side / 2) + 'px';
+    var c = el.getContext('2d');
     for (var i = 0; i < 46; i++) {
-      var x = (r() * 100).toFixed(1), y = (r() * 100).toFixed(1), rad = Math.round(u * (0.05 + r() * 0.07)), a = (0.6 + r() * 0.4).toFixed(2);
-      g.push('radial-gradient(circle at ' + x + '% ' + y + '%, rgba(255,255,255,' + a + ') 0, rgba(255,255,255,0) ' + rad + 'px)');
+      var x = r() * w, y = r() * h, rad = u * (0.05 + r() * 0.07) * k, a = 0.6 + r() * 0.4;
+      var g = c.createRadialGradient(x, y, 0, x, y, rad);
+      g.addColorStop(0, 'rgba(255,255,255,' + a.toFixed(2) + ')'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = g; c.fillRect(x - rad, y - rad, rad * 2, rad * 2);
     }
-    el.style.background = g.join(',');
-    el.style.transformOrigin = ox + ' ' + oy;
+    el.style.transformOrigin = '50% 50%';
   }
   function applyWater() {
     document.getElementById('waterDepth').style.opacity = V.tint;
