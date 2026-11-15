@@ -1216,17 +1216,23 @@
     var s = this.s;
     this.L = Math.min(this.W, this.H) * (s.length || 0.16);
     var m = this.L * (s.edge === undefined ? 0.6 : s.edge);
-    this.ex = Math.max(this.L, this.hw - m); this.ey = Math.max(this.L, this.hh - m);
+    // s.bottomIn: CSS pixels kept clear along the bottom (the rocks of the
+    // pond's edge in koiscreen.html); the pond's middle moves up by half of it
+    var bi = Math.max(0, Math.min(s.bottomIn || 0, this.H * 0.6));
+    this.oy = -bi / 2;
+    this.ex = Math.max(this.L, this.hw - m); this.ey = Math.max(this.L, this.hh - m - bi / 2);
     this.rc = Math.min(this.ex, this.ey) * 0.45;         // rounded corners
     this.span = Math.min(this.ex, this.ey);
     for (var i = 0; i < this.fish.length; i++) this.fish[i].size();
   };
   Pond.prototype.sdf = function (x, y) {
+    y -= this.oy || 0;
     var qx = Math.abs(x) - (this.ex - this.rc), qy = Math.abs(y) - (this.ey - this.rc);
     return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - this.rc;
   };
   // the outward direction of the edge nearest (x, y)
   Pond.prototype.normal = function (x, y) {
+    y -= this.oy || 0;
     var qx = Math.abs(x) - (this.ex - this.rc), qy = Math.abs(y) - (this.ey - this.rc), nx, ny;
     if (qx > 0 && qy > 0) { var l = Math.hypot(qx, qy) || 1; nx = qx / l; ny = qy / l; }
     else if (qx > qy) { nx = 1; ny = 0; } else { nx = 0; ny = 1; }
@@ -1244,7 +1250,7 @@
   Pond.prototype.randomPoint = function (inset) {
     var r = this.rnd;
     for (var t = 0; t < 30; t++) {
-      var x = (r() * 2 - 1) * this.ex, y = (r() * 2 - 1) * this.ey;
+      var x = (r() * 2 - 1) * this.ex, y = (this.oy || 0) + (r() * 2 - 1) * this.ey;
       if (this.sdf(x, y) < -inset) return { x: x, y: y };
     }
     return { x: 0, y: 0 };

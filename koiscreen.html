@@ -53,6 +53,8 @@
   .water-light.l2 { animation-duration: 680s; animation-direction: reverse; }
   @keyframes lightTurn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   #pond { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  /* the rocks along the bottom (the pond's edge): over the koi, taps pass through */
+  #rocks { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
 
   /* ---------- panel ---------- */
   .kp-panel {
@@ -121,6 +123,7 @@
   <canvas class="water-light l2" id="light2"></canvas>
 </div>
 <canvas id="pond"></canvas>
+<canvas id="rocks"></canvas>
 
 <button class="kp-show" id="kpShow" type="button" aria-label="Show settings">⚙</button>
 <div class="kp-panel" id="kpPanel">
@@ -162,6 +165,7 @@
     shadow: 1.75, shadowOpacity: 1, shadowFeather: 1,
     foodCount: 6, foodSpread: 0.4, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
     light: 0.24, lightSpeed: 1, tint: 1,
+    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkKoi: 0.55, rkShade: 0.35, rkTone: 0.1,
     maxDpr: 2
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
@@ -234,6 +238,186 @@
   canvas.addEventListener('pointerdown', function (e) { e.preventDefault(); pond.feed(e.clientX, e.clientY); });
 
   /* ============================================================
+     3b. THE ROCKS ALONG THE BOTTOM (the pond's edge)
+     The user's four rock drawings (koi-rocks/rock01 … rock04.webp, cut
+     out of their vector sheet: the brown, the grey-brown, the speckled
+     and the blue-grey). They are scattered at random along the bottom,
+     then wherever the background would still show inside the cluster
+     (below the line of the rocks' tops) another rock is put in, until
+     none shows; any sliver left is a dark crevice. Each rock is its own:
+     size, a little tilt and stretch, way round, colour (hue, warmth,
+     brightness), and on some a patch of moss; where a rock lies in front
+     of another it casts a soft shadow on it. Drawn once on a canvas of
+     their own over the koi (so a koi near the edge swims under them),
+     again only when the screen or a rock setting changes. The pond's edge
+     moves up by rkKoi × their height, so the koi turn back there.
+     ============================================================ */
+  var ROCK_N = 4;
+  var rockImg = [], rocksLoaded = 0;
+  for (var ri = 1; ri <= ROCK_N; ri++) {
+    var im = new Image();
+    im.onload = function () { if (++rocksLoaded === ROCK_N) drawRocks(); };
+    im.src = 'koi-rocks/rock0' + ri + '.webp';
+    rockImg.push(im);
+  }
+  function rockRng(seed) { var s = seed >>> 0; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+  var MOSS = [[96, 112, 58], [122, 132, 70], [84, 98, 52], [140, 146, 84]];
+
+  // the layout: a list of rocks, the line of their tops, and where the
+  // cluster lies (the cells of a coarse grid that must be covered)
+  function layRocks(W, H) {
+    var r = rockRng(V.rkSeed * 7919 + 3), band = V.rkHeight * H, list = [], last = -1;
+    function make(cx, cy, scale) {
+      var k = Math.floor(r() * ROCK_N); if (k === last) k = (k + 1 + Math.floor(r() * (ROCK_N - 1))) % ROCK_N; last = k;
+      var im = rockImg[k], h = band * V.rkSize * scale * (1 + (r() * 2 - 1) * V.rkVary);
+      var R = { k: k, im: im, cx: cx, cy: cy, h: h, w: h * im.width / im.height * Math.min(1, 1.45 / (im.width / im.height)),
+        rot: (r() * 2 - 1) * V.rkTilt * Math.PI / 180, flip: r() < 0.5, sx: 1 + (r() * 2 - 1) * 0.12,
+        hue: (r() * 2 - 1) * 8 * V.rkColour, sat: 1 + (r() * 2 - 1) * 0.2 * V.rkColour, bri: 1 + (r() * 2 - 1) * 0.12 * V.rkColour,
+        warm: r() * V.rkColour, moss: r() < V.rkMoss, seed: Math.floor(r() * 1e9), z: r() };
+      R.w *= R.sx; list.push(R); return R;
+    }
+    // first: a loose random scatter along the bottom
+    var x = -band * 0.4;
+    while (x < W + band * 0.4) {
+      var R = make(x, H - band * (0.25 + r() * 0.45), 0.8 + r() * 0.4);
+      x += R.w * (0.45 + r() * 0.4);
+    }
+    // then fill every hole inside the cluster, checked on a coarse grid
+    var G = 6, gw = Math.ceil(W / G), gh = Math.ceil(H / G);
+    var m = document.createElement('canvas'); m.width = gw; m.height = gh;
+    var mx = m.getContext('2d', { willReadFrequently: true });
+    function stamp(R) {
+      mx.save(); mx.scale(1 / G, 1 / G); placeRock(mx, R); mx.drawImage(R.im, -R.w / 2, -R.h / 2, R.w, R.h); mx.restore();
+    }
+    list.forEach(stamp);
+    var top = [], inside = null;
+    for (var it = 0; it < 160; it++) {
+      var a = mx.getImageData(0, 0, gw, gh).data;
+      // each column's highest solid cell; the cluster is below the lower of the nearby tops
+      for (var cx = 0; cx < gw; cx++) { top[cx] = gh; for (var cy = 0; cy < gh; cy++) if (a[(cy * gw + cx) * 4 + 3] > 230) { top[cx] = cy; break; } }
+      var reach = Math.max(2, Math.round(band * 0.35 / G)), holes = [];
+      inside = new Uint8Array(gw * gh);
+      for (cx = 0; cx < gw; cx++) {
+        var lim = top[cx];
+        for (var d = -reach; d <= reach; d++) { var c2 = Math.min(gw - 1, Math.max(0, cx + d)); lim = Math.max(lim, top[c2]); }
+        lim = Math.min(lim + 1, gh);
+        for (cy = lim; cy < gh; cy++) { inside[cy * gw + cx] = 1; if (a[(cy * gw + cx) * 4 + 3] < 200) holes.push(cy * gw + cx); }
+      }
+      if (!holes.length) break;
+      var hcell = holes[Math.floor(r() * holes.length)];
+      var F = make(((hcell % gw) + 0.5) * G, (Math.floor(hcell / gw) + 0.5) * G, 0.55 + r() * 0.35);
+      F.z = r() * 0.5;                 // a rock seen through a gap lies behind
+      stamp(F);
+    }
+    // the line of the tops (for the koi): the mean height of the cluster
+    var sum = 0; for (cx = 0; cx < gw; cx++) sum += H - top[cx] * G;
+    // drawing order: higher on the screen = farther back
+    list.sort(function (p, q) { return (p.cy + p.h * 0.5 + p.z * band * 0.3) - (q.cy + q.h * 0.5 + q.z * band * 0.3); });
+    return { list: list, band: band, depth: sum / gw, inside: inside, G: G, gw: gw, gh: gh };
+  }
+  function placeRock(ctx, R) {
+    ctx.translate(R.cx, R.cy); ctx.rotate(R.rot); if (R.flip) ctx.scale(-1, 1);
+  }
+  // one rock on a little picture of its own: its colour, and its moss
+  function rockPicture(R, dpr) {
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.ceil(R.w * dpr)); c.height = Math.max(1, Math.ceil(R.h * dpr));
+    var x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.filter = 'hue-rotate(' + R.hue.toFixed(1) + 'deg) saturate(' + R.sat.toFixed(2) + ') brightness(' + R.bri.toFixed(2) + ')';
+    x.drawImage(R.im, 0, 0, c.width, c.height);
+    x.filter = 'none';
+    x.globalCompositeOperation = 'source-atop';
+    // a little warmth of its own (some rocks sunnier, some cooler)
+    x.globalAlpha = 0.12 * R.warm; x.fillStyle = 'rgb(235, 170, 110)'; x.fillRect(0, 0, c.width, c.height);
+    // moss in one to three patches on its upper part, in soft dabs
+    if (R.moss) {
+      var r = rockRng(R.seed), n = 1 + Math.floor(r() * 3);
+      for (var p = 0; p < n; p++) {
+        var px = c.width * (0.2 + r() * 0.6), py = c.height * (0.12 + r() * 0.3), pr = c.height * (0.08 + r() * 0.12);
+        var col = MOSS[Math.floor(r() * MOSS.length)];
+        // many small dabs, crisp in the middle (a soft blur reads as a smudge), a few lit tips
+        for (var d = 0; d < 90; d++) {
+          var aa = r() * Math.PI * 2, dd = Math.pow(r(), 0.7) * pr, rr = c.height * (0.006 + r() * 0.016);
+          var bx = px + Math.cos(aa) * dd * 1.7, by = py + Math.sin(aa) * dd * 0.75;
+          var k = 0.7 + r() * 0.45, lit = r() < 0.25;
+          var cr = Math.round(col[0] * k + (lit ? 40 : 0)), cg = Math.round(col[1] * k + (lit ? 38 : 0)), cb = Math.round(col[2] * k + (lit ? 16 : 0));
+          var al = (0.42 + r() * 0.3) * V.rkMossStrength * (1 - dd / pr * 0.5);
+          var g = x.createRadialGradient(bx, by, 0, bx, by, rr);
+          g.addColorStop(0, 'rgba(' + cr + ',' + cg + ',' + cb + ',' + Math.min(1, al).toFixed(2) + ')');
+          g.addColorStop(0.6, 'rgba(' + cr + ',' + cg + ',' + cb + ',' + Math.min(1, al * 0.8).toFixed(2) + ')');
+          g.addColorStop(1, 'rgba(' + cr + ',' + cg + ',' + cb + ',0)');
+          x.globalAlpha = 1; x.fillStyle = g; x.fillRect(bx - rr, by - rr, rr * 2, rr * 2);
+        }
+      }
+    }
+    return c;
+  }
+  var rocksCv = document.getElementById('rocks'), rockTimer = 0;
+  function drawRocks() {
+    clearTimeout(rockTimer);
+    rockTimer = setTimeout(drawRocksNow, 60);     // (sliders: once they pause)
+  }
+  function drawRocksNow() {
+    var W = innerWidth, H = innerHeight, dpr = Math.min(V.maxDpr || 2, window.devicePixelRatio || 1);
+    rocksCv.width = Math.round(W * dpr); rocksCv.height = Math.round(H * dpr);
+    var c = rocksCv.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, rocksCv.width, rocksCv.height);
+    if (!V.rkShow || rocksLoaded < ROCK_N) { pond.set({ bottomIn: 0 }); return; }
+    var L = layRocks(W, H);
+    function sheet() { var s = document.createElement('canvas'); s.width = rocksCv.width; s.height = rocksCv.height; return s; }
+    // the rocks, back to front, each casting a soft shadow on those behind it
+    var lay = sheet(), lx = lay.getContext('2d');
+    // the dark of the crevices, under every rock of the cluster
+    var bed = document.createElement('canvas'); bed.width = L.gw; bed.height = L.gh;
+    var bx = bed.getContext('2d'), bd = bx.createImageData(L.gw, L.gh);
+    for (var i = 0; i < L.inside.length; i++) if (L.inside[i]) { bd.data[i * 4] = 58; bd.data[i * 4 + 1] = 46; bd.data[i * 4 + 2] = 38; bd.data[i * 4 + 3] = 255; }
+    bx.putImageData(bd, 0, 0);
+    lx.imageSmoothingEnabled = true;
+    lx.filter = 'blur(' + (2 * dpr) + 'px)';
+    lx.drawImage(bed, 0, 0, L.gw, L.gh, 0, 0, L.gw * L.G * dpr, L.gh * L.G * dpr);
+    lx.filter = 'none';
+    L.list.forEach(function (R) {
+      var pic = rockPicture(R, dpr);
+      if (V.rkDepth > 0) {
+        var sh = document.createElement('canvas'); sh.width = pic.width; sh.height = pic.height;
+        var sx = sh.getContext('2d'); sx.drawImage(pic, 0, 0);
+        sx.globalCompositeOperation = 'source-in'; sx.fillStyle = 'rgb(40, 28, 20)'; sx.fillRect(0, 0, sh.width, sh.height);
+        lx.save();
+        lx.globalCompositeOperation = 'source-atop'; lx.globalAlpha = V.rkDepth;
+        lx.filter = 'blur(' + (R.h * 0.06 * dpr).toFixed(1) + 'px)';
+        lx.setTransform(dpr, 0, 0, dpr, R.h * 0.05 * dpr, R.h * 0.08 * dpr);
+        placeRock(lx, R); lx.drawImage(sh, -R.w / 2, -R.h / 2, R.w, R.h);
+        lx.restore();
+      }
+      lx.save(); lx.imageSmoothingQuality = 'high';
+      lx.setTransform(dpr, 0, 0, dpr, 0, 0); placeRock(lx, R);
+      lx.drawImage(pic, -R.w / 2, -R.h / 2, R.w, R.h);
+      lx.restore();
+    });
+    // the whole edge warmed a little toward the water's cream
+    if (V.rkTone > 0) {
+      lx.save(); lx.globalCompositeOperation = 'source-atop'; lx.globalAlpha = V.rkTone;
+      lx.fillStyle = 'rgb(240, 190, 140)'; lx.fillRect(0, 0, lay.width, lay.height); lx.restore();
+    }
+    // the shade the rocks cast on the water along their edge
+    if (V.rkShade > 0) {
+      var sc = sheet(), sx2 = sc.getContext('2d');
+      sx2.drawImage(lay, 0, 0);
+      sx2.globalCompositeOperation = 'source-in'; sx2.fillStyle = 'rgb(150, 70, 30)'; sx2.fillRect(0, 0, sc.width, sc.height);
+      c.save(); c.filter = 'blur(' + (L.band * 0.1 * dpr).toFixed(1) + 'px)'; c.globalAlpha = V.rkShade;
+      c.drawImage(sc, 0, -L.band * 0.05 * dpr); c.restore();
+    }
+    c.drawImage(lay, 0, 0);
+    // the koi turn back this far into the rocks
+    pond.set({ bottomIn: Math.max(0, L.depth * V.rkKoi) });
+  }
+  window.addEventListener('resize', function () {
+    if (rocksCv.width !== Math.round(innerWidth * Math.min(V.maxDpr || 2, window.devicePixelRatio || 1)) ||
+        rocksCv.height !== Math.round(innerHeight * Math.min(V.maxDpr || 2, window.devicePixelRatio || 1))) drawRocksNow();
+  });
+
+  /* ============================================================
      4. THE PANEL
      ============================================================ */
   var body = document.getElementById('kpBody');
@@ -270,6 +454,20 @@
     { k: 'light', l: 'Light on the water', min: 0, max: 0.6, step: 0.01, re: 'water' },
     { k: 'lightSpeed', l: 'How fast the light turns', min: 0.1, max: 4, step: 0.05, re: 'water' },
     { k: 'tint', l: 'Warm amber toward the edge', min: 0, max: 2, step: 0.05, re: 'water' },
+    { g: 'Rocks along the bottom (the pond’s edge)' },
+    { k: 'rkShow', l: 'Show the rocks (1 = on, 0 = off)', min: 0, max: 1, step: 1, re: 'rocks' },
+    { k: 'rkHeight', l: 'How far up the rock edge reaches (share of the screen’s height)', min: 0.05, max: 0.35, step: 0.005, re: 'rocks' },
+    { k: 'rkSize', l: 'Rock size (× that height)', min: 0.4, max: 2, step: 0.05, re: 'rocks' },
+    { k: 'rkVary', l: 'Sizes differ by (±, share)', min: 0, max: 0.6, step: 0.01, re: 'rocks' },
+    { k: 'rkTilt', l: 'Tilt each rock up to (degrees)', min: 0, max: 40, step: 1, re: 'rocks' },
+    { k: 'rkColour', l: 'Each rock’s own colour (how much they differ)', min: 0, max: 2, step: 0.05, re: 'rocks' },
+    { k: 'rkMoss', l: 'Share of rocks with moss', min: 0, max: 1, step: 0.05, re: 'rocks' },
+    { k: 'rkMossStrength', l: 'How strong the moss', min: 0, max: 2, step: 0.05, re: 'rocks' },
+    { k: 'rkDepth', l: 'Shadows of rocks on the rocks behind them', min: 0, max: 1, step: 0.05, re: 'rocks' },
+    { k: 'rkSeed', l: 'Arrangement (another number lays them out another way)', min: 1, max: 99, step: 1, re: 'rocks' },
+    { k: 'rkKoi', l: 'Koi turn back this far into the rocks (share of their height; 0 = at the screen’s edge)', min: 0, max: 1.2, step: 0.05, re: 'rocks' },
+    { k: 'rkShade', l: 'Shade on the water along the rocks', min: 0, max: 1, step: 0.05, re: 'rocks' },
+    { k: 'rkTone', l: 'Rocks warmed toward the water’s colour', min: 0, max: 0.6, step: 0.01, re: 'rocks' },
     { k: 'maxDpr', l: 'Sharpness (device pixels per pixel, lower is lighter work)', min: 1, max: 3, step: 0.5, re: 'set' }
   ];
 
@@ -314,7 +512,8 @@
     inp.addEventListener('input', function () {
       V[c.k] = +inp.value; out.textContent = inp.value; save();
       if (c.re === 'water') applyWater();
-      else { var o = {}; o[c.k] = V[c.k]; pond.set(o); if (c.re === 'reset') pond.reset(); }
+      else if (c.re === 'rocks') drawRocks();
+      else { var o = {}; o[c.k] = V[c.k]; pond.set(o); if (c.re === 'reset') pond.reset(); if (c.k === 'maxDpr') drawRocks(); }
     });
     inputs[c.k] = { inp: inp, out: out };
     body.appendChild(row);
