@@ -1197,7 +1197,7 @@
   function Pond(canvas, settings) {
     this.canvas = canvas; this.ctx = canvas.getContext('2d');
     this.s = settings;
-    this.fish = []; this.t = 0; this.acc = 0; this.rings = []; this.food = []; this.laps = []; this.lapT = 0; this.rnd = rng(97);
+    this.fish = []; this.t = 0; this.acc = 0; this.rings = []; this.food = []; this.laps = []; this.lapT = 0; this.drops = []; this.rnd = rng(97);
     this.off = document.createElement('canvas'); this.offCtx = this.off.getContext('2d');
     this.resize(); this.rebuild();
   }
@@ -1281,7 +1281,7 @@
   };
   Pond.prototype.rebuild = function () {
     var s = this.s;
-    this.fish = []; this.food = []; this.rings = []; this.laps = [];
+    this.fish = []; this.food = []; this.rings = []; this.laps = []; this.drops = [];
     var kinds = s.kinds || ['kohaku'];
     for (var i = 0; i < kinds.length; i++) {
       var k = new Koi(this, i, (s.seed || 1) * 1234 + i * 777);
@@ -1300,104 +1300,163 @@
     this.rings = [];
   };
 
-  /* Waves lapping at the rocks: a short wavelet follows the rocks' line,
-     comes in, breaks on them (a flash of foam along the line) and runs
-     back out weaker and wider, fading. They come by themselves now and
-     then (s.lapEvery s apart, on average) and when a koi swims close to
-     the rocks or turns away from them (its wake: s.koiWake). */
-  Pond.prototype.addLap = function (x, d, a, hl) {
+  /* Waves lapping at the rocks. A pond, not the sea: a small, low ripple
+     starts only a short way out (s.lapStart × the koi's length short of
+     the highest rock it will reach) and runs in as a gentle, nearly
+     straight line along the rocks' broad line (ys). Each part of it meets
+     the rocks' outline (yw) at its own moment: the taller rocks first,
+     the dips between them later. Where it meets them it breaks (white
+     foam along the rock), and from there it runs back out as the mirror
+     of the incoming line about the outline (y = 2·yw − y_in), so the
+     returning ripple takes the rocks' shape only once it has hit them,
+     weaker, fading as it goes. They come by themselves now and then
+     (s.lapEvery s apart, on average) and from a koi swimming close to the
+     rocks (its wake: s.koiWake). */
+  Pond.prototype.lapLines = function (x) {
+    var F = this.fl, n = F.yw.length, u = clamp((x + this.hw) / F.g, 0, n - 1.001), i0 = Math.floor(u), f0 = u - i0;
+    var yw = F.yw[i0] + (F.yw[i0 + 1] - F.yw[i0]) * f0, ys = F.ys ? F.ys[i0] + (F.ys[i0 + 1] - F.ys[i0]) * f0 : yw;
+    return { yw: yw - this.hh + this.L * 0.015, ys: ys - this.hh };
+  };
+  Pond.prototype.addLap = function (x, d0, a, hl) {
     if (this.laps.length > 24) return;
-    var L = this.L;
-    this.laps.push({ x: x, d: d, a: a, hl: hl, v: L * (0.32 + this.rnd() * 0.12) * (this.s.lapSpeed || 1),
-                     out: false, foam: 0, seed: Math.floor(this.rnd() * 1e6), t: 0 });
+    var L = this.L, lo = 1e9, hi = -1e9;
+    for (var j = 0; j <= 16; j++) {
+      var q = this.lapLines(x + (j / 8 - 1) * hl), g = q.yw - q.ys;
+      lo = Math.min(lo, g); hi = Math.max(hi, g);
+    }
+    this.laps.push({ x: x, hl: hl, a: a, s: lo - d0, sEnd: hi + L * 0.75, v: L * (0.2 + this.rnd() * 0.08) * (this.s.lapSpeed || 1),
+                     seed: Math.floor(this.rnd() * 1e6), t: 0 });
   };
   Pond.prototype.stepLaps = function (dt) {
     var s = this.s, L = this.L;
     if (!this.fl) { this.laps.length = 0; return; }
+    var start = s.lapStart === undefined ? 0.3 : s.lapStart;
     var every = s.lapEvery === undefined ? 1.4 : s.lapEvery;
     if (every > 0 && this.rnd() < dt / every)
-      this.addLap((this.rnd() * 2 - 1) * this.hw, L * (0.7 + this.rnd() * 0.5), 0.7 + this.rnd() * 0.5, L * (0.35 + this.rnd() * 0.55));
-    // koi near the rocks: their wake runs to the rocks
+      this.addLap((this.rnd() * 2 - 1) * this.hw, L * start * (0.7 + this.rnd() * 0.6), 0.55 + this.rnd() * 0.45, L * (0.3 + this.rnd() * 0.45));
+    // a koi near the rocks: its wake runs on to them
     var wake = s.koiWake === undefined ? 1 : s.koiWake;
     if (wake > 0) for (var j = 0; j < this.fish.length; j++) {
       var k = this.fish[j];
       k.wakeT = (k.wakeT || 0) - dt;
       if (k.wakeT > 0 || k.z > 0.35 || k.v < L * 0.15) continue;
-      var R = this.rockLine(k.x, false), dd = R.y - k.y;
-      if (dd > 0 && dd < L * 1.2) {
-        this.addLap(k.x, dd * 0.8, wake * clamp(k.v / (L * 0.6), 0.35, 1) * 0.8, L * (0.3 + 0.2 * this.rnd()));
+      var q = this.lapLines(k.x), dd = q.yw - k.y;
+      if (dd > 0 && dd < L * 1.1) {
+        this.addLap(k.x, clamp(dd * 0.4, L * 0.1, L * start), wake * clamp(k.v / (L * 0.6), 0.35, 1) * 0.7, L * (0.22 + 0.15 * this.rnd()));
         k.wakeT = 1.6 + this.rnd() * 1.4;
       }
     }
     for (var i = this.laps.length - 1; i >= 0; i--) {
       var w = this.laps[i];
-      w.t += dt; w.foam = Math.max(0, w.foam - dt * 1.5);
-      if (!w.out) {
-        w.d -= w.v * dt;
-        if (w.d <= 0) { w.d = 0; w.out = true; w.foam = 1; w.a *= 0.8; w.v *= 0.8; }   // it breaks on the rocks and rebounds
-      } else {
-        w.d += w.v * dt; w.hl += L * 0.12 * dt; w.a -= dt * 0.25;
-        if (w.a <= 0.02 || w.d > L * 1.3) this.laps.splice(i, 1);
-      }
+      w.t += dt; w.s += w.v * dt;
+      if (w.s > w.sEnd) this.laps.splice(i, 1);
     }
   };
   Pond.prototype.drawLaps = function (ctx) {
     if (!this.fl || !this.laps.length) return;
     var s = this.s, L = this.L, str = s.lapStrength === undefined ? 1 : s.lapStrength;
     if (str <= 0) return;
-    var self = this;
-    // a point d out from the rocks: far out a wave runs along the rocks'
-    // broad line (ys), and takes the shape of their outline (yw) only as it
-    // reaches them (a hair inside them at d = 0)
-    function pt(x, d) {
-      var F = self.fl, n = F.yw.length, u = clamp((x + self.hw) / F.g, 0, n - 1.001), i0 = Math.floor(u), f0 = u - i0;
-      var yw = F.yw[i0] + (F.yw[i0 + 1] - F.yw[i0]) * f0, ys = F.ys ? F.ys[i0] + (F.ys[i0 + 1] - F.ys[i0]) * f0 : yw;
-      var c = clamp(1 - d / (L * 0.6), 0, 1); c = c * c * (3 - 2 * c);
-      return { x: x, y: ys + (yw - ys) * c - self.hh + L * 0.015 - d };
+    var N = 32, P = [];
+    ctx.save(); ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
+    function seg(p0, p1, w, col, al) {
+      if (al <= 0.004) return;
+      ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y);
+      ctx.lineWidth = w; ctx.strokeStyle = 'rgba(' + col + ', ' + Math.min(1, al).toFixed(3) + ')'; ctx.stroke();
     }
-    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     for (var i = 0; i < this.laps.length; i++) {
-      var w = this.laps[i], n = 24, a = w.a * str * (w.out ? 1 : clamp(w.t / 0.5, 0, 1));
-      var lead = w.out ? 1 : -1;            // its middle runs a little ahead of its ends
-      if (a > 0.01) {
-        // a crest (cream) with its trough just behind it (warm): one smooth
-        // stroke each, fading out toward both ends
-        for (var pass = 0; pass < 2; pass++) {
-          var off = pass ? 0 : -lead * L * 0.04;
-          ctx.beginPath();
-          for (var j = 0; j <= n; j++) {
-            var uu = j / n * 2 - 1, q = pt(w.x + uu * w.hl, Math.max(0, w.d + off + lead * (1 - uu * uu) * L * 0.06));
-            if (j) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y);
-          }
-          var gr = ctx.createLinearGradient(w.x - w.hl, 0, w.x + w.hl, 0);
-          var col = pass ? '255, 255, 255' : '186, 88, 36', top = pass ? 1.0 * a : 0.32 * a;
-          for (var gs = 0; gs <= 6; gs++) {
-            var gu = gs / 6 * 2 - 1;
-            gr.addColorStop(gs / 6, 'rgba(' + col + ', ' + (Math.min(1, top) * Math.pow(Math.cos(gu * Math.PI / 2), 1.3)).toFixed(3) + ')');
-          }
-          ctx.strokeStyle = gr; ctx.lineWidth = pass ? L * 0.03 + 0.6 : L * 0.06 + 0.6;
-          ctx.stroke();
+      var w = this.laps[i], a = w.a * str * clamp(w.t / 0.5, 0, 1);
+      // each sample across the ripple: where the incoming line is now, and
+      // how far past the rock's outline it has run (> 0: it has hit there)
+      for (var j = 0; j <= N; j++) {
+        var u = j / N * 2 - 1, x = w.x + u * w.hl, q = this.lapLines(x);
+        var yi = q.ys + w.s + (1 - u * u) * L * 0.03;        // its middle a little ahead
+        P[j] = { x: x, u: u, yi: yi, yw: q.yw, ys: q.ys, past: yi - q.yw, taper: Math.pow(Math.cos(u * Math.PI / 2), 1.3) };
+      }
+      for (j = 0; j < N; j++) {
+        var A = P[j], B = P[j + 1], um = (A.u + B.u) / 2, tp = (A.taper + B.taper) / 2;
+        if (A.past < 0 && B.past < 0) {
+          // coming in: trough behind (toward the open water), crest ahead
+          seg({ x: A.x, y: A.yi - L * 0.04 }, { x: B.x, y: B.yi - L * 0.04 }, L * 0.05 + 0.5, '186, 88, 36', 0.22 * a * tp);
+          seg({ x: A.x, y: A.yi }, { x: B.x, y: B.yi }, L * 0.022 + 0.5, '255, 255, 255', 0.85 * a * tp);
+        } else if (A.past > 0 && B.past > 0) {
+          // running back out: the mirror of the incoming line about the rocks
+          // (just off the rocks it has their shape; it smooths out quickly as
+          // it spreads, toward a plain line about the rocks' broad line)
+          var ka = clamp(A.past / (L * 0.3), 0, 1), kb = clamp(B.past / (L * 0.3), 0, 1);
+          ka = ka * ka * (3 - 2 * ka); kb = kb * kb * (3 - 2 * kb);
+          var ya = 2 * A.yw - A.yi + (2 * A.ys - 2 * A.yw) * ka, yb = 2 * B.yw - B.yi + (2 * B.ys - 2 * B.yw) * kb, tr = (A.past + B.past) / 2;
+          var fade = 0.6 * Math.max(0, 1 - tr / (L * 0.75));
+          seg({ x: A.x, y: ya + L * 0.04 }, { x: B.x, y: yb + L * 0.04 }, L * 0.05 + 0.5, '186, 88, 36', 0.2 * a * tp * fade);
+          seg({ x: A.x, y: ya }, { x: B.x, y: yb }, L * 0.022 + 0.5, '255, 255, 255', 0.85 * a * tp * fade);
+        }
+        // breaking: foam along the rock where it has just hit
+        var pm = (A.past + B.past) / 2;
+        if (pm > -L * 0.01 && pm < L * 0.22) {
+          var fo = Math.pow(1 - clamp(pm / (L * 0.22), 0, 1), 1.4);
+          seg({ x: A.x, y: A.yw - L * 0.02 }, { x: B.x, y: B.yw - L * 0.02 }, L * (0.05 + 0.04 * (1 - fo)), '255, 255, 255', 0.5 * a * tp * fo);
         }
       }
-      // foam where it breaks: a soft white band along the rocks, and bright
-      // flecks that spread back out a little as it fades
-      if (w.foam > 0) {
-        var fa = w.foam * str;
-        ctx.beginPath();
-        for (var j2 = 0; j2 <= 20; j2++) { var u2 = j2 / 20 * 2 - 1, q2 = pt(w.x + u2 * w.hl * 1.05, L * 0.02); if (j2) ctx.lineTo(q2.x, q2.y); else ctx.moveTo(q2.x, q2.y); }
-        var gb = ctx.createLinearGradient(w.x - w.hl, 0, w.x + w.hl, 0);
-        for (var g2 = 0; g2 <= 6; g2++) gb.addColorStop(g2 / 6, 'rgba(255, 255, 255, ' + (0.45 * fa * Math.pow(Math.cos((g2 / 6 * 2 - 1) * Math.PI / 2), 1.2)).toFixed(3) + ')');
-        ctx.strokeStyle = gb; ctx.lineWidth = L * (0.05 + 0.05 * (1 - w.foam)); ctx.stroke();
-        var r = rng(w.seed), m = 30;
-        for (var f = 0; f < m; f++) {
-          var u = r() * 2 - 1, q = pt(w.x + u * w.hl * 1.1, L * (0.01 + r() * 0.08) * (1 + (1 - w.foam) * 1.8));
-          var rr = L * (0.01 + r() * 0.022) * (0.6 + w.foam * 0.5);
-          ctx.beginPath(); ctx.arc(q.x, q.y, rr, 0, TAU);
-          ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, 0.95 * fa * Math.cos(u * Math.PI / 2)).toFixed(3) + ')'; ctx.fill();
-        }
+      // flecks of foam: each its own spot, showing just after the ripple reaches it
+      var r = rng(w.seed);
+      for (var f = 0; f < 34; f++) {
+        var fu = r() * 2 - 1, fx = w.x + fu * w.hl, qf = this.lapLines(fx);
+        var fyi = qf.ys + w.s + (1 - fu * fu) * L * 0.03, fp = fyi - qf.yw - r() * L * 0.04;
+        if (fp < 0 || fp > L * 0.25) continue;
+        var ff = 1 - fp / (L * 0.25), rr = L * (0.008 + r() * 0.018) * (0.6 + ff * 0.5);
+        ctx.beginPath(); ctx.arc(fx, qf.yw - L * (0.01 + r() * 0.06) * (1 + (1 - ff) * 1.5), rr, 0, TAU);
+        ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, 0.95 * a * ff * Math.cos(fu * Math.PI / 2)).toFixed(3) + ')'; ctx.fill();
       }
     }
     ctx.restore();
+  };
+
+  /* Koi snatching for food churn the water: each koi taking food at the
+     surface sends little rings out from its mouth now and then, and where
+     several crowd the same food they slap with their tails and throw up
+     drops (s.feedSplash scales it all; eating itself splashes too). */
+  Pond.prototype.stepChurn = function (dt) {
+    var ch = this.s.feedSplash === undefined ? 1 : this.s.feedSplash, L = this.L, fish = this.fish;
+    for (var i = this.drops.length - 1; i >= 0; i--) {
+      var d = this.drops[i]; d.t += dt; d.x += d.vx * dt; d.y += d.vy * dt; d.vx *= Math.pow(0.05, dt); d.vy *= Math.pow(0.05, dt);
+      if (d.t > d.life) { this.drops.splice(i, 1); if (this.rnd() < 0.25 && this.rings.length < 70) this.rings.push({ x: d.x, y: d.y, t: 0.6, L: L * 0.25 }); }
+    }
+    if (ch <= 0) return;
+    for (var j = 0; j < fish.length; j++) {
+      var k = fish[j];
+      if (k.mode !== 'feed' || k.z > 0.08 || !k.food) continue;
+      var m = k.at(0, 0);
+      if (Math.hypot(k.food.x - m.x, k.food.y - m.y) > k.L * 1.3) continue;
+      // how many others crowd the same food
+      var crowd = 0;
+      for (var o = 0; o < fish.length; o++) {
+        var ko = fish[o];
+        if (ko !== k && ko.mode === 'feed' && ko.z < 0.1 && Math.hypot(ko.x - k.x, ko.y - k.y) < k.L * 1.2) crowd++;
+      }
+      // mouth ripples (more when crowded and when it is pushing hard)
+      if (this.rnd() < dt * ch * (1.6 + crowd * 1.2) && this.rings.length < 70)
+        this.rings.push({ x: m.x, y: m.y, t: 0.2 + this.rnd() * 0.3, L: k.L * (0.4 + 0.25 * this.rnd()) });
+      if (crowd > 0) {
+        // tail slaps and the swirl behind a jostling koi
+        if (this.rnd() < dt * ch * crowd * 0.9 && this.rings.length < 70) {
+          var tl = k.P[k.P.length - 1];
+          this.rings.push({ x: tl.x, y: tl.y, t: 0.1, L: k.L * (0.45 + 0.3 * this.rnd()) });
+          this.splash(tl.x, tl.y, Math.round(2 + 3 * ch), k.L * 0.6);
+        }
+        // drops off the mouths as they gulp at the surface together
+        if (this.rnd() < dt * ch * crowd * 1.4) this.splash(m.x, m.y, Math.round(1 + 2 * ch), k.L * 0.5);
+      }
+    }
+  };
+  Pond.prototype.drawDrops = function (ctx) {
+    if (!this.drops.length) return;
+    for (var i = 0; i < this.drops.length; i++) {
+      var d = this.drops[i], f = d.t / d.life, al = Math.sin(Math.PI * Math.min(1, f * 1.2 + 0.1));
+      // a drop in the air: its little shadow on the water, then the drop
+      ctx.beginPath(); ctx.arc(d.x + d.r * 1.6, d.y + d.r * 2.4, d.r * 0.9, 0, TAU);
+      ctx.fillStyle = 'rgba(176, 72, 22, ' + (0.16 * al).toFixed(3) + ')'; ctx.fill();
+      ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, TAU);
+      ctx.fillStyle = 'rgba(255, 255, 255, ' + (0.95 * al).toFixed(3) + ')'; ctx.fill();
+    }
   };
 
   /* Now and then a koi dives or comes up for air (s.airMax at most at the
@@ -1406,6 +1465,7 @@
     var s = this.s;
     for (var i = this.rings.length - 1; i >= 0; i--) { this.rings[i].t += dt; if (this.rings[i].t > 1.6) this.rings.splice(i, 1); }
     this.stepLaps(dt);
+    this.stepChurn(dt);
     var fish = this.fish, n = fish.length;
     // koi that noticed food come over after a moment
     for (var j = 0; j < n; j++) {
@@ -1453,8 +1513,11 @@
     for (var i = 0; i < n && this.food.length < 80; i++) {
       var a = r() * TAU, d = L * (s.foodSpread || 0.4) * Math.sqrt(r());
       var q = this.clampIn(c.x + Math.cos(a) * d, c.y + Math.sin(a) * d, L * 0.4);
-      this.food.push({ x: q.x, y: q.y, vx: (r() - 0.5) * L * 0.04, vy: (r() - 0.5) * L * 0.04,
-                       t: -r() * 0.25, size: 0.8 + r() * 0.45, tone: r(), spin: r() * TAU, sinking: false, sinkT: 0, gone: false });
+      // (it lands still moving: it glides on outward from the throw, slowing)
+      var gl = L * (0.12 + r() * 0.3) * (s.foodDrift === undefined ? 1 : s.foodDrift);
+      this.food.push({ x: q.x, y: q.y, vx: Math.cos(a) * gl + (r() - 0.5) * L * 0.08, vy: Math.sin(a) * gl + (r() - 0.5) * L * 0.08,
+                       t: -r() * 0.25, size: 0.8 + r() * 0.45, tone: r(), spin: r() * TAU, sv: (r() - 0.5) * 0.8,
+                       wa: r() * TAU, sinking: false, sinkT: 0, gone: false });
     }
     // the koi that notice it
     var near = (s.feedNear || 0.7) * Math.min(this.W, this.H);
@@ -1489,7 +1552,27 @@
   };
   Pond.prototype.eat = function (f, k) {
     f.gone = true;
+    var L = this.L, ch = this.s.feedSplash === undefined ? 1 : this.s.feedSplash;
     this.rings.push({ x: f.x, y: f.y, t: 0, L: k.L });
+    if (ch <= 0) return;
+    this.rings.push({ x: f.x, y: f.y, t: 0.15, L: k.L * 0.6 });
+    this.splash(f.x, f.y, Math.round(5 + 6 * ch), k.L * 0.9);
+    // the swirl of the snatch pushes the pellets near it away
+    for (var i = 0; i < this.food.length; i++) {
+      var o = this.food[i];
+      if (o === f || o.gone || o.t < 0) continue;
+      var dx = o.x - f.x, dy = o.y - f.y, d = Math.hypot(dx, dy);
+      if (d < L * 0.6 && d > 0.01) { var p = L * 0.35 * ch * (1 - d / (L * 0.6)); o.vx += dx / d * p; o.vy += dy / d * p; }
+    }
+  };
+  // drops thrown up off the water, falling back round where they rose
+  Pond.prototype.splash = function (x, y, n, size) {
+    var r = this.rnd;
+    for (var i = 0; i < n && this.drops.length < 160; i++) {
+      var a = r() * TAU, sp = size * (0.3 + r() * 0.7);
+      this.drops.push({ x: x + Math.cos(a) * size * 0.05, y: y + Math.sin(a) * size * 0.05, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                        t: 0, life: 0.25 + r() * 0.3, r: size * (0.012 + r() * 0.02) });
+    }
   };
   Pond.prototype.stepFood = function (dt) {
     var s = this.s, L = this.L, life = s.foodLife || 40;
@@ -1500,15 +1583,26 @@
       if (f.t < 0) continue;
       if (f.gone) { this.food.splice(i, 1); continue; }
       if (f.skipT > 0) f.skipT -= dt;
-      // drifting slowly on the water, pushed off by a koi swimming past
-      f.vx += (this.rnd() - 0.5) * L * 0.02 * dt; f.vy += (this.rnd() - 0.5) * L * 0.02 * dt;
+      // drifting on the water: the pond's slow current (turning slowly)
+      // and each pellet's own wander, which its speed settles toward
+      // (the glide from the throw and every push die away gently)
+      var dr = s.foodDrift === undefined ? 1 : s.foodDrift;
+      var ca = this.t * 0.05 + Math.sin(this.t * 0.031) * 2, cs = L * 0.035 * dr;
+      f.wa += (this.rnd() - 0.5) * 1.6 * dt;
+      var tx = Math.cos(ca) * cs + Math.cos(f.wa) * L * 0.03 * dr, ty = Math.sin(ca) * cs + Math.sin(f.wa) * L * 0.03 * dr;
+      var ease = Math.pow(0.55, dt);
+      f.vx = tx + (f.vx - tx) * ease; f.vy = ty + (f.vy - ty) * ease;
+      // pushed along by a koi swimming past (its bow wave)
       for (var j = 0; j < this.fish.length; j++) {
         var k = this.fish[j];
         if (k.z > 0.25 || k.food === f) continue;
         var dx = f.x - k.x, dy = f.y - k.y, d = Math.hypot(dx, dy);
-        if (d < k.L * 0.3 && d > 0.01) { var push = (1 - d / (k.L * 0.3)) * k.v * 0.15 * dt; f.vx += dx / d * push; f.vy += dy / d * push; }
+        if (d < k.L * 0.45 && d > 0.01) {
+          var push = (1 - d / (k.L * 0.45)) * k.v * 0.9 * dt, hx = Math.cos(k.heading), hy = Math.sin(k.heading);
+          f.vx += (dx / d * 0.6 + hx * 0.4) * push; f.vy += (dy / d * 0.6 + hy * 0.4) * push;
+        }
       }
-      f.vx *= Math.pow(0.35, dt); f.vy *= Math.pow(0.35, dt);
+      f.spin += f.sv * dt;
       f.x += f.vx * dt; f.y += f.vy * dt;
       var q = this.clampIn(f.x, f.y, L * 0.35); f.x = q.x; f.y = q.y;
       if (!f.sinking && f.t > life) f.sinking = true;
@@ -1608,7 +1702,6 @@
     fish.sort(function (a, b) { return b.z - a.z; });
     for (var i = 0; i < fish.length; i++) this.depthLook(fish[i], s);
     this.drawShadows(ctx, fish, s);
-    this.drawFood(ctx, true);
     for (i = 0; i < fish.length; i++) {
       // measured from the koi's own cruising depth: every koi that is
       // just cruising is drawn at full size, sharp and solid
@@ -1674,6 +1767,7 @@
         ctx.strokeStyle = 'rgba(255, 253, 249, ' + (0.9 * (1 - f)).toFixed(3) + ')'; ctx.stroke();
       }
     }
+    this.drawDrops(ctx);
   };
   Pond.prototype.frame = function (dt) {
     var s = this.s, ctx = this.ctx, look = LOOKS.nishiki;

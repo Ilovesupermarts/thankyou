@@ -164,9 +164,9 @@
     speed: 1.2, wave: 1.2, fins: 0.8, roam: 0.8, edge: 0.6,
     eventEvery: 5, airShare: 0.45, airMax: 2, deepTime: 10, deepSize: 0.57, deepBlur: 3, deepFade: 0.35,
     shadow: 1.75, shadowOpacity: 1, shadowFeather: 1,
-    foodCount: 6, foodSpread: 0.4, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
+    foodCount: 6, foodSpread: 0.4, foodDrift: 1, feedSplash: 1, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
     light: 0.24, lightSpeed: 1, tint: 1,
-    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, lapEvery: 1.4, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
+    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, lapEvery: 1.4, lapStart: 0.3, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
     maxDpr: 2
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
@@ -473,6 +473,8 @@
     { g: 'Feeding (tap the water)' },
     { k: 'foodCount', l: 'Pellets per tap', min: 1, max: 20, step: 1, re: 'set' },
     { k: 'foodSpread', l: 'How widely they scatter (× length)', min: 0.05, max: 1.5, step: 0.05, re: 'set' },
+    { k: 'foodDrift', l: 'How much the pellets drift on the water', min: 0, max: 3, step: 0.05, re: 'set' },
+    { k: 'feedSplash', l: 'How much the water churns when koi snatch the food', min: 0, max: 2.5, step: 0.05, re: 'set' },
     { k: 'feedNear', l: 'Koi notice it from (share of the screen)', min: 0.1, max: 1.5, step: 0.05, re: 'set' },
     { k: 'feedJoin', l: 'Chance a koi comes to eat', min: 0, max: 1, step: 0.05, re: 'set' },
     { k: 'foodLife', l: 'Uneaten pellets sink after (s)', min: 5, max: 120, step: 1, re: 'set' },
@@ -493,6 +495,7 @@
     { k: 'rkSeed', l: 'Arrangement (another number lays them out another way)', min: 1, max: 99, step: 1, re: 'rocks' },
     { k: 'rkGap', l: 'Koi turn away this far from the rocks (× koi length)', min: 0, max: 1.5, step: 0.05, re: 'set' },
     { k: 'lapEvery', l: 'Waves lapping at the rocks: about every (s, 0 = none)', min: 0, max: 8, step: 0.1, re: 'set' },
+    { k: 'lapStart', l: 'How far out a wave starts from the rocks (× koi length)', min: 0.05, max: 1.2, step: 0.01, re: 'set' },
     { k: 'lapStrength', l: 'How strong the waves and their foam', min: 0, max: 2, step: 0.05, re: 'set' },
     { k: 'lapSpeed', l: 'How fast the waves run', min: 0.3, max: 3, step: 0.05, re: 'set' },
     { k: 'koiWake', l: 'Waves from koi swimming near the rocks', min: 0, max: 2, step: 0.05, re: 'set' },
