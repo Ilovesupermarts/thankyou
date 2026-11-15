@@ -193,9 +193,14 @@
                exitV: 0.8,     // swimming speed when it swims away (× length per second)
                wallIn: 0.2,    // it starts turning back this far inside the pond's edge (× length)
                goalIn: 0.3,    // spots it swims to are at least this far inside the edge (× length)
-               suck: 0.5,      // … and pulls in a pellet this close in front of its mouth (× length)
-               eatReach: 0.2,  // its mouth this close to a pellet (× length): it takes it
+               suck: 0.14,     // … and sucks in a pellet this close in front of its mouth (× length)
+               eatReach: 0.09, // its mouth this close to a pellet (× length): it takes it
+               retarget: 0.4,  // a feeding koi looks again for the nearest pellet this often (s)
                eatRise: 1.6 }; // this close to its pellet (× length) it rises to the surface
+  // the shadows' softness against the old blur filter's (calibrated by
+  // comparing the two at the same moment) and the largest little picture
+  // a diving koi is drawn on (device pixels across)
+  var SHADOW_SOFT = 1, DIVE_MAX = 300, SMALL_SIG = 1.2;
   // how far apart two koi are in depth, counting the depth each is
   // heading for (so one coming back up already counts as at that depth)
   function depthGap(a, b) {
@@ -306,9 +311,12 @@
         }
       }
     }
-    this.v *= 1 - clamp(slow, 0, 0.8) * dt * 4;
+    // (a feeding koi close to its food does not give way: it pushes in, and the bump below slides it off the others)
+    if (!(this.mode === 'feed' && this.food && Math.hypot(this.food.x - this.x, this.food.y - this.y) < L * 2.5)) this.v *= 1 - clamp(slow, 0, 0.8) * dt * 4;
     // (the push to steer round the other koi is capped, so it can not lock it in place)
-    turn += clamp(avoidTurn * (this.mode === 'feed' ? 0.45 : 1), -TUNE.avoidMax, TUNE.avoidMax);
+    // (a feeding koi close to its food jostles: it steers round the others less and the bump slides it past)
+    var feedNear = this.mode === 'feed' && this.food && Math.hypot(this.food.x - this.x, this.food.y - this.y) < L * 2.5;
+    turn += clamp(avoidTurn * (feedNear ? 0.25 : this.mode === 'feed' ? 0.45 : 1), -TUNE.avoidMax, TUNE.avoidMax);
     // stuck at the edge for a while: it gives up that way and turns the other way round
     if (p.sdf(this.x, this.y) > -L * 0.04 && Math.abs(this.omega || 0) < 0.3) this.stuckT = (this.stuckT || 0) + dt;
     else this.stuckT = 0;
@@ -477,48 +485,79 @@
     this.pickAct('feed');
   };
   Koi.prototype.stepFeed = function (dt) {
-    var p = this.pond, L = this.L, f = this.food;
+    var p = this.pond, L = this.L, i;
     this.eatCool = (this.eatCool || 0) - dt;
+    var jz = -0.1 + (this.idx % 7) * 0.006;      // its own hair of depth at the surface (crowding koi keep their order)
+
+    // 1. at the surface it takes whatever pellet is just in front of its
+    // mouth (any pellet, not only the one it was after): it sucks it in
+    // from very close, then takes it
+    var near = 1e9, best = null, bd = 1e9;
+    for (i = 0; i < p.food.length; i++) {
+      var g = p.food[i];
+      if (g.gone || g.sinking || g.t < 0) continue;
+      var dg = Math.hypot(g.x - this.x, g.y - this.y);
+      if (dg < near) near = dg;
+      if (dg < L * TUNE.suck && dg < bd && Math.abs(angDiff(this.heading, Math.atan2(g.y - this.y, g.x - this.x))) < 1.2) { bd = dg; best = g; }
+    }
+    if (best && this.z < 0.06) {
+      if (!this.suckFrom) this.suckFrom = bd / L;          // (kept for the checks)
+      var pull = Math.min(bd, L * 0.9 * dt) / (bd || 1);
+      best.x += (this.x - best.x) * pull; best.y += (this.y - best.y) * pull; best.vx = best.vy = 0;
+      bd = Math.hypot(best.x - this.x, best.y - this.y);
+      if (bd < L * TUNE.eatReach && this.eatCool <= 0) {
+        p.eat(best, this);
+        this.gulpT = 0; this.eatCool = 0.45 + this.r() * 0.4; this.suckFrom = 0;
+        if (this.food === best) this.food = null;
+      }
+    }
+    // near any food it stays up at the surface, whatever it is doing
+    this.zT = near < L * TUNE.eatRise ? jz : Math.min(this.zHome, 0.12);
+
+    // 2. which pellet it goes for: the nearest (they compete: the first
+    // mouth there gets it), looked for again now and then as the others move
+    var f = this.food;
     if (f && f === this.lastFood) {
-      // chased the same pellet too long (circling it): it lets it go for a while
       this.foodAge += dt;
-      if (this.foodAge > 6) { f.owner = null; f.skip = this; f.skipT = 3; f = this.food = null; }
+      // chased the same pellet too long: it lets it go for a moment
+      if (this.foodAge > 10) { f.skip = this; f.skipT = 2.5; f = this.food = null; }
     }
-    if (!f || f.gone || f.sinking || (f.owner && f.owner !== this)) f = this.food = p.nearestFood(this);
-    if (f) f.owner = this;
+    this.retargetT = (this.retargetT || 0) - dt;
+    if (!f || f.gone || f.sinking || this.retargetT <= 0) {
+      this.retargetT = TUNE.retarget * (0.7 + this.r() * 0.6);
+      f = this.food = p.nearestFood(this);
+    }
     if (f !== this.lastFood) { this.lastFood = f; this.foodAge = 0; }
-    if (!f && p.nearestFood(this, true)) {
-      // every pellet near it is taken: it waits a little way off, slowly,
-      // at a shallow depth, until one is free
-      var w = p.nearestFood(this, true), wx = this.x - w.x, wy = this.y - w.y, wl = Math.hypot(wx, wy) || 1;
-      this.goal = p.clampIn(w.x + wx / wl * L * 1.6, w.y + wy / wl * L * 1.6, L * TUNE.goalIn); this.goalAge = 0;
-      this.feedSlow = clamp((wl - L * 1.6) / (L * 2), 0.25, 0.8);
-      this.zT = Math.min(this.zHome, 0.1);
-      return;
-    }
     if (!f) {
-      // nothing left near it: back to its own swimming and depth
+      if (near < 1e9) {
+        // the only food near it is the pellet it let go for a moment: it
+        // swims on a little and comes round again
+        this.goal = { x: this.x + Math.cos(this.heading) * L, y: this.y + Math.sin(this.heading) * L }; this.goalAge = 0;
+        this.feedSlow = 0.6;
+        return;
+      }
+      // nothing left: back to its own swimming and depth
       this.mode = 'cruise'; this.zT = this.zHome; this.food = null; this.feedSlow = 1;
       this.pickAct('slow');
       return;
     }
-    this.goal = { x: f.x, y: f.y }; this.goalAge = 0;
+
+    // 3. steering
     var d = Math.hypot(f.x - this.x, f.y - this.y);
-    // close: it slows to take it gently, and rises to the surface
-    // (off to its side and close: it nearly stops and turns on the spot with its fins)
     var off = Math.abs(angDiff(this.heading, Math.atan2(f.y - this.y, f.x - this.x)));
-    this.feedSlow = clamp(d / (L * 2.2), 0.35, 1) * (d < L * 1.5 ? Math.max(0.12, Math.cos(Math.min(off, Math.PI / 2))) : 1);
-    this.zT = d < L * TUNE.eatRise ? -0.1 : Math.min(this.zHome, 0.12);
-    // at the surface with the pellet just in front: it sucks it in
-    if (d < L * TUNE.suck && off < 1.2 && this.z < 0.06) {
-      var pull = Math.min(d, L * 0.9 * dt) / (d || 1);
-      f.x += (this.x - f.x) * pull; f.y += (this.y - f.y) * pull; f.vx = f.vy = 0;
-      d = Math.hypot(f.x - this.x, f.y - this.y);
+    // close, with the pellet off to its side, it lies inside its turning
+    // circle: it can never bring its mouth onto it by turning, so it swims
+    // straight on a little and comes round to it again (as koi do)
+    this.outT = (this.outT || 0) - dt;
+    if (this.outT <= 0 && ((d < L * 0.55 && off > 0.85) || (d < L * 1.5 && off > 1.6)) && d > L * TUNE.suck) this.outT = 0.35 + this.r() * 0.25;
+    if (this.outT > 0) {
+      this.goal = { x: this.x + Math.cos(this.heading) * L, y: this.y + Math.sin(this.heading) * L }; this.goalAge = 0;
+      this.feedSlow = 0.55;
+      return;
     }
-    if (d < L * TUNE.eatReach && this.z < 0.06 && this.eatCool <= 0) {
-      p.eat(f, this);
-      this.gulpT = 0; this.eatCool = 0.45 + this.r() * 0.4; this.food = null;
-    }
+    this.goal = { x: f.x, y: f.y }; this.goalAge = 0;
+    // close: it slows to take it gently
+    this.feedSlow = clamp(d / L, 0.45, 1) * (d < L * 1.5 ? Math.max(d < L * 0.8 ? 0.3 : 0.12, Math.cos(Math.min(off, Math.PI / 2))) : 1);
   };
 
   // swipe up: a hard wriggle on the spot, then down and away
@@ -551,7 +590,7 @@
     dart:   { v: 1.25, beat: 1,    acc: 6,   steer: 3,   turnR: 0.65, ease: 2,   w: 0.12, t: [0.9, 1.6] },
     snap:   { v: 0.42, beat: 0.9,  acc: 3,   steer: 2.5, turnR: 0.75, ease: 1.6, w: 0.10, t: [0.8, 1.3] },
     // swimming over to food (never picked at random)
-    feed:   { v: 0.42, beat: 0.7,  acc: 1.6, steer: 2.2, turnR: 0.55, ease: 1.4, w: 0,    t: [9, 9] }
+    feed:   { v: 0.6,  beat: 0.85, acc: 2.2, steer: 2.2, turnR: 0.55, ease: 1.4, w: 0,    t: [9, 9] }
   };
   Koi.prototype.pickAct = function (force) {
     var r = this.r, name = force;
@@ -1240,6 +1279,19 @@
       f.feedDelay -= dt;
       if (f.feedDelay <= 0) { f.feedDelay = undefined; if (f.mode !== 'feed' && this.nearestFood(f)) f.startFeed(); }
     }
+    // a koi swimming near floating food notices it and joins in
+    if (this.food.length) {
+      for (j = 0; j < n; j++) {
+        var kj = fish[j];
+        if (kj.mode === 'feed' || kj.mode === 'exit' || kj.feedDelay !== undefined || (kj.mode === 'dive' && kj.diveDown)) continue;
+        if (Math.random() > dt * 2) continue;                 // about twice a second it looks
+        for (var fi = 0; fi < this.food.length; fi++) {
+          var fd = this.food[fi];
+          if (fd.gone || fd.sinking || fd.t < 0) continue;
+          if (Math.hypot(fd.x - kj.x, fd.y - kj.y) < kj.L * 2.5 && Math.random() < (s.feedJoin === undefined ? 0.85 : s.feedJoin)) { kj.feedDelay = 0.2 + Math.random() * 0.5; break; }
+        }
+      }
+    }
     if (!(s.eventEvery > 0)) return;
     // each koi decides for itself, so several can be down at once (each
     // at its own depth); only so many at the surface at a time
@@ -1290,15 +1342,18 @@
       if (f.gone || f.sinking || f.t < 0 || (f.skip === k && f.skipT > 0)) continue;
       var d = Math.hypot(f.x - k.x, f.y - k.y);
       if (d > reach) continue;
-      // (one koi to a pellet: another takes it only when it is much closer)
-      var o = f.owner;
-      if (!any && o && o !== k && o.mode === 'feed' && o.food === f && Math.hypot(f.x - o.x, f.y - o.y) < d * 1.8) continue;
+      // (a pellet already crowded by nearer koi counts a little farther, so
+      // they spread over the food a bit; but they still compete for it)
+      for (var j = 0; j < this.fish.length; j++) {
+        var o = this.fish[j];
+        if (o !== k && o.food === f && Math.hypot(f.x - o.x, f.y - o.y) < d) d += L * 0.25;
+      }
       if (d < bd) { bd = d; best = f; }
     }
     return best;
   };
   Pond.prototype.eat = function (f, k) {
-    f.gone = true; f.owner = null;
+    f.gone = true;
     this.rings.push({ x: f.x, y: f.y, t: 0, L: k.L });
   };
   Pond.prototype.stepFood = function (dt) {
@@ -1363,30 +1418,51 @@
     k.dSc = up > 0 ? 1 + 0.05 * up : 1 - (1 - s.deepSize) * zd;
     k.dShadow = s.shadow * (1 + 0.4 * up - 0.7 * zd);
   };
-  /* All the koi's shadows on one SMALL picture (about 1/8 of the pond's
-     size), laid down once, scaled up smooth: the scaling is the blur. (A
-     blur filter on every koi, every frame, was what made it stutter.) */
+  /* A small blank picture of at least w x h, cleared all over (so nothing
+     left from an earlier, bigger picture can bleed in at its edges when it
+     is scaled up). */
+  function smallCanvas(o, key, w, h) {
+    var c = o[key] || (o[key] = document.createElement('canvas'));
+    if (c.width < w || c.height < h) { c.width = Math.max(c.width, w); c.height = Math.max(c.height, h); }
+    var x = c._ctx || (c._ctx = c.getContext('2d'));
+    x.setTransform(1, 0, 0, 1, 0, 0); x.filter = 'none'; x.globalAlpha = 1;
+    x.clearRect(0, 0, c.width, c.height);
+    return c;
+  }
+  /* Soften a small picture with a real (Gaussian) blur into a second one.
+     The pictures are small, so this is cheap; done on the whole screen at
+     full size for every koi it was what made the pond stutter. */
+  function blurInto(src, dst, w, h, sigma) {
+    var x = dst._ctx;
+    if (sigma > 0.3) x.filter = 'blur(' + sigma.toFixed(2) + 'px)';
+    x.drawImage(src, 0, 0, w, h, 0, 0, w, h);
+    x.filter = 'none';
+  }
+  /* All the koi's shadows, drawn flat on one small picture (about 1.2
+     small pixels to the blur), softened with a real blur, then scaled up:
+     a smooth picture scales up smooth (no blocks). */
   Pond.prototype.drawShadows = function (ctx, fish, s) {
     if (!(s.shadow > 0)) return;
-    var blur = this.L * 0.035 * s.shadow;
-    var sc = clamp(1 / Math.max(1, blur * 0.8), 0.1, 0.6);
-    var sw = Math.ceil(this.W * sc) + 2, sh = Math.ceil(this.H * sc) + 2;
-    var can = this.shCan || (this.shCan = document.createElement('canvas'));
-    var c2 = this.shCtx || (this.shCtx = can.getContext('2d'));
-    if (can.width !== sw || can.height !== sh) { can.width = sw; can.height = sh; }
-    else { c2.setTransform(1, 0, 0, 1, 0, 0); c2.clearRect(0, 0, sw, sh); }
+    var dpr = this.dpr;
+    var sig = this.L * 0.035 * s.shadow * SHADOW_SOFT;       // the shadows' blur, CSS pixels
+    var sc = clamp(SMALL_SIG / Math.max(0.5, sig), 0.06, 0.5);     // small-picture pixels per CSS pixel
+    var pad = Math.ceil(sig * sc * 3) + 2;
+    var sw = Math.ceil(this.W * sc) + pad * 2, sh = Math.ceil(this.H * sc) + pad * 2;
+    var A = smallCanvas(this, 'shA', sw, sh), B = smallCanvas(this, 'shB', sw, sh), c2 = A._ctx;
     for (var i = 0; i < fish.length; i++) {
       var k = fish[i];
       if (k.dGone >= 1 || k.dShadow <= 0.001) continue;
       var c = k.P[9], se = Object.create(s); se.shadow = k.dShadow;
-      c2.setTransform(sc, 0, 0, sc, this.hw * sc, this.hh * sc);
+      c2.setTransform(sc, 0, 0, sc, this.hw * sc + pad, this.hh * sc + pad);
       c2.translate(c.x, c.y); c2.scale(k.dSc, k.dSc); c2.translate(-c.x, -c.y);
       drawKoiShadow(c2, k, se);
     }
+    blurInto(A, B, sw, sh, sig * sc);
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(can, 0, 0, sw, sh, 0, 0, sw / sc * this.dpr, sh / sc * this.dpr);
+    var k2 = dpr / sc;
+    ctx.drawImage(B, 0, 0, sw, sh, -pad * k2, -pad * k2, sw * k2, sh * k2);
     ctx.restore();
   };
 
@@ -1413,25 +1489,28 @@
         ctx.restore();
         continue;
       }
-      // diving: the blur is made by drawing the koi SMALL on a little
-      // picture and scaling it up smooth (no blur filter: it is far
-      // too slow), then laying it down faded
+      // diving: drawn on a little picture (smaller the blurrier it is, so
+      // about 1.2 of its pixels to the blur), softened with a real blur,
+      // then scaled up and laid down faded. The blur in device pixels is
+      // the same as the old blur filter's.
       var blur = s.deepBlur * zd * dpr * k.sizeK * (this.L / 83);
-      var r = Math.max(1, blur * 2.4), half = k.L * 0.95;
-      var bw = Math.ceil(half * 2 * dpr);                    // the square in device pixels
-      var sw = Math.max(2, Math.ceil(bw / r));
-      if (this.off.width < sw || this.off.height < sw) { this.off.width = Math.max(this.off.width, sw); this.off.height = Math.max(this.off.height, sw); }
-      oc.setTransform(1, 0, 0, 1, 0, 0);
-      oc.clearRect(0, 0, sw, sw);
-      var kk = sw / (half * 2);                             // little-picture pixels per CSS pixel
-      oc.setTransform(kk, 0, 0, kk, 0, 0);
-      oc.translate(half, half); oc.scale(sc, sc); oc.translate(-c.x, -c.y);
-      oc.save(); look.draw(oc, k, se); oc.restore();
+      var half = k.L * 1.35;                                 // the whole koi, tail and fins too
+      var full = half * 2 * dpr;                             // that square in device pixels
+      var q = Math.max(1, blur / SMALL_SIG, full / DIVE_MAX);       // how many times smaller it is drawn
+      var sig = blur / q, pad = Math.ceil(sig * 3) + 2;
+      var inner = Math.ceil(full / q), n = inner + pad * 2;
+      var A = smallCanvas(this, 'dvA', n, n), B = smallCanvas(this, 'dvB', n, n), ac = A._ctx;
+      var kk = inner / (half * 2);                           // little-picture pixels per CSS pixel
+      ac.setTransform(kk, 0, 0, kk, pad, pad);
+      ac.translate(half, half); ac.scale(sc, sc); ac.translate(-c.x, -c.y);
+      ac.save(); look.draw(ac, k, se); ac.restore();
+      blurInto(A, B, n, n, sig);
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
       ctx.globalAlpha = (1 - s.deepFade * Math.min(zd, 1)) * (1 - gone);
-      ctx.drawImage(this.off, 0, 0, sw, sw, Math.round((hw + c.x - half) * dpr), Math.round((hh + c.y - half) * dpr), bw, bw);
+      var qs = full / inner;                                 // device pixels per little-picture pixel
+      ctx.drawImage(B, 0, 0, n, n, (hw + c.x - half) * dpr - pad * qs, (hh + c.y - half) * dpr - pad * qs, n * qs, n * qs);
       ctx.restore();
     }
     this.drawFood(ctx, false);
