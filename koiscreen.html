@@ -168,7 +168,7 @@
     shadow: 1.75, shadowOpacity: 1, shadowFeather: 1,
     foodCount: 6, foodSpread: 0.4, foodDrift: 1, feedSplash: 1, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
     light: 0.24, lightSpeed: 1, tint: 1,
-    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, fnShow: 1, fnY: 0.6, fnReach: 0.21, fnSize: 1, fnTurn: 0, fnNotch: 1.5, fnStand: 1, fnFlow: 1, fnSpeed: 1, fnThrow: 0.9, fnShadow: 1, fnFoam: 1, fnLegWaves: 1, fnSplash: 1, fnRipple: 1, fnAvoid: 0.8, lapEvery: 1.4, lapStart: 0.3, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
+    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, fnShow: 1, fnY: 0.6, fnReach: 0.21, fnSize: 1, fnTurn: 0, fnNotch: 1.5, fnStand: 1, fnFlow: 1, fnSpeed: 1, fnSound: 1, fnThrow: 0.9, fnShadow: 1, fnFoam: 1, fnLegWaves: 1, fnSplash: 1, fnRipple: 1, fnAvoid: 0.8, lapEvery: 1.4, lapStart: 0.3, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
     maxDpr: 2
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
@@ -594,6 +594,7 @@
   }
 
   function drawFountain() {
+    fnSoundLevel();
     var dpr = Math.min(V.maxDpr || 2, window.devicePixelRatio || 1);
     fnCv.width = Math.round(innerWidth * dpr); fnCv.height = Math.round(innerHeight * dpr);
     fxCv.width = fnCv.width; fxCv.height = fnCv.height;
@@ -824,6 +825,69 @@
   });
 
   /* ============================================================
+     3d. THE FOUNTAIN'S SOUND (Sound/fountain01.mp3)
+     The recording (19.3 s of steady trickling water) is made into a
+     seamless endless loop: a few hundredths of a second are cut off each
+     end (the mp3's padding), then its last 2 s are cross-faded into its
+     first 2 s (equal power: the two stretches are unrelated noise, so the
+     level stays even through the join), giving a 17.2 s loop that plays
+     sample-exact with no gap or click (Web Audio, not an <audio> loop,
+     which leaves a gap with mp3s). The recording is very quiet (about
+     -48 LUFS); at volume 1 it is lifted to about -32 LUFS, a soft
+     background bed meant to sit well under music added later.
+     The browser lets sound start only after a touch: it fades in over
+     2 s on the first touch, and fades out when the fountain is hidden or
+     the volume is 0; it is paused while the page is not showing.
+     ============================================================ */
+  var FN_SOUND_URL = 'Sound/fountain01.mp3';
+  var FN_SOUND_GAIN = 6.1;            // about +15.7 dB: -48 LUFS -> about -32 LUFS at volume 1
+  var fnAC = null, fnGain = null, fnSrc = null, fnSoundTried = false;
+  function fnLoopBuffer(ac, b) {
+    var sr = b.sampleRate, edge = Math.round(0.06 * sr), X = Math.round(2 * sr);
+    var n = b.length - 2 * edge, L = n - X;
+    var out = ac.createBuffer(b.numberOfChannels, L, sr);
+    for (var ch = 0; ch < b.numberOfChannels; ch++) {
+      var a = b.getChannelData(ch), o = out.getChannelData(ch), i;
+      for (i = 0; i < L; i++) o[i] = a[edge + i];
+      for (i = 0; i < X; i++) {
+        var t = i / X;
+        o[i] = a[edge + i] * Math.sin(t * Math.PI / 2) + a[edge + L + i] * Math.cos(t * Math.PI / 2);
+      }
+    }
+    return out;
+  }
+  function fnSoundTarget() { return (V.fnShow && fnSrc) ? FN_SOUND_GAIN * (V.fnSound || 0) : 0; }
+  function fnSoundLevel(fade) {
+    if (!fnGain) return;
+    var now = fnAC.currentTime, g = fnGain.gain;
+    g.cancelScheduledValues(now); g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(fnSoundTarget(), now + (fade || 0.4));
+  }
+  function fnSoundStart() {
+    if (fnSoundTried) { if (fnAC && fnAC.state === 'suspended' && !document.hidden) fnAC.resume(); return; }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    fnSoundTried = true;
+    fnAC = new AC();
+    fnGain = fnAC.createGain(); fnGain.gain.value = 0; fnGain.connect(fnAC.destination);
+    fetch(FN_SOUND_URL).then(function (r) { return r.arrayBuffer(); })
+      .then(function (ab) { return new Promise(function (ok, bad) { fnAC.decodeAudioData(ab, ok, bad); }); })
+      .then(function (b) {
+        fnSrc = fnAC.createBufferSource();
+        fnSrc.buffer = fnLoopBuffer(fnAC, b); fnSrc.loop = true;
+        fnSrc.connect(fnGain); fnSrc.start();
+        fnSoundLevel(2);
+      })
+      .catch(function (e) { console.warn('fountain sound:', e); });
+  }
+  ['pointerdown', 'keydown'].forEach(function (ev) { window.addEventListener(ev, fnSoundStart, true); });
+  document.addEventListener('visibilitychange', function () {
+    if (!fnAC) return;
+    if (document.hidden) fnAC.suspend(); else fnAC.resume();
+  });
+  window.koiSound = function () { return { state: fnAC && fnAC.state, playing: !!fnSrc, loopSeconds: fnSrc ? fnSrc.buffer.duration : 0, gain: fnGain ? fnGain.gain.value : 0, target: fnSoundTarget() }; };
+
+  /* ============================================================
      4. THE PANEL
      ============================================================ */
   var body = document.getElementById('kpBody');
@@ -897,6 +961,7 @@
     { k: 'fnSplash', l: 'Splash: drops thrown up where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
     { k: 'fnRipple', l: 'Rings spreading from where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
     { k: 'fnFoam', l: 'Foam and bubbles where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
+    { k: 'fnSound', l: 'Sound of the water: volume (0 = off; 1 = a soft background under music)', min: 0, max: 2, step: 0.05, re: 'sound' },
     { k: 'fnLegWaves', l: 'Waves round the stand where its poles go into the water', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
     { k: 'fnAvoid', l: 'Koi keep this far from where it lands (× koi length)', min: 0, max: 2, step: 0.05, re: 'fountain' },
     { k: 'maxDpr', l: 'Sharpness (device pixels per pixel, lower is lighter work)', min: 1, max: 3, step: 0.5, re: 'set' }
@@ -945,6 +1010,7 @@
       if (c.re === 'water') applyWater();
       else if (c.re === 'rocks') drawRocks();
       else if (c.re === 'fountain') drawFountain();
+      else if (c.re === 'sound') fnSoundLevel();
       else { var o = {}; o[c.k === 'rkGap' ? 'floorGap' : c.k] = V[c.k]; pond.set(o); if (c.re === 'reset') pond.reset(); if (c.k === 'maxDpr' || c.k === 'length' || c.k === 'sizeVary') { drawRocks(); drawFountain(); } }
     });
     inputs[c.k] = { inp: inp, out: out };
