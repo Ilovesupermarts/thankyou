@@ -4236,6 +4236,7 @@ function loadAllPanels() {
   return Promise.all([
     loadPanelInto('panel1Body', 'panel-1.html'),
     loadPanelInto('panel2Body', 'panel-2.html'),
+    loadPanelInto('panel2bBody', 'panel-2b.html'),
     loadPanelHtml('panel-3.html').then(function(html) { panel3DefaultHtml = html; }),
     loadPanelHtml('panel-3-no.html').then(function(html) { panel3NoHtml = html; }),
     loadPanelInto('panel4Body', 'panel-4.html')
@@ -4548,7 +4549,7 @@ var therapistDisplayName = '桜庭さん';
 var tableUnlocked = false;
 var tableVisited = false;
 var currentPanel = 0;
-var totalPanels = 6;
+var totalPanels = 7;
 var rejected = false;
 var confirmedTipAmount = 1500;
 var firstServiceInReceipt = false;
@@ -8548,7 +8549,7 @@ function confirmName() {
   var panel3Anchor = document.getElementById('panel3Body');
   if (panel3Anchor) {
     panel3Anchor.innerHTML = anyPresetSelected ? panel3DefaultHtml : panel3NoHtml;
-    var p3Panel = document.querySelector('.panel[data-panel="3"]');
+    var p3Panel = document.querySelector('.panel[data-panel="4"]');
     if (p3Panel) preparePanel(p3Panel);
   }
 
