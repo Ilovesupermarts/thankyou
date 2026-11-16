@@ -637,12 +637,7 @@
     // the notch: an oval opening on the spout's top, the cut face round it, the hollow deep at its back end
     var nl = V.fnNotch * u, oc = G.P(nl * 0.6, 0);
     fnOpenEnd(c, oc, G.a + Math.PI, nl * 0.6, u * 0.43, -0.45);
-    // the water in it, running out to the tip
-    c.save(); c.translate(oc.x, oc.y); c.rotate(G.a + Math.PI);
-    var wg = c.createLinearGradient(-nl * 0.3, 0, nl * 0.55, 0);
-    wg.addColorStop(0, 'rgba(200, 220, 228, 0)'); wg.addColorStop(0.55, 'rgba(210, 228, 236, 0.45)'); wg.addColorStop(1, 'rgba(240, 248, 252, 0.8)');
-    c.beginPath(); c.ellipse(nl * 0.15, 0, nl * 0.4, u * 0.17, 0, 0, Math.PI * 2); c.fillStyle = wg; c.fill();
-    c.restore();
+    // (the water in it is drawn each frame with the stream, as one body: fnFrame)
     // the rope round the spout and the crossing
     if (V.fnStand) fnRope(c, G, PC.along, PC.legs);
     // the koi keep out of where the water lands
@@ -666,30 +661,42 @@
     var G = FN, u = G.u, t = now / 1000, M = G.lip, Lp = G.land, flow = V.fnFlow;
     var out = { x: -G.ex.x, y: -G.ex.y }, nrm = { x: G.ey.x, y: G.ey.y };
     var dist = Math.hypot(Lp.x - M.x, Lp.y - M.y);
-    // the stream: a glassy tongue from the tip out to where it plunges, narrowing as it
-    // falls away from you, a bright line and streaks running out along it
-    var N = 16, pts = [];
-    for (var i = 0; i <= N; i++) {
-      var s = i / N, w = u * 0.22 * flow * (1 - 0.45 * s) + 0.5;
-      var wob = Math.sin(t * 8 + s * 9) * w * 0.18 * s;
-      pts.push({ x: M.x + out.x * dist * s + nrm.x * wob, y: M.y + out.y * dist * s + nrm.y * wob, w: w });
+    // the water: ONE body, from the back of the hollow down the notch, over the tip and
+    // out to where it plunges. One width all along (it follows the flow's strength but is
+    // never wider than the hollow it comes from); in the hollow it narrows to the hollow's
+    // own round back; past the tip it narrows a little as it falls away from you.
+    var nl = V.fnNotch * u, hc = nl * 0.6, hrx = nl * 0.48, hry = u * 0.43 * 0.76;
+    var w0 = Math.min(hry * 0.88, u * (0.07 + 0.07 * flow));
+    var lip0 = u * 0.08, back = hc + hrx * 0.94;
+    var Ni = 8, N = 16, pts = [];
+    for (var i = 0; i <= Ni; i++) {                       // in the hollow, back to the tip
+      var lx = back + (lip0 - back) * (i / Ni), w = w0;
+      if (lx > hc) { var e = (lx - hc) / hrx; w = Math.min(w0, hry * 0.9 * Math.sqrt(Math.max(0, 1 - e * e))); }
+      var P0 = G.P(lx, 0); pts.push({ x: P0.x, y: P0.y, w: Math.max(0.3, w) });
     }
+    for (i = 1; i <= N; i++) {                            // out over the tip to the water
+      var s = i / N, ws = w0 * (1 - 0.4 * s) + 0.3;
+      var wob = Math.sin(t * 8 + s * 9) * ws * 0.18 * s;
+      pts.push({ x: M.x + out.x * dist * s + nrm.x * wob, y: M.y + out.y * dist * s + nrm.y * wob, w: ws });
+    }
+    var NT = pts.length - 1, Bk = pts[0], fi = Ni / NT;
     c.save();
     c.beginPath();
     pts.forEach(function (p, k) { var X = p.x + nrm.x * p.w, Y = p.y + nrm.y * p.w; if (k) c.lineTo(X, Y); else c.moveTo(X, Y); });
-    for (i = N; i >= 0; i--) { var p = pts[i]; c.lineTo(p.x - nrm.x * p.w, p.y - nrm.y * p.w); }
+    for (i = NT; i >= 0; i--) { var p = pts[i]; c.lineTo(p.x - nrm.x * p.w, p.y - nrm.y * p.w); }
     c.closePath();
-    var sg = c.createLinearGradient(M.x, M.y, Lp.x, Lp.y);
-    sg.addColorStop(0, 'rgba(228, 242, 250, 0.8)'); sg.addColorStop(1, 'rgba(240, 248, 252, 0.95)');
+    var sg = c.createLinearGradient(Bk.x, Bk.y, Lp.x, Lp.y);
+    sg.addColorStop(0, 'rgba(200, 220, 228, 0)'); sg.addColorStop(fi * 0.45, 'rgba(210, 228, 236, 0.5)');
+    sg.addColorStop(fi, 'rgba(228, 242, 250, 0.8)'); sg.addColorStop(1, 'rgba(240, 248, 252, 0.95)');
     c.fillStyle = sg; c.fill();
     c.lineWidth = 0.8; c.strokeStyle = 'rgba(150, 100, 60, 0.25)'; c.stroke();
     c.lineCap = 'round';
     for (var k = 0; k < 5; k++) {
       var off = (k / 4 - 0.5) * 1.2, ph = (t * 1.8 * (0.5 + 0.5 * flow) * (0.85 + k * 0.08) + k * 0.31) % 1;
-      var a0 = Math.min(N, Math.floor(ph * N)), a1 = Math.min(N, a0 + 3);
+      var a0 = Math.min(NT, Math.floor(ph * NT)), a1 = Math.min(NT, a0 + 4);
       c.beginPath();
       for (var j = a0; j <= a1; j++) { var q = pts[j], X2 = q.x + nrm.x * q.w * off, Y2 = q.y + nrm.y * q.w * off; if (j === a0) c.moveTo(X2, Y2); else c.lineTo(X2, Y2); }
-      c.lineWidth = 1; c.strokeStyle = 'rgba(255, 255, 255, 0.75)'; c.stroke();
+      c.lineWidth = 1; c.strokeStyle = 'rgba(255, 255, 255, ' + (a0 < Ni ? 0.45 : 0.75) + ')'; c.stroke();
     }
     // where it plunges: a white boil of foam, bubbles circling out round it
     var fr = u * 0.5 * (0.6 + 0.4 * flow) * (0.5 + 0.5 * V.fnFoam), foam = V.fnFoam;
