@@ -168,7 +168,7 @@
     shadow: 1.75, shadowOpacity: 1, shadowFeather: 1,
     foodCount: 6, foodSpread: 0.4, foodDrift: 1, feedSplash: 1, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
     light: 0.24, lightSpeed: 1, tint: 1,
-    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, fnShow: 1, fnY: 0.6, fnReach: 0.21, fnSize: 1, fnTurn: 0, fnNotch: 1.5, fnStand: 1, fnFlow: 1, fnThrow: 0.9, fnShadow: 1, fnFoam: 1, fnLegWaves: 1, fnSplash: 1, fnRipple: 1, fnAvoid: 0.8, lapEvery: 1.4, lapStart: 0.3, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
+    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, fnShow: 1, fnY: 0.6, fnReach: 0.21, fnSize: 1, fnTurn: 0, fnNotch: 1.5, fnStand: 1, fnFlow: 1, fnSpeed: 1, fnThrow: 0.9, fnShadow: 1, fnFoam: 1, fnLegWaves: 1, fnSplash: 1, fnRipple: 1, fnAvoid: 0.8, lapEvery: 1.4, lapStart: 0.3, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
     maxDpr: 2
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
@@ -692,7 +692,7 @@
     c.lineWidth = 0.8; c.strokeStyle = 'rgba(150, 100, 60, 0.25)'; c.stroke();
     c.lineCap = 'round';
     for (var k = 0; k < 5; k++) {
-      var off = (k / 4 - 0.5) * 1.2, ph = (t * 1.8 * (0.5 + 0.5 * flow) * (0.85 + k * 0.08) + k * 0.31) % 1;
+      var off = (k / 4 - 0.5) * 1.2, ph = (t * 1.8 * (0.5 + 0.5 * V.fnSpeed) * (0.85 + k * 0.08) + k * 0.31) % 1;
       var a0 = Math.min(NT, Math.floor(ph * NT)), a1 = Math.min(NT, a0 + 4);
       c.beginPath();
       for (var j = a0; j <= a1; j++) { var q = pts[j], X2 = q.x + nrm.x * q.w * off, Y2 = q.y + nrm.y * q.w * off; if (j === a0) c.moveTo(X2, Y2); else c.lineTo(X2, Y2); }
@@ -715,7 +715,7 @@
     // out over the water, a little larger and with their shadow further off while high)
     var rate = 46 * V.fnSplash * flow, nn = Math.floor(rate * dt + Math.random());
     for (k = 0; k < nn && fnDrops.length < 140; k++) {
-      var sa = Math.random() * Math.PI * 2, sp = u * (0.5 + Math.random() * 1.5) * (0.6 + 0.4 * flow);
+      var sa = Math.random() * Math.PI * 2, sp = u * (0.5 + Math.random() * 1.5) * (0.6 + 0.4 * V.fnSpeed);
       fnDrops.push({ x: Lp.x + Math.cos(sa) * fr * 0.3, y: Lp.y + Math.sin(sa) * fr * 0.3, vx: Math.cos(sa) * sp, vy: Math.sin(sa) * sp,
                      h: 0, vh: u * (1.5 + Math.random() * 2), r: u * (0.02 + Math.random() * 0.035) });
     }
@@ -800,7 +800,7 @@
     if (V.fnRipple > 0) {
       fnRingT -= dt;
       if (fnRingT <= 0) {
-        fnRingT = (0.16 + Math.random() * 0.14) / (V.fnRipple * (0.5 + 0.5 * flow));
+        fnRingT = (0.16 + Math.random() * 0.14) / (V.fnRipple * (0.5 + 0.5 * V.fnSpeed));
         var P0 = pond.pond;
         if (P0.rings.length < 70) P0.rings.push({ x: Lp.x - P0.hw + (Math.random() - 0.5) * fr, y: Lp.y - P0.hh + (Math.random() - 0.5) * fr, t: 0, L: P0.L * (0.7 + Math.random() * 0.6) });
       }
@@ -879,7 +879,8 @@
     { k: 'fnStand', l: 'Crossed stand with rope (1 = on, 0 = off)', min: 0, max: 1, step: 1, re: 'fountain' },
     { k: 'fnShadow', l: 'Shadow of the bamboo on the water', min: 0, max: 2, step: 0.05, re: 'fountain' },
     { g: 'Bamboo fountain (筧): the flow and the water' },
-    { k: 'fnFlow', l: 'Strength of the flow (the stream’s width, speed and reach, how hard it splashes)', min: 0.2, max: 2.5, step: 0.05, re: 'fountain' },
+    { k: 'fnFlow', l: 'Strength of the flow (the stream’s width and reach, how much it splashes)', min: 0.2, max: 2.5, step: 0.05, re: 'fountain' },
+    { k: 'fnSpeed', l: 'Speed of the flow (how fast the water runs, the splash drops fly and the rings come; 1 = as it was at strength 1)', min: 0.2, max: 2.5, step: 0.05, re: 'fountain' },
     { k: 'fnThrow', l: 'How far out past the tip it lands (× thickness, at strength 1)', min: 0.2, max: 3, step: 0.05, re: 'fountain' },
     { k: 'fnSplash', l: 'Splash: drops thrown up where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
     { k: 'fnRipple', l: 'Rings spreading from where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
