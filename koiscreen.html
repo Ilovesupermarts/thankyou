@@ -168,7 +168,7 @@
     shadow: 1.75, shadowOpacity: 1, shadowFeather: 1,
     foodCount: 6, foodSpread: 0.4, foodDrift: 1, feedSplash: 1, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
     light: 0.24, lightSpeed: 1, tint: 1,
-    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, fnShow: 1, fnY: 0.6, fnReach: 0.21, fnSize: 1, fnTurn: 0, fnNotch: 1.5, fnStand: 1, fnFlow: 1, fnThrow: 0.9, fnShadow: 1, fnSplash: 1, fnRipple: 1, fnAvoid: 0.8, lapEvery: 1.4, lapStart: 0.3, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
+    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, fnShow: 1, fnY: 0.6, fnReach: 0.21, fnSize: 1, fnTurn: 0, fnNotch: 1.5, fnStand: 1, fnFlow: 1, fnThrow: 0.9, fnShadow: 1, fnFoam: 1, fnLegWaves: 1, fnSplash: 1, fnRipple: 1, fnAvoid: 0.8, lapEvery: 1.4, lapStart: 0.3, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
     maxDpr: 2
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
@@ -465,6 +465,7 @@
   var FN_NODES = [0.165, 0.418, 0.675, 0.923], FN_X0 = 18 / 216, FN_X1 = 210 / 216;
   var fnCv = document.getElementById('fountain'), fxCv = document.getElementById('fnFx');
   var FN = null;            // the fountain's geometry, worked out from the screen and the settings
+  var FN_WATERLINE = 0.66;  // how far from the crossing to its foot each pole goes into the water
 
   // Everything seen from straight above, as the rest of the pond: the spout
   // lies flat over the water, its slanting notch an oval opening on its top
@@ -483,7 +484,7 @@
     var len = (W - E.x) / Math.max(0.2, Math.cos(a)) + u * 1.5;
     var P = function (lx, ly) { return { x: E.x + ex.x * lx + ey.x * ly, y: E.y + ex.y * lx + ey.y * ly }; };
     var lip = P(u * 0.08, 0);                               // the water runs out over the tip
-    var land = P(-u * V.fnThrow, 0);                        // and falls a little way out beyond it
+    var land = P(-u * V.fnThrow * (0.45 + 0.55 * V.fnFlow), 0);                        // and falls a little way out beyond it
     var cross = P(len * 0.42 + u * 0.4, 0);                 // where the poles cross, right under the spout
     return { W: W, H: H, u: u, a: a, ex: ex, ey: ey, E: E, len: len, P: P, lip: lip, land: land, cross: cross };
   }
@@ -618,7 +619,8 @@
         p.draw(c);
         // the pole goes down into the water: toward its foot the water's colour over it
         var Lg = p.leg, g = c.createLinearGradient(G.cross.x, G.cross.y, Lg.foot.x, Lg.foot.y);
-        g.addColorStop(0, 'rgba(253, 238, 225, 0)'); g.addColorStop(0.45, 'rgba(253, 238, 225, 0.15)'); g.addColorStop(1, 'rgba(250, 232, 218, 0.75)');
+        g.addColorStop(0, 'rgba(253, 238, 225, 0)'); g.addColorStop(FN_WATERLINE - 0.02, 'rgba(253, 238, 225, 0.05)');
+        g.addColorStop(FN_WATERLINE + 0.03, 'rgba(252, 236, 222, 0.42)'); g.addColorStop(0.88, 'rgba(250, 232, 218, 0.85)'); g.addColorStop(1, 'rgba(250, 232, 218, 1)');
         c.save(); c.globalCompositeOperation = 'source-atop'; c.fillStyle = g; c.fillRect(0, 0, innerWidth, innerHeight); c.restore();
       } else p.draw(c);
     });
@@ -634,6 +636,11 @@
     // the rope round the spout and the crossing
     if (V.fnStand) fnRope(c, G, PC.along, PC.legs);
     // the koi keep out of where the water lands
+    // where each pole goes into the water (its waves are drawn each frame)
+    G.legs = PC.legs.map(function (Lg) {
+      var dx = Lg.foot.x - G.cross.x, dy = Lg.foot.y - G.cross.y, l = Math.hypot(dx, dy);
+      return { x: G.cross.x + dx * FN_WATERLINE, y: G.cross.y + dy * FN_WATERLINE, d: { x: dx / l, y: dy / l }, w: u * 0.62, seed: Lg.sd };
+    });
     pond.set({ fountain: { x: G.land.x, y: G.land.y, r: (pond.info().length || 100) * V.fnAvoid } });
   }
 
@@ -668,18 +675,18 @@
     c.lineWidth = 0.8; c.strokeStyle = 'rgba(150, 100, 60, 0.25)'; c.stroke();
     c.lineCap = 'round';
     for (var k = 0; k < 5; k++) {
-      var off = (k / 4 - 0.5) * 1.2, ph = (t * 1.8 * (0.85 + k * 0.08) + k * 0.31) % 1;
+      var off = (k / 4 - 0.5) * 1.2, ph = (t * 1.8 * (0.5 + 0.5 * flow) * (0.85 + k * 0.08) + k * 0.31) % 1;
       var a0 = Math.min(N, Math.floor(ph * N)), a1 = Math.min(N, a0 + 3);
       c.beginPath();
       for (var j = a0; j <= a1; j++) { var q = pts[j], X2 = q.x + nrm.x * q.w * off, Y2 = q.y + nrm.y * q.w * off; if (j === a0) c.moveTo(X2, Y2); else c.lineTo(X2, Y2); }
       c.lineWidth = 1; c.strokeStyle = 'rgba(255, 255, 255, 0.75)'; c.stroke();
     }
     // where it plunges: a white boil of foam, bubbles circling out round it
-    var fr = u * 0.5 * (0.6 + 0.4 * flow);
+    var fr = u * 0.5 * (0.6 + 0.4 * flow) * (0.5 + 0.5 * V.fnFoam), foam = V.fnFoam;
     var g = c.createRadialGradient(Lp.x, Lp.y, 0, Lp.x, Lp.y, fr * 1.5);
-    g.addColorStop(0, 'rgba(255, 255, 255, 0.85)'); g.addColorStop(0.5, 'rgba(255, 255, 255, 0.4)'); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    g.addColorStop(0, 'rgba(255, 255, 255, ' + Math.min(1, 0.85 * foam).toFixed(3) + ')'); g.addColorStop(0.5, 'rgba(255, 255, 255, ' + Math.min(1, 0.4 * foam).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
     c.fillStyle = g; c.beginPath(); c.arc(Lp.x, Lp.y, fr * 1.5, 0, Math.PI * 2); c.fill();
-    for (k = 0; k < 16; k++) {
+    for (k = 0; k < Math.round(16 * foam); k++) {
       var life = (t * 0.45 + k * 0.618) % 1;                       // each bubble drifts out and pops
       var ba = k * 2.39996 + Math.sin(t * 0.7 + k) * 0.3, br = fr * (0.4 + 1.4 * life);
       var bx = Lp.x + Math.cos(ba) * br, by = Lp.y + Math.sin(ba) * br, rr = u * (0.018 + 0.03 * ((k * 0.37) % 1));
@@ -691,7 +698,7 @@
     // out over the water, a little larger and with their shadow further off while high)
     var rate = 46 * V.fnSplash * flow, nn = Math.floor(rate * dt + Math.random());
     for (k = 0; k < nn && fnDrops.length < 140; k++) {
-      var sa = Math.random() * Math.PI * 2, sp = u * (0.5 + Math.random() * 1.5);
+      var sa = Math.random() * Math.PI * 2, sp = u * (0.5 + Math.random() * 1.5) * (0.6 + 0.4 * flow);
       fnDrops.push({ x: Lp.x + Math.cos(sa) * fr * 0.3, y: Lp.y + Math.sin(sa) * fr * 0.3, vx: Math.cos(sa) * sp, vy: Math.sin(sa) * sp,
                      h: 0, vh: u * (1.5 + Math.random() * 2), r: u * (0.02 + Math.random() * 0.035) });
     }
@@ -708,11 +715,75 @@
       c.beginPath(); c.arc(dr.x, dr.y, dr.r * (1 + up * 0.25), 0, Math.PI * 2); c.fillStyle = 'rgba(255, 255, 255, 0.95)'; c.fill();
     }
     c.restore();
+    // where each pole of the stand goes into the water: the water heaps against
+    // it and runs round it in a wavy line, and little waves spread out from it
+    if (V.fnStand && G.legs && V.fnLegWaves > 0) {
+      var lw = V.fnLegWaves;
+      G.legs.forEach(function (W) {
+        var ang = Math.atan2(W.d.y, W.d.x), rA = W.w * 0.62, rB = W.w * 0.5;   // the pole cut by the water: an ellipse along it
+        c.save(); c.translate(W.x, W.y); c.rotate(ang);
+        // (local: x along the pole toward its foot, under the water; x < 0 is the dry part
+        // above the water, which nothing of the water may be drawn over)
+        c.save();
+        c.beginPath(); c.rect(-W.w * 40, -W.w * 40, W.w * 80, W.w * 80); c.rect(-W.w * 6, -W.w * 0.52, W.w * 6, W.w * 1.04);
+        c.clip('evenodd');
+        // spreading wavelets, each a little wavy, fading as it grows (over the water and the pole under it)
+        for (var q = 0; q < 3; q++) {
+          var ph = (t * 0.55 + q / 3 + W.seed * 0.17) % 1, gr = 1 + ph * 2.2;
+          c.beginPath();
+          for (var m = 0; m <= 40; m++) {
+            var th = m / 40 * Math.PI * 2, wv = 1 + 0.045 * Math.sin(th * 5 + t * 3 + q) + 0.03 * Math.sin(th * 3 - t * 2);
+            var X = Math.cos(th) * rA * gr * wv, Y = Math.sin(th) * rB * gr * wv;
+            if (m) c.lineTo(X, Y); else c.moveTo(X, Y);
+          }
+          c.lineWidth = Math.max(0.6, W.w * 0.06 * (1 - ph));
+          c.strokeStyle = 'rgba(186, 88, 36, ' + (0.16 * (1 - ph) * lw).toFixed(3) + ')'; c.stroke();
+          c.save(); c.translate(-0.6, -0.8);
+          c.strokeStyle = 'rgba(255, 255, 255, ' + Math.min(1, 0.75 * (1 - ph) * lw).toFixed(3) + ')'; c.stroke();
+          c.restore();
+        }
+        // the water heaped against each side of the pole: a small bright wavy bulge
+        [-1, 1].forEach(function (sd) {
+          // (in short pieces, each as bright as the bulge is high there, so it fades at both ends)
+          var prev = null;
+          c.lineCap = 'round';
+          for (var m2 = 0; m2 <= 18; m2++) {
+            var s2 = m2 / 18, xx = s2 * W.w * 0.9;
+            var hgt = Math.sin(Math.PI * s2) * (1 + 0.3 * Math.sin(t * 5 + s2 * 6 + sd));
+            var yy = sd * (W.w * 0.5 + W.w * 0.11 * hgt);
+            if (prev) {
+              c.beginPath(); c.moveTo(prev.x, prev.y); c.lineTo(xx, yy);
+              c.lineWidth = Math.max(0.8, W.w * 0.06); c.strokeStyle = 'rgba(255, 255, 255, ' + Math.min(1, 0.8 * lw * Math.max(0, hgt)).toFixed(3) + ')'; c.stroke();
+            }
+            prev = { x: xx, y: yy };
+          }
+        });
+        // a few flecks of foam caught round it
+        for (m = 0; m < 7; m++) {
+          var fa = m * 0.9 - 1.5 + Math.sin(t * 1.7 + m) * 0.35, fd = 1.15 + 0.15 * Math.sin(t * 2.3 + m * 2);
+          c.beginPath(); c.arc(Math.cos(fa) * rA * fd, Math.sin(fa) * rB * fd, Math.max(0.6, W.w * 0.035), 0, Math.PI * 2);
+          c.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, 0.85 * lw).toFixed(3) + ')'; c.fill();
+        }
+        c.restore();
+        // the waterline across the pole: wavy, bright, with the water's shade just under it
+        c.beginPath();
+        for (m = 0; m <= 20; m++) {
+          var s3 = m / 20, yy3 = (s3 - 0.5) * W.w * 1.08;
+          var xx3 = W.w * 0.1 * Math.cos(Math.PI * (s3 - 0.5)) + W.w * 0.04 * Math.sin(t * 5 + s3 * 9);
+          if (m) c.lineTo(xx3, yy3); else c.moveTo(xx3, yy3);
+        }
+        c.lineWidth = Math.max(1, W.w * 0.09); c.strokeStyle = 'rgba(255, 255, 255, ' + Math.min(1, 0.85 * lw).toFixed(3) + ')'; c.stroke();
+        c.save(); c.translate(W.w * 0.07, 0);
+        c.lineWidth = Math.max(0.8, W.w * 0.07); c.strokeStyle = 'rgba(186, 88, 36, ' + (0.22 * lw).toFixed(3) + ')'; c.stroke();
+        c.restore();
+        c.restore();
+      });
+    }
     // rings spreading over the pond from where it lands
     if (V.fnRipple > 0) {
       fnRingT -= dt;
       if (fnRingT <= 0) {
-        fnRingT = (0.16 + Math.random() * 0.14) / V.fnRipple;
+        fnRingT = (0.16 + Math.random() * 0.14) / (V.fnRipple * (0.5 + 0.5 * flow));
         var P0 = pond.pond;
         if (P0.rings.length < 70) P0.rings.push({ x: Lp.x - P0.hw + (Math.random() - 0.5) * fr, y: Lp.y - P0.hh + (Math.random() - 0.5) * fr, t: 0, L: P0.L * (0.7 + Math.random() * 0.6) });
       }
@@ -781,19 +852,22 @@
     { k: 'koiWake', l: 'Waves from koi swimming near the rocks', min: 0, max: 2, step: 0.05, re: 'set' },
     { k: 'rkShade', l: 'Shade on the water along the rocks', min: 0, max: 1, step: 0.05, re: 'rocks' },
     { k: 'rkTone', l: 'Rocks warmed toward the water’s colour', min: 0, max: 0.6, step: 0.01, re: 'rocks' },
-    { g: 'Bamboo fountain (筧)' },
+    { g: 'Bamboo fountain (筧): where it is and how it looks' },
     { k: 'fnShow', l: 'Show the fountain (1 = on, 0 = off)', min: 0, max: 1, step: 1, re: 'fountain' },
-    { k: 'fnY', l: 'Height of the spout (share of the screen’s height)', min: 0.15, max: 0.85, step: 0.005, re: 'fountain' },
-    { k: 'fnReach', l: 'How far it reaches in from the right edge (share of the width)', min: 0.08, max: 0.45, step: 0.005, re: 'fountain' },
-    { k: 'fnSize', l: 'Thickness of the bamboo', min: 0.5, max: 2, step: 0.05, re: 'fountain' },
+    { k: 'fnY', l: 'Position: how far down the screen (share of its height)', min: 0.1, max: 0.85, step: 0.005, re: 'fountain' },
+    { k: 'fnReach', l: 'Position: how far in from the right edge (share of its width)', min: 0.08, max: 0.6, step: 0.005, re: 'fountain' },
     { k: 'fnTurn', l: 'Which way the spout points (degrees, + = turned up the screen)', min: -45, max: 45, step: 0.5, re: 'fountain' },
+    { k: 'fnSize', l: 'Thickness of the bamboo', min: 0.5, max: 2, step: 0.05, re: 'fountain' },
     { k: 'fnNotch', l: 'Length of the slanted notch (× thickness)', min: 0.5, max: 3, step: 0.05, re: 'fountain' },
     { k: 'fnStand', l: 'Crossed stand with rope (1 = on, 0 = off)', min: 0, max: 1, step: 1, re: 'fountain' },
-    { k: 'fnFlow', l: 'How much water runs', min: 0.3, max: 2, step: 0.05, re: 'fountain' },
-    { k: 'fnThrow', l: 'How far out past the tip the water lands (× thickness)', min: 0.2, max: 3, step: 0.05, re: 'fountain' },
     { k: 'fnShadow', l: 'Shadow of the bamboo on the water', min: 0, max: 2, step: 0.05, re: 'fountain' },
-    { k: 'fnSplash', l: 'Splash', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
-    { k: 'fnRipple', l: 'Rings from where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
+    { g: 'Bamboo fountain (筧): the flow and the water' },
+    { k: 'fnFlow', l: 'Strength of the flow (the stream’s width, speed and reach, how hard it splashes)', min: 0.2, max: 2.5, step: 0.05, re: 'fountain' },
+    { k: 'fnThrow', l: 'How far out past the tip it lands (× thickness, at strength 1)', min: 0.2, max: 3, step: 0.05, re: 'fountain' },
+    { k: 'fnSplash', l: 'Splash: drops thrown up where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
+    { k: 'fnRipple', l: 'Rings spreading from where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
+    { k: 'fnFoam', l: 'Foam and bubbles where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
+    { k: 'fnLegWaves', l: 'Waves round the stand where its poles go into the water', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
     { k: 'fnAvoid', l: 'Koi keep this far from where it lands (× koi length)', min: 0, max: 2, step: 0.05, re: 'fountain' },
     { k: 'maxDpr', l: 'Sharpness (device pixels per pixel, lower is lighter work)', min: 1, max: 3, step: 0.5, re: 'set' }
   ];
