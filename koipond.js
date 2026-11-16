@@ -1771,6 +1771,15 @@
       ctx.drawImage(B, 0, 0, nw, nh, (hw + bx0) * dpr - pad * q, (hh + by0) * dpr - pad * q, nw * q, nh * q);
       ctx.restore();
     }
+    // s.hide (koiscreen.html): a picture as large as the screen of what stands over
+    // the water and hides the koi (the fountain's poles where they go into the water):
+    // the koi and their shadows are cut out there, so none shows through
+    if (s.hide) {
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.drawImage(s.hide, 0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
+    }
     this.drawFood(ctx, false);
     this.drawLaps(ctx);
     // rings on the water where a koi gulped air or took food

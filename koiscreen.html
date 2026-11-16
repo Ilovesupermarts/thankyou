@@ -599,7 +599,7 @@
     fxCv.width = fnCv.width; fxCv.height = fnCv.height;
     var c = fnCv.getContext('2d');
     c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, innerWidth, innerHeight);
-    if (!V.fnShow || !fnLoaded) { FN = null; pond.set({ fountain: null }); return; }
+    if (!V.fnShow || !fnLoaded) { FN = null; pond.set({ fountain: null, hide: null }); return; }
     FN = fnGeometry();
     var G = FN, u = G.u, PC = fnPieces(G);
     c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
@@ -614,6 +614,10 @@
       c.filter = 'blur(' + (u * 0.22 * dpr).toFixed(1) + 'px)'; c.globalAlpha = 0.3 * V.fnShadow;
       c.drawImage(sc, u * 0.45 * dpr, u * 0.8 * dpr); c.restore();
     }
+    // where the poles stand in the water: a mask the pond cuts the koi out of, so no
+    // part of a koi shows through a pole's underwater part (it fades toward its foot)
+    var hide = document.createElement('canvas'); hide.width = fnCv.width; hide.height = fnCv.height;
+    var hx = hide.getContext('2d');
     PC.list.forEach(function (p) {
       if (p.kind === 'leg') {
         // the pole goes down into the water: drawn on a picture of its own, the
@@ -623,6 +627,14 @@
         var Lg = p.leg, tc = document.createElement('canvas'); tc.width = fnCv.width; tc.height = fnCv.height;
         var tx = tc.getContext('2d'); tx.setTransform(dpr, 0, 0, dpr, 0, 0); tx.imageSmoothingQuality = 'high';
         p.draw(tx);
+        // the mask: the pole's own outline, solid wherever any of the pole shows,
+        // fading only where the pole itself has faded to nothing
+        var mc = document.createElement('canvas'); mc.width = fnCv.width; mc.height = fnCv.height;
+        var mx = mc.getContext('2d'); mx.drawImage(tc, 0, 0);
+        var mg = mx.createLinearGradient(G.cross.x * dpr, G.cross.y * dpr, Lg.foot.x * dpr, Lg.foot.y * dpr);
+        mg.addColorStop(0, 'rgba(0, 0, 0, 1)'); mg.addColorStop(0.72, 'rgba(0, 0, 0, 1)'); mg.addColorStop(0.8, 'rgba(0, 0, 0, 0)'); mg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        mx.globalCompositeOperation = 'destination-in'; mx.fillStyle = mg; mx.fillRect(0, 0, mc.width, mc.height);
+        hx.drawImage(mc, 0, 0);
         var g = tx.createLinearGradient(G.cross.x, G.cross.y, Lg.foot.x, Lg.foot.y), wl = FN_WATERLINE;
         g.addColorStop(0, 'rgba(253, 238, 225, 0)'); g.addColorStop(wl - 0.01, 'rgba(253, 238, 225, 0.04)');
         g.addColorStop(wl + 0.04, 'rgba(252, 236, 222, 0.38)'); g.addColorStop(0.75, 'rgba(250, 232, 218, 0.7)'); g.addColorStop(1, 'rgba(250, 232, 218, 0.9)');
@@ -646,7 +658,7 @@
       var dx = Lg.foot.x - G.cross.x, dy = Lg.foot.y - G.cross.y, l = Math.hypot(dx, dy);
       return { x: G.cross.x + dx * FN_WATERLINE, y: G.cross.y + dy * FN_WATERLINE, d: { x: dx / l, y: dy / l }, w: u * 0.62, seed: Lg.sd };
     });
-    pond.set({ fountain: { x: G.land.x, y: G.land.y, r: (pond.info().length || 100) * V.fnAvoid } });
+    pond.set({ fountain: { x: G.land.x, y: G.land.y, r: (pond.info().length || 100) * V.fnAvoid }, hide: V.fnStand ? hide : null });
   }
 
   // ---- the water, each frame (seen from above) ----
