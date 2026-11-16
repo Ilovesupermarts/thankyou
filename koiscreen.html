@@ -465,7 +465,7 @@
   var FN_NODES = [0.165, 0.418, 0.675, 0.923], FN_X0 = 18 / 216, FN_X1 = 210 / 216;
   var fnCv = document.getElementById('fountain'), fxCv = document.getElementById('fnFx');
   var FN = null;            // the fountain's geometry, worked out from the screen and the settings
-  var FN_WATERLINE = 0.66;  // how far from the crossing to its foot each pole goes into the water
+  var FN_WATERLINE = 0.45;  // how far from the crossing to its foot each pole goes into the water
 
   // Everything seen from straight above, as the rest of the pond: the spout
   // lies flat over the water, its slanting notch an oval opening on its top
@@ -554,7 +554,7 @@
       // that side (down in the water) and its top a little out on the other
       [[-1, 0.3, 0.98, 0.3], [1, 0.12, 0.8, -0.3]].forEach(function (Lg) {
         var sd = Lg[0], skew = Lg[3];
-        var foot = G.P(along + skew * u * 2.4, sd * u * 2.6), top = G.P(along - skew * u * 0.55, -sd * u * 0.95);
+        var foot = G.P(along + skew * u * 3.5, sd * u * 3.8), top = G.P(along - skew * u * 0.55, -sd * u * 0.95);
         legs.push({ foot: foot, top: top, s0: Lg[1], s1: Lg[2], sd: sd });
       });
       legs.forEach(function (Lg) {
@@ -616,12 +616,22 @@
     }
     PC.list.forEach(function (p) {
       if (p.kind === 'leg') {
-        p.draw(c);
-        // the pole goes down into the water: toward its foot the water's colour over it
-        var Lg = p.leg, g = c.createLinearGradient(G.cross.x, G.cross.y, Lg.foot.x, Lg.foot.y);
-        g.addColorStop(0, 'rgba(253, 238, 225, 0)'); g.addColorStop(FN_WATERLINE - 0.02, 'rgba(253, 238, 225, 0.05)');
-        g.addColorStop(FN_WATERLINE + 0.03, 'rgba(252, 236, 222, 0.42)'); g.addColorStop(0.88, 'rgba(250, 232, 218, 0.85)'); g.addColorStop(1, 'rgba(250, 232, 218, 1)');
-        c.save(); c.globalCompositeOperation = 'source-atop'; c.fillStyle = g; c.fillRect(0, 0, innerWidth, innerHeight); c.restore();
+        // the pole goes down into the water: drawn on a picture of its own, the
+        // water's colour laid over it below the waterline, deeper and deeper, and
+        // it fades out to nothing long before its foot (no end to be seen), the
+        // fading edge a little uneven
+        var Lg = p.leg, tc = document.createElement('canvas'); tc.width = fnCv.width; tc.height = fnCv.height;
+        var tx = tc.getContext('2d'); tx.setTransform(dpr, 0, 0, dpr, 0, 0); tx.imageSmoothingQuality = 'high';
+        p.draw(tx);
+        var g = tx.createLinearGradient(G.cross.x, G.cross.y, Lg.foot.x, Lg.foot.y), wl = FN_WATERLINE;
+        g.addColorStop(0, 'rgba(253, 238, 225, 0)'); g.addColorStop(wl - 0.01, 'rgba(253, 238, 225, 0.04)');
+        g.addColorStop(wl + 0.04, 'rgba(252, 236, 222, 0.38)'); g.addColorStop(0.75, 'rgba(250, 232, 218, 0.7)'); g.addColorStop(1, 'rgba(250, 232, 218, 0.9)');
+        tx.save(); tx.globalCompositeOperation = 'source-atop'; tx.fillStyle = g; tx.fillRect(0, 0, innerWidth, innerHeight); tx.restore();
+        var fg = tx.createLinearGradient(G.cross.x, G.cross.y, Lg.foot.x, Lg.foot.y);
+        fg.addColorStop(0, 'rgba(0, 0, 0, 1)'); fg.addColorStop(wl + 0.03, 'rgba(0, 0, 0, 1)');
+        fg.addColorStop(wl + 0.2, 'rgba(0, 0, 0, 0.55)'); fg.addColorStop(0.62, 'rgba(0, 0, 0, 0.22)'); fg.addColorStop(0.78, 'rgba(0, 0, 0, 0)'); fg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        tx.save(); tx.globalCompositeOperation = 'destination-in'; tx.fillStyle = fg; tx.fillRect(0, 0, innerWidth, innerHeight); tx.restore();
+        c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(tc, 0, 0); c.restore();
       } else p.draw(c);
     });
     // the notch: an oval opening on the spout's top, the cut face round it, the hollow deep at its back end
