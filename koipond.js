@@ -1228,6 +1228,9 @@
     // the koi keep s.floorGap × their length above it
     this.fl = (s.floor && s.floor.y && s.floor.y.length) ? s.floor : null;
     this.flGap = this.L * (s.floorGap === undefined ? 0.35 : s.floorGap);
+    // s.fountain: where the fountain's water lands (koiscreen.html), { x, y, r }
+    // in screen pixels: the koi keep out of that circle, as from an edge
+    this.fn = (s.fountain && s.fountain.r > 0) ? { x: s.fountain.x - this.hw, y: s.fountain.y - this.hh, r: s.fountain.r } : null;
     for (var i = 0; i < this.fish.length; i++) this.fish[i].size();
   };
   // the rocks' line at x (pond coordinates; gap: kept clear above it) and its slope
@@ -1246,10 +1249,17 @@
       var R = this.rockLine(x0, true);
       d = Math.max(d, (y0 - R.y) / Math.sqrt(1 + R.slope * R.slope));
     }
+    if (this.fn) d = Math.max(d, this.fn.r - Math.hypot(x0 - this.fn.x, y0 - this.fn.y));
     return d;
   };
   // the outward direction of the edge nearest (x, y)
   Pond.prototype.normal = function (x, y) {
+    if (this.fn) {
+      // inside (or nearest) the fountain's circle: out of it is "inward"
+      var fx = x - this.fn.x, fy = y - this.fn.y, fd = Math.hypot(fx, fy) || 1;
+      var dFn = this.fn.r - fd, dRest = this.sdfNoFn(x, y);
+      if (dFn >= dRest) return { x: -fx / fd, y: -fy / fd };
+    }
     if (this.fl) {
       var R = this.rockLine(x, true), l0 = Math.sqrt(1 + R.slope * R.slope), df = (y - R.y) / l0;
       var yy = y - (this.oy || 0), qx0 = Math.abs(x) - (this.ex - this.rc), qy0 = Math.abs(yy) - (this.ey - this.rc);
@@ -1261,6 +1271,10 @@
     if (qx > 0 && qy > 0) { var l = Math.hypot(qx, qy) || 1; nx = qx / l; ny = qy / l; }
     else if (qx > qy) { nx = 1; ny = 0; } else { nx = 0; ny = 1; }
     return { x: nx * (x < 0 ? -1 : 1), y: ny * (y < 0 ? -1 : 1) };
+  };
+  Pond.prototype.sdfNoFn = function (x, y) {
+    var keep = this.fn; this.fn = null;
+    var d = this.sdf(x, y); this.fn = keep; return d;
   };
   // (x, y) moved inside the edge by at least inset, along the edge's normal
   Pond.prototype.clampIn = function (x, y, inset) {
@@ -1601,6 +1615,11 @@
           var push = (1 - d / (k.L * 0.45)) * k.v * 0.9 * dt, hx = Math.cos(k.heading), hy = Math.sin(k.heading);
           f.vx += (dx / d * 0.6 + hx * 0.4) * push; f.vy += (dy / d * 0.6 + hy * 0.4) * push;
         }
+      }
+      // the water falling from the fountain pushes the pellets out from where it lands
+      if (this.fn) {
+        var fx = f.x - this.fn.x, fy = f.y - this.fn.y, fd = Math.hypot(fx, fy) || 1, fr = this.fn.r * 2;
+        if (fd < fr) { var fp = L * 0.9 * (1 - fd / fr) * dt; f.vx += fx / fd * fp; f.vy += fy / fd * fp; }
       }
       f.spin += f.sv * dt;
       f.x += f.vx * dt; f.y += f.vy * dt;
