@@ -1282,7 +1282,7 @@
     for (var i = 0; i < P.length; i++) {
       var q = P[i], vx = q.x1 - q.x0, vy = q.y1 - q.y0, ll = vx * vx + vy * vy || 1;
       var t = clamp(((x + mx - q.x0) * vx + (y + my - q.y0) * vy) / ll, 0, 1);
-      var ax = x + mx - (q.x0 + vx * t), ay = y + my - (q.y0 + vy * t), ad = Math.hypot(ax, ay), need = q.w + half + this.L * 0.03;
+      var ax = x + mx - (q.x0 + vx * t), ay = y + my - (q.y0 + vy * t), ad = Math.hypot(ax, ay), need = q.w + half + this.L * (half > this.L * 0.05 ? 0.03 : 0);
       if (ad >= need) continue;
       if (ad < 1e-6) { ax = -vy; ay = vx; ad = Math.sqrt(ll); }
       mx += ax / ad * (need - ad); my += ay / ad * (need - ad); hit = true;
@@ -1678,7 +1678,20 @@
       }
       f.spin += f.sv * dt;
       f.x += f.vx * dt; f.y += f.vy * dt;
-      var q = this.clampIn(f.x, f.y, L * 0.35); f.x = q.x; f.y = q.y;
+      // kept off the pond's edge (and the fountain's circle) as before; the stand's
+      // poles are another matter: a pellet only has to stay clear of the pole itself,
+      // not out of the koi's wide keep-clear zone (that zone leaves no free spot
+      // between the two poles, and the pellet was pushed back and forth, wriggling,
+      // for ever). It slides along the pole instead, losing the speed into it.
+      var kp = this.posts; this.posts = null;
+      var q = this.clampIn(f.x, f.y, L * 0.35); this.posts = kp;
+      f.x = q.x; f.y = q.y;
+      var po = this.postOut(f.x, f.y, L * 0.02);
+      if (po) {
+        var pl = Math.hypot(po.x, po.y) || 1, nx = po.x / pl, ny = po.y / pl, vin = f.vx * nx + f.vy * ny;
+        f.x += po.x; f.y += po.y;
+        if (vin < 0) { f.vx -= vin * nx; f.vy -= vin * ny; }
+      }
       if (!f.sinking && f.t > life) f.sinking = true;
       if (f.sinking) { f.sinkT += dt; if (f.sinkT > 5) this.food.splice(i, 1); }
     }
