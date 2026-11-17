@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v344';
+const CACHE = 'thankyou-v346';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
@@ -27,6 +27,7 @@ const ASSETS = [
   './presets.json',
   './panel-1.html',
   './panel-2.html',
+  './panel-2b.html',
   './panel-3.html',
   './panel-3-no.html',
   './panel-4.html',
