@@ -168,7 +168,7 @@
     shadow: 1.75, shadowOpacity: 1, shadowFeather: 1,
     foodCount: 6, foodSpread: 0.4, foodDrift: 1, feedSplash: 1, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
     light: 0.24, lightSpeed: 1, tint: 1,
-    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, fnShow: 1, fnY: 0.6, fnReach: 0.21, fnSize: 1, fnTurn: 0, fnNotch: 1.5, fnStand: 1, fnFlow: 1, fnSpeed: 1, fnSound: 1, fnThrow: 0.9, fnShadow: 1, fnFoam: 1, fnLegWaves: 1, fnSplash: 1, fnRipple: 1, fnAvoid: 0.8, lapEvery: 1.4, lapStart: 0.3, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
+    rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, fnShow: 1, fnY: 0.6, fnReach: 0.21, fnSize: 1, fnTurn: 0, fnNotch: 1.5, fnStand: 1, fnFlow: 1, fnSpeed: 1, fnSound: 1, fnPostGap: 0.25, fnThrow: 0.9, fnShadow: 1, fnFoam: 1, fnLegWaves: 1, fnSplash: 1, fnRipple: 1, fnAvoid: 0.8, lapEvery: 1.4, lapStart: 0.3, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
     maxDpr: 2
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
@@ -600,7 +600,7 @@
     fxCv.width = fnCv.width; fxCv.height = fnCv.height;
     var c = fnCv.getContext('2d');
     c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, innerWidth, innerHeight);
-    if (!V.fnShow || !fnLoaded) { FN = null; pond.set({ fountain: null, hide: null }); return; }
+    if (!V.fnShow || !fnLoaded) { FN = null; pond.set({ fountain: null, hide: null, posts: [] }); return; }
     FN = fnGeometry();
     var G = FN, u = G.u, PC = fnPieces(G);
     c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
@@ -659,7 +659,11 @@
       var dx = Lg.foot.x - G.cross.x, dy = Lg.foot.y - G.cross.y, l = Math.hypot(dx, dy);
       return { x: G.cross.x + dx * FN_WATERLINE, y: G.cross.y + dy * FN_WATERLINE, d: { x: dx / l, y: dy / l }, w: u * 0.62, seed: Lg.sd };
     });
-    pond.set({ fountain: { x: G.land.x, y: G.land.y, r: (pond.info().length || 100) * V.fnAvoid }, hide: V.fnStand ? hide : null });
+    // the poles stand in the water: the koi swim round them (each pole kept
+    // clear by half its thickness and fnPostGap × the koi's length), never through
+    var KL = pond.info().length || 100;
+    var posts = V.fnStand ? PC.legs.map(function (Lg) { return { x0: Lg.top.x, y0: Lg.top.y, x1: Lg.foot.x, y1: Lg.foot.y, r: u * 0.31 + KL * V.fnPostGap, w: u * 0.31 }; }) : [];
+    pond.set({ fountain: { x: G.land.x, y: G.land.y, r: KL * V.fnAvoid }, hide: V.fnStand ? hide : null, posts: posts });
   }
 
   // ---- the water, each frame (seen from above) ----
@@ -961,6 +965,7 @@
     { k: 'fnSplash', l: 'Splash: drops thrown up where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
     { k: 'fnRipple', l: 'Rings spreading from where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
     { k: 'fnFoam', l: 'Foam and bubbles where it lands', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
+    { k: 'fnPostGap', l: 'Koi keep this far from the stand’s poles (× koi length)', min: 0, max: 1, step: 0.05, re: 'fountain' },
     { k: 'fnSound', l: 'Sound of the water: volume (0 = off; 1 = a soft background under music)', min: 0, max: 2, step: 0.05, re: 'sound' },
     { k: 'fnLegWaves', l: 'Waves round the stand where its poles go into the water', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
     { k: 'fnAvoid', l: 'Koi keep this far from where it lands (× koi length)', min: 0, max: 2, step: 0.05, re: 'fountain' },

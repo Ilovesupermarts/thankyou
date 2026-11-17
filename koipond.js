@@ -772,6 +772,15 @@
         var ang = Math.atan2(C[i].y - C[i - 1].y, C[i].x - C[i - 1].x);
         if (i > 1) { var lim3 = seg0 / (L * TUNE.bendR) * (1 + i / (N - 1)); ang = pa + lim3 * Math.tanh(angDiff(pa, ang) / lim3); }
         C[i].x = C[i - 1].x + Math.cos(ang) * seg0; C[i].y = C[i - 1].y + Math.sin(ang) * seg0;
+        // the body can not pass through a pole standing in the water: a point
+        // that would lie in one slides round it (keeping its spacing)
+        for (var pk0 = 0; pk0 < 4; pk0++) {
+          var po = p.postOut(C[i].x, C[i].y, bodyW(i / (N - 1)) * L * 0.14 * s.girth);
+          if (!po) break;
+          var px2 = C[i].x + po.x * 1.1 - C[i - 1].x, py2 = C[i].y + po.y * 1.1 - C[i - 1].y, pl2 = Math.hypot(px2, py2) || 1;
+          ang = Math.atan2(py2, px2);
+          C[i].x = C[i - 1].x + px2 / pl2 * seg0; C[i].y = C[i - 1].y + py2 / pl2 * seg0;
+        }
         pa = ang;
       }
       // drawn from the rope (shorter while it tilts to change depth)
@@ -814,6 +823,14 @@
         // tail twitch each time the swimming wave pushes it to the limit)
         if (i > 1) aA = prevA + lim2 * Math.tanh(dA / lim2);
         P[i].x = P[i - 1].x + Math.cos(aA) * seg; P[i].y = P[i - 1].y + Math.sin(aA) * seg;
+        // (the swimming wave too: never into a pole)
+        for (var pk = 0; pk < 4; pk++) {
+          var po2 = p.postOut(P[i].x, P[i].y, bodyW(i / (N - 1)) * L * 0.14 * s.girth);
+          if (!po2) break;
+          var qx2 = P[i].x + po2.x * 1.1 - P[i - 1].x, qy2 = P[i].y + po2.y * 1.1 - P[i - 1].y, ql2 = Math.hypot(qx2, qy2) || 1;
+          aA = Math.atan2(qy2, qx2);
+          P[i].x = P[i - 1].x + qx2 / ql2 * seg; P[i].y = P[i - 1].y + qy2 / ql2 * seg;
+        }
         prevA = aA;
       }
     }
@@ -1231,6 +1248,11 @@
     // s.fountain: where the fountain's water lands (koiscreen.html), { x, y, r }
     // in screen pixels: the koi keep out of that circle, as from an edge
     this.fn = (s.fountain && s.fountain.r > 0) ? { x: s.fountain.x - this.hw, y: s.fountain.y - this.hh, r: s.fountain.r } : null;
+    // s.posts: things standing in the water the koi must swim round (the
+    // fountain's poles, koiscreen.html): [{ x0, y0, x1, y1, r }] in screen
+    // pixels, each a line from x0,y0 to x1,y1 kept r clear on every side
+    var hw = this.hw, hh = this.hh;
+    this.posts = (s.posts || []).map(function (P) { return { x0: P.x0 - hw, y0: P.y0 - hh, x1: P.x1 - hw, y1: P.y1 - hh, r: P.r, w: P.w || 0 }; });
     for (var i = 0; i < this.fish.length; i++) this.fish[i].size();
   };
   // the rocks' line at x (pond coordinates; gap: kept clear above it) and its slope
@@ -1249,16 +1271,49 @@
       var R = this.rockLine(x0, true);
       d = Math.max(d, (y0 - R.y) / Math.sqrt(1 + R.slope * R.slope));
     }
-    if (this.fn) d = Math.max(d, this.fn.r - Math.hypot(x0 - this.fn.x, y0 - this.fn.y));
+    if (this.fn || (this.posts && this.posts.length)) { var o = this.obstacle(x0, y0); if (o) d = Math.max(d, o.d); }
     return d;
+  };
+  // a point of a koi's body (with its half width) inside a pole: how far to
+  // move it so it lies clear of the pole (null when clear)
+  Pond.prototype.postOut = function (x, y, half) {
+    var P = this.posts; if (!P || !P.length) return null;
+    var mx = 0, my = 0, hit = false;
+    for (var i = 0; i < P.length; i++) {
+      var q = P[i], vx = q.x1 - q.x0, vy = q.y1 - q.y0, ll = vx * vx + vy * vy || 1;
+      var t = clamp(((x + mx - q.x0) * vx + (y + my - q.y0) * vy) / ll, 0, 1);
+      var ax = x + mx - (q.x0 + vx * t), ay = y + my - (q.y0 + vy * t), ad = Math.hypot(ax, ay), need = q.w + half + this.L * 0.03;
+      if (ad >= need) continue;
+      if (ad < 1e-6) { ax = -vy; ay = vx; ad = Math.sqrt(ll); }
+      mx += ax / ad * (need - ad); my += ay / ad * (need - ad); hit = true;
+    }
+    return hit ? { x: mx, y: my } : null;
+  };
+  // the obstacle standing in the water nearest to being entered at (x, y):
+  // { d: how far inside its keep-clear zone (negative: outside), x, y: the way out of it }
+  Pond.prototype.obstacle = function (x, y) {
+    var best = null;
+    if (this.fn) {
+      var fx = x - this.fn.x, fy = y - this.fn.y, fd = Math.hypot(fx, fy) || 1;
+      best = { d: this.fn.r - fd, x: fx / fd, y: fy / fd };
+    }
+    var P = this.posts || [];
+    for (var i = 0; i < P.length; i++) {
+      var q = P[i], vx = q.x1 - q.x0, vy = q.y1 - q.y0, ll = vx * vx + vy * vy || 1;
+      var t = clamp(((x - q.x0) * vx + (y - q.y0) * vy) / ll, 0, 1);
+      var ax = x - (q.x0 + vx * t), ay = y - (q.y0 + vy * t), ad = Math.hypot(ax, ay);
+      if (ad < 1e-6) { ax = -vy; ay = vx; ad = Math.sqrt(ll); }
+      var dd = q.r - ad;
+      if (!best || dd > best.d) best = { d: dd, x: ax / ad, y: ay / ad };
+    }
+    return best;
   };
   // the outward direction of the edge nearest (x, y)
   Pond.prototype.normal = function (x, y) {
-    if (this.fn) {
-      // inside (or nearest) the fountain's circle: out of it is "inward"
-      var fx = x - this.fn.x, fy = y - this.fn.y, fd = Math.hypot(fx, fy) || 1;
-      var dFn = this.fn.r - fd, dRest = this.sdfNoFn(x, y);
-      if (dFn >= dRest) return { x: -fx / fd, y: -fy / fd };
+    if (this.fn || (this.posts && this.posts.length)) {
+      // inside (or nearest) the fountain's circle or a pole's zone: out of it is "inward"
+      var o = this.obstacle(x, y);
+      if (o && o.d >= this.sdfNoFn(x, y)) return { x: -o.x, y: -o.y };
     }
     if (this.fl) {
       var R = this.rockLine(x, true), l0 = Math.sqrt(1 + R.slope * R.slope), df = (y - R.y) / l0;
@@ -1273,8 +1328,8 @@
     return { x: nx * (x < 0 ? -1 : 1), y: ny * (y < 0 ? -1 : 1) };
   };
   Pond.prototype.sdfNoFn = function (x, y) {
-    var keep = this.fn; this.fn = null;
-    var d = this.sdf(x, y); this.fn = keep; return d;
+    var keep = this.fn, kp = this.posts; this.fn = null; this.posts = null;
+    var d = this.sdf(x, y); this.fn = keep; this.posts = kp; return d;
   };
   // (x, y) moved inside the edge by at least inset, along the edge's normal
   Pond.prototype.clampIn = function (x, y, inset) {
