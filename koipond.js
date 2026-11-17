@@ -772,15 +772,6 @@
         var ang = Math.atan2(C[i].y - C[i - 1].y, C[i].x - C[i - 1].x);
         if (i > 1) { var lim3 = seg0 / (L * TUNE.bendR) * (1 + i / (N - 1)); ang = pa + lim3 * Math.tanh(angDiff(pa, ang) / lim3); }
         C[i].x = C[i - 1].x + Math.cos(ang) * seg0; C[i].y = C[i - 1].y + Math.sin(ang) * seg0;
-        // the body can not pass through a pole standing in the water: a point
-        // that would lie in one slides round it (keeping its spacing)
-        for (var pk0 = 0; pk0 < 4; pk0++) {
-          var po = p.postOut(C[i].x, C[i].y, bodyW(i / (N - 1)) * L * 0.14 * s.girth);
-          if (!po) break;
-          var px2 = C[i].x + po.x * 1.1 - C[i - 1].x, py2 = C[i].y + po.y * 1.1 - C[i - 1].y, pl2 = Math.hypot(px2, py2) || 1;
-          ang = Math.atan2(py2, px2);
-          C[i].x = C[i - 1].x + px2 / pl2 * seg0; C[i].y = C[i - 1].y + py2 / pl2 * seg0;
-        }
         pa = ang;
       }
       // drawn from the rope (shorter while it tilts to change depth)
@@ -823,15 +814,24 @@
         // tail twitch each time the swimming wave pushes it to the limit)
         if (i > 1) aA = prevA + lim2 * Math.tanh(dA / lim2);
         P[i].x = P[i - 1].x + Math.cos(aA) * seg; P[i].y = P[i - 1].y + Math.sin(aA) * seg;
-        // (the swimming wave too: never into a pole)
-        for (var pk = 0; pk < 4; pk++) {
-          var po2 = p.postOut(P[i].x, P[i].y, bodyW(i / (N - 1)) * L * 0.14 * s.girth);
-          if (!po2) break;
-          var qx2 = P[i].x + po2.x * 1.1 - P[i - 1].x, qy2 = P[i].y + po2.y * 1.1 - P[i - 1].y, ql2 = Math.hypot(qx2, qy2) || 1;
-          aA = Math.atan2(qy2, qx2);
-          P[i].x = P[i - 1].x + qx2 / ql2 * seg; P[i].y = P[i - 1].y + qy2 / ql2 * seg;
-        }
         prevA = aA;
+      }
+      // a pole standing in the water (the fountain's stand): no part of the body
+      // may pass through it. The body is never bent to dodge it (that kinked
+      // it); the whole koi is moved off it as one piece, as a fish nudging a
+      // post would be, keeping its natural shape.
+      if (p.posts && p.posts.length) {
+        for (var pk = 0; pk < 3; pk++) {
+          var mx = 0, my = 0, mm = 0;
+          for (i = 0; i < N; i++) {
+            var po = p.postOut(P[i].x, P[i].y, bodyW(i / (N - 1)) * L * 0.14 * s.girth + L * 0.02);
+            if (po) { var pm = po.x * po.x + po.y * po.y; if (pm > mm) { mm = pm; mx = po.x; my = po.y; } }
+          }
+          if (!mm) break;
+          for (i = 0; i < N; i++) { P[i].x += mx; P[i].y += my; this.C[i].x += mx; this.C[i].y += my; }
+          this.x += mx; this.y += my;
+          var hl = tr[tr.length - 1]; if (hl) { hl.x += mx; hl.y += my; }
+        }
       }
     }
     for (i = 0; i < N; i++) {
@@ -1282,7 +1282,7 @@
     for (var i = 0; i < P.length; i++) {
       var q = P[i], vx = q.x1 - q.x0, vy = q.y1 - q.y0, ll = vx * vx + vy * vy || 1;
       var t = clamp(((x + mx - q.x0) * vx + (y + my - q.y0) * vy) / ll, 0, 1);
-      var ax = x + mx - (q.x0 + vx * t), ay = y + my - (q.y0 + vy * t), ad = Math.hypot(ax, ay), need = q.w + half + this.L * (half > this.L * 0.05 ? 0.03 : 0);
+      var ax = x + mx - (q.x0 + vx * t), ay = y + my - (q.y0 + vy * t), ad = Math.hypot(ax, ay), need = q.w + half;
       if (ad >= need) continue;
       if (ad < 1e-6) { ax = -vy; ay = vx; ad = Math.sqrt(ll); }
       mx += ax / ad * (need - ad); my += ay / ad * (need - ad); hit = true;
@@ -1686,7 +1686,16 @@
       var kp = this.posts; this.posts = null;
       var q = this.clampIn(f.x, f.y, L * 0.35); this.posts = kp;
       f.x = q.x; f.y = q.y;
-      var po = this.postOut(f.x, f.y, L * 0.02);
+      // (kept out of the koi's keep-clear zone round each pole, so a koi can
+      // always reach it without turning tight round the pole; the pushes from
+      // both poles add up, so between them it is moved out to open water)
+      var pz = this.posts && this.posts.length ? this.posts[0].r - this.posts[0].w + L * 0.1 : 0;
+      var po = null;
+      for (var pi = 0; pi < 6; pi++) {
+        var pq = this.postOut(f.x + (po ? po.x : 0), f.y + (po ? po.y : 0), pz);
+        if (!pq) break;
+        po = po ? { x: po.x + pq.x, y: po.y + pq.y } : pq;
+      }
       if (po) {
         var pl = Math.hypot(po.x, po.y) || 1, nx = po.x / pl, ny = po.y / pl, vin = f.vx * nx + f.vy * ny;
         f.x += po.x; f.y += po.y;
