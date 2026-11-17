@@ -335,6 +335,9 @@
     var maxTurn = Math.max(this.v, L * 0.12) / (L * TUNE.turnR * A.turnR * tightness);
     // when slow it can still turn on the spot with its front fins
     maxTurn = Math.max(maxTurn, this.act === 'rest' ? 0.35 : TUNE.pivot);
+    // a fin or the tail close to a pole of the fountain's stand: it turns
+    // more gently, so its tail does not swing hard into the pole
+    if (this.postNear) maxTurn *= 0.5;
     if (Math.abs(turn) > maxTurn * 0.8 && !this.kick && this.act === 'cruise') { this.kick = true; this.gaitT = 0.4 + r() * 0.3; }
     this.omega = (this.omega || 0) + (clamp(turn, -maxTurn, maxTurn) - (this.omega || 0)) * Math.min(1, TUNE.turnEase * A.ease * dt);
     this.heading += this.omega * dt;
@@ -772,15 +775,6 @@
         var ang = Math.atan2(C[i].y - C[i - 1].y, C[i].x - C[i - 1].x);
         if (i > 1) { var lim3 = seg0 / (L * TUNE.bendR) * (1 + i / (N - 1)); ang = pa + lim3 * Math.tanh(angDiff(pa, ang) / lim3); }
         C[i].x = C[i - 1].x + Math.cos(ang) * seg0; C[i].y = C[i - 1].y + Math.sin(ang) * seg0;
-        // the body can not pass through a pole standing in the water: a point
-        // that would lie in one slides round it (keeping its spacing)
-        for (var pk0 = 0; pk0 < 4; pk0++) {
-          var po = p.postOut(C[i].x, C[i].y, bodyW(i / (N - 1)) * L * 0.14 * s.girth);
-          if (!po) break;
-          var px2 = C[i].x + po.x * 1.1 - C[i - 1].x, py2 = C[i].y + po.y * 1.1 - C[i - 1].y, pl2 = Math.hypot(px2, py2) || 1;
-          ang = Math.atan2(py2, px2);
-          C[i].x = C[i - 1].x + px2 / pl2 * seg0; C[i].y = C[i - 1].y + py2 / pl2 * seg0;
-        }
         pa = ang;
       }
       // drawn from the rope (shorter while it tilts to change depth)
@@ -823,14 +817,6 @@
         // tail twitch each time the swimming wave pushes it to the limit)
         if (i > 1) aA = prevA + lim2 * Math.tanh(dA / lim2);
         P[i].x = P[i - 1].x + Math.cos(aA) * seg; P[i].y = P[i - 1].y + Math.sin(aA) * seg;
-        // (the swimming wave too: never into a pole)
-        for (var pk = 0; pk < 4; pk++) {
-          var po2 = p.postOut(P[i].x, P[i].y, bodyW(i / (N - 1)) * L * 0.14 * s.girth);
-          if (!po2) break;
-          var qx2 = P[i].x + po2.x * 1.1 - P[i - 1].x, qy2 = P[i].y + po2.y * 1.1 - P[i - 1].y, ql2 = Math.hypot(qx2, qy2) || 1;
-          aA = Math.atan2(qy2, qx2);
-          P[i].x = P[i - 1].x + qx2 / ql2 * seg; P[i].y = P[i - 1].y + qy2 / ql2 * seg;
-        }
         prevA = aA;
       }
     }
@@ -841,6 +827,98 @@
       this.Nn[i].x = -uy / ul; this.Nn[i].y = ux / ul;      // left side
       this.W[i] = bodyW(i / (N - 1)) * L * 0.14 * s.girth;
     }
+    // a pole standing in the water (the fountain's stand): no part of the koi,
+    // body, fins or tail, may pass through it. The body is never bent to dodge
+    // it (that kinked it); the whole koi is moved off it as one piece, as a fish
+    // nudging a post would be, keeping its natural shape.
+    if (pool && p.posts && p.posts.length) {
+      // (each pole in turn: the koi is moved to the side of the pole its body's
+      // middle is on, by as much as its farthest-in point needs; a tip that has
+      // got across is pulled back with the rest, never pushed on through)
+      var self = this, sides = this._postSide || (this._postSide = []);
+      var deepest = function (extra) {
+        var pts = self.reachPoints(), mx = 0, my = 0, mm = 0, at = null;
+        for (var qi = 0; qi < p.posts.length; qi++) {
+          var q = p.posts[qi], vx = q.x1 - q.x0, vy = q.y1 - q.y0, ll = Math.sqrt(vx * vx + vy * vy) || 1;
+          var nx = -vy / ll, ny = vx / ll, mid = P[9];
+          // (the side is kept while the koi is near the pole, so a koi curving
+          // round the pole's end is never flung across to the other side)
+          var mc = (mid.x - q.x0) * nx + (mid.y - q.y0) * ny, mt = ((mid.x - q.x0) * vx + (mid.y - q.y0) * vy) / (ll * ll);
+          var far = Math.abs(mc) > q.r + L || mt < -0.6 || mt > 1.6;
+          if (!sides[qi] || far) sides[qi] = mc >= 0 ? 1 : -1;
+          var side = sides[qi];
+          for (var j = 0; j < pts.length; j++) {
+            var px = pts[j].x - q.x0, py = pts[j].y - q.y0, t = (px * vx + py * vy) / (ll * ll), need = q.w + pts[j].h + extra, dx = 0, dy = 0;
+            if (t >= 0 && t <= 1) {
+              var dd = (px * nx + py * ny) * side;
+              if (dd < need) { dx = nx * side * (need - dd); dy = ny * side * (need - dd); }
+            } else {
+              var ex = t < 0 ? px : pts[j].x - q.x1, ey = t < 0 ? py : pts[j].y - q.y1, ed = Math.hypot(ex, ey) || 1e-6;
+              if (ed < need) { dx = ex / ed * (need - ed); dy = ey / ed * (need - ed); }
+            }
+            var pm = dx * dx + dy * dy; if (pm > mm) { mm = pm; mx = dx; my = dy; at = pts[j]; }
+          }
+        }
+        return { x: mx, y: my, m: Math.sqrt(mm), at: at };
+      };
+      // the koi is turned about its head, as a fish whose tail meets a post
+      // pivots away from it (its head stays put, so it never jumps); only a
+      // touch right at the head moves it as one piece
+      var head = P[0];
+      var nudge = function (d, at) {
+        var rx = at.x - head.x, ry = at.y - head.y, rr = rx * rx + ry * ry;
+        if (rr < (L * 0.25) * (L * 0.25)) {
+          for (var j = 0; j < N; j++) { P[j].x += d.x; P[j].y += d.y; if (self.C) { self.C[j].x += d.x; self.C[j].y += d.y; } }
+          self.x += d.x; self.y += d.y;
+          var hl = tr[tr.length - 1]; if (hl) { hl.x += d.x; hl.y += d.y; }
+          return;
+        }
+        // the turn that moves the touching point across the pole by d
+        var th = (rx * d.y - ry * d.x) / rr, need = Math.hypot(d.x, d.y) / Math.sqrt(rr);
+        th = (th >= 0 ? 1 : -1) * Math.max(Math.abs(th), need * 0.9);
+        var c = Math.cos(th), sn = Math.sin(th), hx = head.x, hy = head.y;
+        var rot = function (o) { var ox = o.x - hx, oy = o.y - hy; o.x = hx + ox * c - oy * sn; o.y = hy + ox * sn + oy * c; };
+        for (var j = 1; j < N; j++) { rot(P[j]); if (self.C) rot(self.C[j]); }
+        self.heading += th;
+      };
+      // first gently, a little each frame, as soon as a fin or the tail comes
+      // near (so the koi eases off the pole instead of being knocked off it)
+      var soft = deepest(L * 0.18);
+      if (soft.m > 0) {
+        var cap = Math.min(soft.m, L * 0.012) / soft.m;
+        nudge({ x: soft.x * cap, y: soft.y * cap }, soft.at)
+      }
+      this.postNear = soft.m > 0;
+      // then, only if still touching, all the way off
+      for (var pk = 0; pk < 6; pk++) {
+        var hard = deepest(0);
+        if (!hard.m) break;
+        nudge(hard, hard.at);
+      }
+      // (the body's directions follow the turn)
+      for (i = 0; i < N; i++) {
+        var j0 = Math.max(0, i - 1), j1 = Math.min(N - 1, i + 1);
+        var ux = P[j1].x - P[j0].x, uy = P[j1].y - P[j0].y, ul = Math.hypot(ux, uy) || 1;
+        this.T[i].x = ux / ul; this.T[i].y = uy / ul; this.Nn[i].x = -uy / ul; this.Nn[i].y = ux / ul;
+      }
+    }
+  };
+  // every point of the koi as it will be drawn this frame, with how far round
+  // it reaches: the body's spine (its half width), the four fins (their edges
+  // and tips) and the tail fan; a small margin for the slight growth of a koi
+  // coming up to the surface (drawn up to 5 % larger about its middle)
+  Koi.prototype.reachPoints = function () {
+    var L = this.L, m = L * 0.03, out = [], i, Pp = this.P;
+    for (i = 0; i < N; i++) out.push({ x: Pp[i].x, y: Pp[i].y, h: this.W[i] + m });
+    var parts = koiParts(this, this.pond.s);
+    parts.fins.forEach(function (F) {
+      [F.a, F.b, F.tip].concat(F.rays).forEach(function (q) { out.push({ x: q.x, y: q.y, h: m }); });
+      out.push({ x: (F.root.x + F.tip.x) / 2, y: (F.root.y + F.tip.y) / 2, h: m });
+    });
+    var T = parts.tail;
+    [T.t1, T.t2, T.notch, T.c1, T.c2].concat(T.rays).forEach(function (q) { out.push({ x: q.x, y: q.y, h: m }); });
+    [[T.base, T.t1], [T.base, T.t2]].forEach(function (e) { out.push({ x: (e[0].x + e[1].x) / 2, y: (e[0].y + e[1].y) / 2, h: m }); });
+    return out;
   };
 
   /* A point on the body: x along (0 nose, 1 tail root), y across (-1..1). */
@@ -1282,7 +1360,7 @@
     for (var i = 0; i < P.length; i++) {
       var q = P[i], vx = q.x1 - q.x0, vy = q.y1 - q.y0, ll = vx * vx + vy * vy || 1;
       var t = clamp(((x + mx - q.x0) * vx + (y + my - q.y0) * vy) / ll, 0, 1);
-      var ax = x + mx - (q.x0 + vx * t), ay = y + my - (q.y0 + vy * t), ad = Math.hypot(ax, ay), need = q.w + half + this.L * 0.03;
+      var ax = x + mx - (q.x0 + vx * t), ay = y + my - (q.y0 + vy * t), ad = Math.hypot(ax, ay), need = q.w + half;
       if (ad >= need) continue;
       if (ad < 1e-6) { ax = -vy; ay = vx; ad = Math.sqrt(ll); }
       mx += ax / ad * (need - ad); my += ay / ad * (need - ad); hit = true;
@@ -1678,7 +1756,29 @@
       }
       f.spin += f.sv * dt;
       f.x += f.vx * dt; f.y += f.vy * dt;
-      var q = this.clampIn(f.x, f.y, L * 0.35); f.x = q.x; f.y = q.y;
+      // kept off the pond's edge (and the fountain's circle) as before; the stand's
+      // poles are another matter: a pellet only has to stay clear of the pole itself,
+      // not out of the koi's wide keep-clear zone (that zone leaves no free spot
+      // between the two poles, and the pellet was pushed back and forth, wriggling,
+      // for ever). It slides along the pole instead, losing the speed into it.
+      var kp = this.posts; this.posts = null;
+      var q = this.clampIn(f.x, f.y, L * 0.35); this.posts = kp;
+      f.x = q.x; f.y = q.y;
+      // (kept out of the koi's keep-clear zone round each pole, so a koi can
+      // always reach it without turning tight round the pole; the pushes from
+      // both poles add up, so between them it is moved out to open water)
+      var pz = this.posts && this.posts.length ? this.posts[0].r - this.posts[0].w + L * 0.1 : 0;
+      var po = null;
+      for (var pi = 0; pi < 6; pi++) {
+        var pq = this.postOut(f.x + (po ? po.x : 0), f.y + (po ? po.y : 0), pz);
+        if (!pq) break;
+        po = po ? { x: po.x + pq.x, y: po.y + pq.y } : pq;
+      }
+      if (po) {
+        var pl = Math.hypot(po.x, po.y) || 1, nx = po.x / pl, ny = po.y / pl, vin = f.vx * nx + f.vy * ny;
+        f.x += po.x; f.y += po.y;
+        if (vin < 0) { f.vx -= vin * nx; f.vy -= vin * ny; }
+      }
       if (!f.sinking && f.t > life) f.sinking = true;
       if (f.sinking) { f.sinkT += dt; if (f.sinkT > 5) this.food.splice(i, 1); }
     }
