@@ -54,6 +54,8 @@
   @keyframes lightTurn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   #pond { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* the rocks along the bottom (the pond's edge): over the koi, taps pass through */
+  /* (until the ink transition has taken its copies of the rocks and the fountain) */
+  body.tr-hold #rocks, body.tr-hold #rockShade, body.tr-hold #fountain, body.tr-hold #fnFx, body.tr-hold #pond { opacity: 0; }
   #rocks, #rockShade, #fountain, #fnFx { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
 
   /* ---------- panel ---------- */
@@ -138,6 +140,8 @@
   <div class="kp-body" id="kpBody"></div>
 </div>
 
+<script src="inkfluid.js"></script>
+<script src="inkreveal.js"></script>
 <script src="koipond.js"></script>
 <script>
 (function () {
@@ -169,7 +173,10 @@
     foodCount: 6, foodSpread: 0.4, foodDrift: 1, feedSplash: 1, feedJoin: 0.85, feedNear: 0.7, foodLife: 40,
     light: 0.24, lightSpeed: 1, tint: 1,
     rkShow: 1, rkHeight: 0.16, rkSize: 1, rkVary: 0.3, rkTilt: 14, rkColour: 1, rkMoss: 0.35, rkMossStrength: 1, rkDepth: 0.45, rkSeed: 1, rkGap: 0.35, fnShow: 1, fnY: 0.6, fnReach: 0.21, fnSize: 1, fnTurn: 0, fnNotch: 1.5, fnStand: 1, fnFlow: 1, fnSpeed: 1, fnSound: 1, fnPostGap: 0.25, fnThrow: 0.9, fnShadow: 1, fnFoam: 1, fnLegWaves: 1, fnSplash: 1, fnRipple: 1, fnAvoid: 0.8, lapEvery: 1.4, lapStart: 0.3, lapStrength: 1, lapSpeed: 1, koiWake: 1, rkShade: 0.35, rkTone: 0.1,
-    maxDpr: 2
+    maxDpr: 2,
+    // the ink transition (section 3e): seconds
+    inkPlay: 1, inkStart: 0.9, inkRocksAt: 0, inkRocksDur: 4, inkFnAt: 1.8, inkFnDur: 3, inkFinish: 1.9,
+    waterFade: 1.6, soundFade: 2, koiAfter: 0, enterOver: 7, enterDepth: 0.6
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
   try {
@@ -381,6 +388,7 @@
     rockTimer = setTimeout(drawRocksNow, 60);     // (sliders: once they pause)
   }
   function drawRocksNow() {
+    if (TR.taken && (TR.phase === 'ink' || TR.phase === 'wait')) trSkip();
     var W = innerWidth, H = innerHeight, dpr = Math.min(V.maxDpr || 2, window.devicePixelRatio || 1);
     rocksCv.width = Math.round(W * dpr); rocksCv.height = Math.round(H * dpr);
     var c = rocksCv.getContext('2d');
@@ -594,6 +602,7 @@
   }
 
   function drawFountain() {
+    if (TR.taken && (TR.phase === 'ink' || TR.phase === 'wait')) trSkip();
     fnSoundLevel();
     var dpr = Math.min(V.maxDpr || 2, window.devicePixelRatio || 1);
     fnCv.width = Math.round(innerWidth * dpr); fnCv.height = Math.round(innerHeight * dpr);
@@ -673,7 +682,7 @@
     var dt = Math.min(0.05, fnLast ? (now - fnLast) / 1000 : 0); fnLast = now;
     var c = fxCv.getContext('2d'), dpr = fxCv.width / innerWidth;
     c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, fxCv.width, fxCv.height);
-    if (!FN || !V.fnShow) return;
+    if (!FN || !V.fnShow || TR.noWater) return;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     var G = FN, u = G.u, t = now / 1000, M = G.lip, Lp = G.land, flow = V.fnFlow;
     var out = { x: -G.ex.x, y: -G.ex.y }, nrm = { x: G.ey.x, y: G.ey.y };
@@ -860,7 +869,7 @@
     }
     return out;
   }
-  function fnSoundTarget() { return (V.fnShow && fnSrc) ? FN_SOUND_GAIN * (V.fnSound || 0) : 0; }
+  function fnSoundTarget() { return (V.fnShow && fnSrc && TR.sound) ? FN_SOUND_GAIN * (V.fnSound || 0) : 0; }
   function fnSoundLevel(fade) {
     if (!fnGain) return;
     var now = fnAC.currentTime, g = fnGain.gain;
@@ -890,6 +899,162 @@
     if (document.hidden) fnAC.suspend(); else fnAC.resume();
   });
   window.koiSound = function () { return { state: fnAC && fnAC.state, playing: !!fnSrc, loopSeconds: fnSrc ? fnSrc.buffer.duration : 0, gain: fnGain ? fnGain.gain.value : 0, target: fnSoundTarget() }; };
+
+  /* ============================================================
+     3e. THE INK TRANSITION (as the app brings the pond in, koipage.js)
+     When the page opens (inkPlay) or on "Play the transition": the koi,
+     the fountain's water and its sound go; after inkStart s the rocks and
+     then the fountain are painted in by the autumn introduction's wet ink
+     washes (inkreveal.js with inkfluid.js, the app's RV_LOOK below); when
+     both are in, the fountain's water fades in over waterFade s and its
+     sound over soundFade s, and koiAfter s later the koi swim in from
+     the left, the right and the top over enterOver s, each up to
+     enterDepth deeper than usual, rising back (koipond.js enter).
+     Every time is in seconds. The ink's own clock runs at INK_LOOK.speed
+     (0.5), so the times are turned into its clock here. inkFinish: the
+     last soft fill of each wash, after its own time. The water's own
+     background (cream, light) is the test bed's: the app has none.
+     ============================================================ */
+  var INK_LOOK = { engine: 'gpu', speed: 0.5, flow: 0.84, swirl: 41, push: 0.88, stir: 49, bleed: 1.05, creep: 0.33, wetSize: 3.7,
+                   prewet: 0.7, load: 2.55, show: 1.15, edge: 0.25, random: 1.5, detail: 384, simRes: 192, drop: 0.65, water: 1,
+                   spread: 4, ragged: 1, fall: 0.06, dry: 2.85, ink: 0.1, rim: 0.6, grain: 0.83, finish: 0.95, cell: 8, inkColour: '#262830' };
+  var TR = { taken: false, phase: 'off', noWater: false, sound: 1, t0: 0, tInk: 0, last: 0, raf: 0, pic: {}, layer: null, timer: 0 };
+  var fxEl = document.getElementById('fnFx');
+  function trDev(x0, y0, x1, y1, dpr) {
+    var X0 = Math.max(0, Math.floor(x0 * dpr)), Y0 = Math.max(0, Math.floor(y0 * dpr));
+    var X1 = Math.min(Math.round(innerWidth * dpr), Math.ceil(x1 * dpr)), Y1 = Math.min(Math.round(innerHeight * dpr), Math.ceil(y1 * dpr));
+    return { x: X0, y: Y0, w: Math.max(1, X1 - X0), h: Math.max(1, Y1 - Y0) };
+  }
+  function trCrop(src, R) {
+    var c = document.createElement('canvas'); c.width = R.w; c.height = R.h;
+    c.getContext('2d').drawImage(src, R.x, R.y, R.w, R.h, 0, 0, R.w, R.h);
+    return c;
+  }
+  function trClear(cv) { var c = cv.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height); }
+  function trLay(cv, pic, R) { trClear(cv); if (pic) cv.getContext('2d').drawImage(pic, R.x, R.y); }
+  // the rocks and the fountain as they are drawn now, kept as pictures cut to where they lie
+  function trTake() {
+    var dpr = rocksCv.width / innerWidth, W = innerWidth, H = innerHeight, P = TR.pic;
+    P.rR = trDev(0, Math.max(0, H - V.rkHeight * H * 2.4), W, H, dpr);
+    P.rocks = trCrop(rocksCv, P.rR); P.shade = trCrop(shadeCv, P.rR);
+    P.fR = null; P.fn = null;
+    if (FN && V.fnShow) {
+      var u = FN.u, xs = [FN.E.x, FN.land.x, FN.cross.x], ys = [FN.E.y, FN.land.y, FN.cross.y];
+      (FN.legs || []).forEach(function (L) { xs.push(L.x); ys.push(L.y); });
+      P.fR = trDev(Math.min.apply(null, xs) - u * 4.5, Math.min.apply(null, ys) - u * 4.5, W, Math.max.apply(null, ys) + u * 5, dpr);
+      P.fn = trCrop(fnCv, P.fR);
+    }
+    [rocksCv, shadeCv, fnCv].forEach(trClear);
+  }
+  function trShowAll() {
+    var P = TR.pic;
+    trLay(shadeCv, P.shade, P.rR); trLay(rocksCv, P.rocks, P.rR); trLay(fnCv, P.fn, P.fR);
+  }
+  // the drops of the washes (CSS px; times on the ink's clock)
+  function trRockSeeds() {
+    var W = innerWidth, H = innerHeight, band = V.rkHeight * H * Math.max(0.6, V.rkSize), out = [], st = band * 0.62;
+    for (var x = -st * 0.3; x < W + st; x += st) {
+      var at = x / W * 1.3;
+      out.push({ x: x, y: H - band * 0.95, r: band * 0.62, at: at });
+      out.push({ x: x + st * 0.45, y: H - band * 0.35, r: band * 0.55, at: at + 0.12 });
+    }
+    return [{ seeds: out, fall: 0.3 }];
+  }
+  function trFnSeeds() {
+    var out = [];
+    if (!FN) return [{ seeds: out }];
+    var G = FN, u = G.u, len = Math.max(u, G.len - u * 1.5);
+    for (var f = 1, i = 0; f >= -0.01; f -= 0.18, i++) { var p = G.P(len * f, 0); out.push({ x: p.x, y: p.y, r: u * 1.25, at: i * 0.12 }); }
+    (G.legs || []).forEach(function (L, k) { out.push({ x: L.x, y: L.y, r: u * 1.6, at: 0.75 + k * 0.1 }); });
+    out.push({ x: G.cross.x, y: G.cross.y, r: u * 1.8, at: 0.7 });
+    return [{ seeds: out, fall: 0.2 }];
+  }
+  function trInkLay(cv, pic, R, id) {
+    var c = cv.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(R.x, R.y, R.w, R.h);
+    if (!pic) return;
+    var st = InkReveal.state(id);
+    if (st === 0) return;
+    if (st === 2) { c.drawImage(pic, R.x, R.y); return; }
+    var l = TR.layer.getContext('2d');
+    l.setTransform(1, 0, 0, 1, 0, 0); l.clearRect(R.x, R.y, R.w, R.h); l.drawImage(pic, R.x, R.y);
+    InkReveal.composite(c, TR.layer, id, rocksCv.width / innerWidth, R);
+  }
+  function trInkStop() {
+    if (typeof InkReveal !== 'undefined') InkReveal.stop();
+    if (typeof InkFluid !== 'undefined' && InkFluid.release) InkFluid.release();
+    if (TR.layer) TR.layer.width = TR.layer.height = 1;
+  }
+  function trStartInk(t) {
+    var sp = INK_LOOK.speed;
+    try {
+      for (var k in INK_LOOK) InkReveal.look[k] = INK_LOOK[k];
+      InkReveal.look.finish = V.inkFinish * sp;
+      InkReveal.setup(innerWidth, innerHeight);
+      InkReveal.plan([
+        { id: 'rocks', kind: 'wash', at: V.inkRocksAt * sp, dur: Math.max(0.1, V.inkRocksDur) * sp, washes: trRockSeeds() },
+        { id: 'fountain', kind: 'wash', at: V.inkFnAt * sp, dur: Math.max(0.1, V.inkFnDur) * sp, washes: trFnSeeds() }
+      ]);
+      InkReveal.play(t);
+      if (!TR.layer) TR.layer = document.createElement('canvas');
+      TR.layer.width = rocksCv.width; TR.layer.height = rocksCv.height;
+      return true;
+    } catch (e) { console.warn('ink transition:', e); return false; }
+  }
+  function trFrame(now) {
+    TR.raf = 0;
+    var t = now / 1000, dt = Math.min(0.05, TR.last ? t - TR.last : 0); TR.last = t;
+    if (TR.phase === 'wait') {
+      // (the rocks and the fountain drawn first; then the wait before the ink)
+      if (!rocksPlaced || rocksLoaded < ROCK_N || (V.fnShow && !FN)) { TR.raf = requestAnimationFrame(trFrame); return; }
+      if (!TR.taken) { trTake(); TR.taken = true; document.body.classList.remove('tr-hold'); TR.t0 = t; }
+      if (t - TR.t0 < V.inkStart) { TR.raf = requestAnimationFrame(trFrame); return; }
+      TR.tInk = t;
+      if (typeof InkReveal === 'undefined' || !trStartInk(t)) { trShowAll(); trLive(); return; }
+      TR.phase = 'ink';
+    }
+    if (TR.phase === 'ink') {
+      InkReveal.update(t, dt);
+      trInkLay(shadeCv, TR.pic.shade, TR.pic.rR, 'rocks');
+      trInkLay(rocksCv, TR.pic.rocks, TR.pic.rR, 'rocks');
+      if (TR.pic.fn) trInkLay(fnCv, TR.pic.fn, TR.pic.fR, 'fountain');
+      if (!InkReveal.running() || t - TR.tInk > 60) { trInkStop(); trShowAll(); trLive(); return; }
+      TR.raf = requestAnimationFrame(trFrame);
+    }
+  }
+  // the rocks and the fountain are in: the water and its sound fade in, then the koi swim in
+  function trLive() {
+    TR.phase = 'live';
+    TR.noWater = false;
+    fxEl.style.transition = 'opacity ' + Math.max(0, V.waterFade) + 's ease'; fxEl.style.opacity = 1;
+    TR.sound = 1; fnSoundLevel(Math.max(0.05, V.soundFade));
+    clearTimeout(TR.timer);
+    TR.timer = setTimeout(function () {
+      pond.enter({ over: V.enterOver, zLo: 0, zHi: V.enterDepth });
+      pond.start();
+    }, Math.max(0, V.koiAfter) * 1000);
+  }
+  // a rock or fountain setting changed during the ink: it ends at once (the new drawing shows)
+  function trSkip() {
+    if (TR.raf) { cancelAnimationFrame(TR.raf); TR.raf = 0; }
+    if (TR.phase === 'ink') trInkStop();
+    trShowAll();                         // (everything back as it was; the redraw then replaces what changed)
+    document.body.classList.remove('tr-hold');
+    TR.phase = 'off'; TR.noWater = false; TR.sound = 1; fxEl.style.opacity = 1; fnSoundLevel(0.4);
+    if (pond) pond.start();
+  }
+  function trPlay() {
+    if (TR.raf) { cancelAnimationFrame(TR.raf); TR.raf = 0; }
+    if (TR.phase === 'ink') { trInkStop(); trShowAll(); }
+    clearTimeout(TR.timer);
+    pond.stop();
+    var pc = canvas.getContext('2d'); pc.setTransform(1, 0, 0, 1, 0, 0); pc.clearRect(0, 0, canvas.width, canvas.height);
+    TR.noWater = true; fxEl.style.transition = 'none'; fxEl.style.opacity = 0;
+    TR.sound = 0; fnSoundLevel(0.3);
+    TR.phase = 'wait'; TR.taken = false; TR.last = 0;
+    if (!TR.raf) TR.raf = requestAnimationFrame(trFrame);
+  }
+  if (V.inkPlay) { document.body.classList.add('tr-hold'); trPlay(); }
 
   /* ============================================================
      4. THE PANEL
@@ -969,7 +1134,20 @@
     { k: 'fnSound', l: 'Sound of the water: volume (0 = off; 1 = a soft background under music)', min: 0, max: 2, step: 0.05, re: 'sound' },
     { k: 'fnLegWaves', l: 'Waves round the stand where its poles go into the water', min: 0, max: 2.5, step: 0.05, re: 'fountain' },
     { k: 'fnAvoid', l: 'Koi keep this far from where it lands (× koi length)', min: 0, max: 2, step: 0.05, re: 'fountain' },
-    { k: 'maxDpr', l: 'Sharpness (device pixels per pixel, lower is lighter work)', min: 1, max: 3, step: 0.5, re: 'set' }
+    { k: 'maxDpr', l: 'Sharpness (device pixels per pixel, lower is lighter work)', min: 1, max: 3, step: 0.5, re: 'set' },
+    { g: 'Ink transition: timing (seconds; press “Play the transition” to see it)' },
+    { k: 'inkPlay', l: 'Play it when the page opens (1 = on, 0 = off)', min: 0, max: 1, step: 1, re: 'ink' },
+    { k: 'inkStart', l: 'Wait before the ink starts (in the app: after the swipe, while the message fades)', min: 0, max: 5, step: 0.1, re: 'ink' },
+    { k: 'inkRocksAt', l: 'Rocks: the ink starts at', min: 0, max: 10, step: 0.1, re: 'ink' },
+    { k: 'inkRocksDur', l: 'Rocks: the washes last', min: 0.5, max: 15, step: 0.1, re: 'ink' },
+    { k: 'inkFnAt', l: 'Fountain: the ink starts at', min: 0, max: 10, step: 0.1, re: 'ink' },
+    { k: 'inkFnDur', l: 'Fountain: the washes last', min: 0.5, max: 15, step: 0.1, re: 'ink' },
+    { k: 'inkFinish', l: 'Last soft fill of each wash (after its time)', min: 0.2, max: 6, step: 0.1, re: 'ink' },
+    { k: 'waterFade', l: 'Then the fountain’s water fades in over', min: 0, max: 6, step: 0.1, re: 'ink' },
+    { k: 'soundFade', l: 'Its sound fades in over', min: 0.1, max: 8, step: 0.1, re: 'ink' },
+    { k: 'koiAfter', l: 'The koi start coming in this long after the ink is done', min: 0, max: 10, step: 0.1, re: 'ink' },
+    { k: 'enterOver', l: 'The koi come in one after another over', min: 0, max: 20, step: 0.5, re: 'ink' },
+    { k: 'enterDepth', l: 'How much deeper than usual they may be as they come in (they rise back)', min: 0, max: 0.9, step: 0.05, re: 'ink' }
   ];
 
   function mixPanel() {
@@ -1016,13 +1194,15 @@
       else if (c.re === 'rocks') drawRocks();
       else if (c.re === 'fountain') drawFountain();
       else if (c.re === 'sound') fnSoundLevel();
+      else if (c.re === 'ink') { /* (used the next time it plays) */ }
       else { var o = {}; o[c.k === 'rkGap' ? 'floorGap' : c.k] = V[c.k]; pond.set(o); if (c.re === 'reset') pond.reset(); if (c.k === 'maxDpr' || c.k === 'length' || c.k === 'sizeVary') { drawRocks(); drawFountain(); } }
     });
     inputs[c.k] = { inp: inp, out: out };
     body.appendChild(row);
   });
   var foot = document.createElement('div'); foot.className = 'kp-foot';
-  foot.innerHTML = '<button class="kp-btn" type="button" id="kpCopy">Copy values</button>' +
+  foot.innerHTML = '<button class="kp-btn" type="button" id="kpPlay">Play the transition</button>' +
+                   '<button class="kp-btn" type="button" id="kpCopy">Copy values</button>' +
                    '<button class="kp-btn" type="button" id="kpNew">New koi</button>' +
                    '<button class="kp-btn" type="button" id="kpReset">Back to defaults</button>';
   body.appendChild(foot);
@@ -1038,6 +1218,7 @@
     catch (e) { try { document.execCommand('copy'); done(); } catch (e2) {} }
   });
   document.getElementById('kpNew').addEventListener('click', function () { pond.reset(); });
+  document.getElementById('kpPlay').addEventListener('click', function () { trPlay(); });
   document.getElementById('kpReset').addEventListener('click', function () {
     if (!confirm('Put every setting back to its default?')) return;
     V = JSON.parse(JSON.stringify(DEFAULTS)); save(); location.reload();
@@ -1045,7 +1226,7 @@
 
   setInterval(function () {
     var i = pond.info();
-    info.textContent = i.koi + ' koi · ' + i.eating + ' eating · ' + i.food + ' pellets on the water · koi ' + Math.round(i.length) + ' px long · ' + i.fps.toFixed(0) + ' frames a second';
+    info.textContent = (TR.phase === 'wait' || TR.phase === 'ink' ? 'Transition: ' + (TR.phase === 'ink' ? 'the ink' : 'waiting') + ' · ' : '') + i.koi + ' koi · ' + i.eating + ' eating · ' + i.food + ' pellets on the water · koi ' + Math.round(i.length) + ' px long · ' + i.fps.toFixed(0) + ' frames a second';
   }, 500);
 
   // fold, hide, drag by the title bar
@@ -1070,7 +1251,7 @@
     head.addEventListener('pointerup', function () { on = false; });
   })();
 
-  window.koiLab = { V: V, pond: pond };
+  window.koiLab = { V: V, pond: pond, play: trPlay, tr: TR };
 })();
 </script>
 </body>
