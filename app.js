@@ -1,4 +1,4 @@
-var BUILD = 'v149';
+var BUILD = 'v150';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -9442,6 +9442,7 @@ function returnToTable() {
     receiptScreen.removeEventListener('transitionend', onFade);
     tyAmbientStage.classList.remove('shown');
     GameWindow.stop();
+    if (typeof KoiPage !== 'undefined') KoiPage.stop();
     tyReceiptBtn.classList.remove('shown');
     currentPanel = totalPanels - 1;
     track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
@@ -10367,16 +10368,23 @@ function goToTyPanel(index) {
   activateTyPanel(tyCurrentPanel);
   updateTySwipeHint();
 }
+/* Past the last message: the koi pond page (koipage.js), in place of the
+   games page. The message fades out (1.6 s) while the season's scenery fades
+   away as it did for the games page (body.games-active: only the Shippō
+   pattern and the sky's colour stay); as the message is nearly gone the
+   rocks and the fountain are painted in with the ink, then the koi swim in.
+   The toolbar and the music stay. */
 function exitTyToGames() {
   if (tyExited) return;
   tyExited = true;
   tySwipeHint.classList.remove('shown');
   tyDotsEl.classList.add('hidden');
   tyCarousel.classList.add('hidden-out');
+  document.body.classList.add('games-active');
   tyPushTimeout(function() {
-    tyAmbientStage.classList.add('shown');
-    GameWindow.start();
-  }, 700);
+    var kp = koiPage();
+    if (kp) kp.start();
+  }, KOI_PAGE_INK_AT);
 }
 var tyStartX = 0, tyStartY = 0, tyCurrentX = 0;
 var tyDragging = false, tyDecided = false, tyHorizontal = false;
@@ -10507,6 +10515,44 @@ window.addEventListener('mouseup', function() {
   else if (deltaX > threshold && tyCurrentPanel > 0) goToTyPanel(tyCurrentPanel - 1);
   else goToTyPanel(tyCurrentPanel);
 });
+
+/* ============ THE KOI POND PAGE (koipage.js) ============
+   After the last thank-you message (in place of the games page): koiscreen.html's
+   pond with the values chosen there ("Copy values" → KOI_SCREEN). The rocks and the
+   fountain come in with the autumn introduction's ink (RV_LOOK), then the koi swim
+   in from every side but the bottom. enterOver: the seconds over which they come in;
+   enterDepth: how much deeper than usual they may be as they come (they rise back). */
+var KOI_SCREEN = {
+  mix: { kohaku: 3, ogon: 2, showa: 3, tancho: 1, sanke: 1, platinum: 1, asagi: 0, shiro: 2, bekko: 2, goshiki: 0 },
+  seed: 10, length: 0.16, sizeVary: 0.2, girth: 0.9, speed: 2.15, wave: 1.2, fins: 0.8, roam: 0.8, edge: 0.6,
+  eventEvery: 16, airShare: 0.45, airMax: 2, deepTime: 10, deepSize: 0.57, deepBlur: 3, deepFade: 0.09,
+  shadow: 3, shadowOpacity: 1, shadowFeather: 1.9,
+  foodCount: 6, foodSpread: 1.1, foodDrift: 1, feedSplash: 1, feedJoin: 0.85, feedNear: 0.7, foodLife: 13,
+  light: 0.24, lightSpeed: 1, tint: 1,
+  rkShow: 1, rkHeight: 0.16, rkSize: 0.95, rkVary: 0.39, rkTilt: 14, rkColour: 1, rkMoss: 0.6, rkMossStrength: 1.3,
+  rkDepth: 0.85, rkSeed: 33, rkGap: 0,
+  fnShow: 1, fnY: 0.5, fnReach: 0.18, fnSize: 1, fnTurn: 0, fnNotch: 1.9, fnStand: 1, fnFlow: 2.5, fnSpeed: 0.2,
+  fnSound: 1, fnPostGap: 0.25, fnThrow: 1.25, fnShadow: 1.25, fnFoam: 1.35, fnLegWaves: 1.75, fnSplash: 1.6,
+  fnRipple: 2.45, fnAvoid: 0.4,
+  lapEvery: 1.4, lapStart: 0.05, lapStrength: 0.7, lapSpeed: 0.85, koiWake: 1.85, rkShade: 0.2, rkTone: 0.09,
+  maxDpr: 2.5,
+  enterOver: 7, enterDepth: 0.6
+};
+var KOI_PAGE_INK_AT = 900;      /* ms after the swipe: the ink starts as the message (1.6 s fade) is nearly gone */
+var _koiPageInit = false;
+function koiPage() {
+  if (typeof KoiPage === 'undefined' || typeof KoiScreen === 'undefined') return null;
+  if (!_koiPageInit) {
+    _koiPageInit = true;
+    KoiPage.init(document.getElementById('koiStage'), KOI_SCREEN, {
+      look: DynBG.inkLook(),
+      audio: function() { return soundAudioCtx; },
+      reduceMotion: DynBG.reduceMotion(),
+      beforeInk: function() { DynBG.inkStop(); }   /* (the one ink: the autumn reveal is long over by now) */
+    });
+  }
+  return KoiPage;
+}
 
 /* ============ THANK-YOU TIMERS ============ */
 var tyTimers = [];
@@ -11572,6 +11618,7 @@ function clearAllTyTimers() {
      receipt, back to the table). Stopping it fades the game music out and
      brings the ambient music back. */
   if (typeof GameWindow !== 'undefined') GameWindow.stop();
+  if (typeof KoiPage !== 'undefined') KoiPage.stop();
 }
 function tyPushTimeout(fn, ms) {
   var id = setTimeout(fn, ms);
@@ -11594,6 +11641,9 @@ function startThankyouSequence() {
   tyAmbientStage.classList.remove('shown');
   GameWindow.stop();
   GameWindow.newVisit();                 /* the top score is for this visit only */
+  if (typeof KoiPage !== 'undefined') KoiPage.stop();
+  /* the koi page's pictures and koi are made ahead while the first message shows */
+  tyPushTimeout(function() { var kp = koiPage(); if (kp) kp.prepare(); }, 2500);
   tyReceiptBtn.classList.add('shown');
   tyCurrentPanel = 0;
   NavSpring && NavSpring.reset('ty');
@@ -11608,8 +11658,9 @@ function resumeThankyouSequence() {
   applyTyPanel1Content();
   tyReceiptBtn.classList.add('shown');
   if (tyExited) {
-    tyAmbientStage.classList.add('shown');
-    GameWindow.start();
+    document.body.classList.add('games-active');
+    var kp = koiPage();
+    if (kp) kp.start();
   } else {
     updateTySwipeHint();
   }
@@ -23420,6 +23471,9 @@ function lakeHallDistance() {
 function rvBambooIn() { return !RV.started || InkReveal.clock() >= RV_MESSAGE_AT; }   // (the first message's time has come)
 return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return rvBambooIn() ? dynMaster : 0; }, sceneBusy: function() { return !rvBambooIn(); },
          sceneReady: dynSceneReady, setupProgress: dynSetupProgress,
+         inkLook: function() { return RV_LOOK; },                      // (the koi page paints its rocks in with the same ink)
+         inkStop: function() { if (RV.started) rvStop(); },            // (… and the ink is one: the autumn reveal ended first)
+         reduceMotion: function() { return dynReduceMotion; },
          bankInfo: function() { return BankTrees.info(); },            // (for checking: how the bank trees are doing)
          rainInfo: function() { return rainInfo(); },                  // (for checking: the rain on the scenery)
          hallDistance: lakeHallDistance,                                // (for the temple bell)
