@@ -1,4 +1,4 @@
-var BUILD = 'v150';
+var BUILD = 'v151';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -10536,9 +10536,13 @@ var KOI_SCREEN = {
   fnRipple: 2.45, fnAvoid: 0.4,
   lapEvery: 1.4, lapStart: 0.05, lapStrength: 0.7, lapSpeed: 0.85, koiWake: 1.85, rkShade: 0.2, rkTone: 0.09,
   maxDpr: 2.5,
-  enterOver: 7, enterDepth: 0.6
+  /* the transition (seconds): inkStart = after the swipe, while the message fades; the rocks' and the fountain's
+     washes (start, length), the last soft fill, the water's and its sound's fade-in, the koi's wait after the ink
+     and how long they take to come in, and how much deeper than usual they may be as they come (they rise back) */
+  inkPlay: 1, inkStart: 0.9, inkRocksAt: 0, inkRocksDur: 4, inkFnAt: 1.8, inkFnDur: 1.5, inkFinish: 1.9,
+  waterFade: 1.6, soundFade: 2, koiAfter: 0, enterOver: 7, enterDepth: 0.6
 };
-var KOI_PAGE_INK_AT = 900;      /* ms after the swipe: the ink starts as the message (1.6 s fade) is nearly gone */
+var KOI_PAGE_INK_AT = KOI_SCREEN.inkStart * 1000;      /* ms after the swipe: the ink starts as the message (1.6 s fade) is nearly gone */
 var _koiPageInit = false;
 function koiPage() {
   if (typeof KoiPage === 'undefined' || typeof KoiScreen === 'undefined') return null;
