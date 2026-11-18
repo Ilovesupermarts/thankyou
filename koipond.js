@@ -240,7 +240,7 @@
     }
     else { vT = L * A.v * s.speed * modeV * (this.mode === 'feed' ? this.feedSlow : 1); beatT = A.beat; acc = A.acc; }
     // a sharp turn ahead, or the edge close: it brakes (with its fins) to turn tightly
-    if (!leaving && this.act !== 'dart' && this.act !== 'rest') {
+    if (!leaving && this.act !== 'dart' && this.act !== 'rest' && this.mode !== 'enter') {
       var hx0 = Math.cos(this.heading), hy0 = Math.sin(this.heading), la0 = L * TUNE.la0 + this.v * TUNE.la1;
       var gdiff = this.goal ? Math.abs(angDiff(this.heading, Math.atan2(this.goal.y - this.y, this.goal.x - this.x))) : 0;
       var edgeNear = p.sdf(this.x + hx0 * la0, this.y + hy0 * la0) > -L * TUNE.wallIn;
@@ -280,7 +280,8 @@
     // inside the pool (any way round) and heads there
     var la = L * TUNE.la0 + this.v * TUNE.la1;
     var fx = this.x + hx * la, fy = this.y + hy * la, fd = p.sdf(fx, fy) + L * TUNE.wallIn;
-    if (fd > 0) {
+    // (swimming in from off the screen: the edge is not in its way yet)
+    if (fd > 0 && this.mode !== 'enter') {
       // (it keeps that spot until it gets there, so it does not keep changing its mind)
       // (only if its spot is outside the area spots are picked from)
       if (!this.goal || p.sdf(this.goal.x, this.goal.y) > -L * TUNE.goalIn * 0.9) this.goal = this.goalAcross();
@@ -318,7 +319,7 @@
     var feedNear = this.mode === 'feed' && this.food && Math.hypot(this.food.x - this.x, this.food.y - this.y) < L * 2.5;
     turn += clamp(avoidTurn * (feedNear ? 0.25 : this.mode === 'feed' ? 0.45 : 1), -TUNE.avoidMax, TUNE.avoidMax);
     // stuck at the edge for a while: it gives up that way and turns the other way round
-    if (p.sdf(this.x, this.y) > -L * 0.04 && Math.abs(this.omega || 0) < 0.3) this.stuckT = (this.stuckT || 0) + dt;
+    if (this.mode !== 'enter' && p.sdf(this.x, this.y) > -L * 0.04 && Math.abs(this.omega || 0) < 0.3) this.stuckT = (this.stuckT || 0) + dt;
     else this.stuckT = 0;
     if (this.stuckT > TUNE.stuckAfter) {
       this.stuckT = 0;
@@ -381,7 +382,7 @@
     // its outward part, so the koi glides along the edge the way it is
     // facing (a snap straight back inward could move it backwards, fold
     // its path back on itself and flip its tail)
-    var dc = p.sdf(this.x, this.y);
+    var dc = this.mode === 'enter' ? -1 : p.sdf(this.x, this.y);
     if (dc > 0) {
       var sx = this.x - ox0, sy = this.y - oy0, un = p.normal(this.x, this.y), ux = un.x, uy = un.y;
       // nose into the edge: it stops and turns first (as a fish does at a wall)
@@ -394,6 +395,12 @@
       if (outward > 0) { sx -= ux * outward; sy -= uy * outward; }
       this.x = ox0 + sx; this.y = oy0 + sy;
       var back = p.clampIn(this.x, this.y, 0); this.x = back.x; this.y = back.y;   // (the last hair, along the edge)
+    }
+
+    // swimming in from off the screen (Pond.enter): once its head is well
+    // inside the pond it swims on as the others do, rising back to its own depth
+    if (this.mode === 'enter' && p.sdf(this.x, this.y) < -L * 0.6) {
+      this.mode = 'cruise'; this.zT = this.zHome; this.goalAge = 0;
     }
 
     // depth: a soft spring toward the depth it wants
@@ -482,7 +489,7 @@
      mouth (rings on the water), and goes on to the next pellet near it;
      when there is none left near it, it swims on as before. */
   Koi.prototype.startFeed = function () {
-    if (this.mode === 'exit') return;
+    if (this.mode === 'exit' || this.mode === 'enter') return;
     this.mode = 'feed'; this.dipFrom = null; this.diveDown = false; this.gulps = 0;
     this.food = null; this.feedSlow = 1; this.eatCool = 0;
     this.pickAct('feed');
@@ -1428,7 +1435,7 @@
   };
   Pond.prototype.rebuild = function () {
     var s = this.s;
-    this.fish = []; this.food = []; this.rings = []; this.laps = []; this.drops = [];
+    this.fish = []; this.food = []; this.rings = []; this.laps = []; this.drops = []; this.waiting = null;
     var kinds = s.kinds || ['kohaku'];
     for (var i = 0; i < kinds.length; i++) {
       var k = new Koi(this, i, (s.seed || 1) * 1234 + i * 777);
@@ -1625,7 +1632,7 @@
     if (this.food.length) {
       for (j = 0; j < n; j++) {
         var kj = fish[j];
-        if (kj.mode === 'feed' || kj.mode === 'exit' || kj.feedDelay !== undefined || (kj.mode === 'dive' && kj.diveDown)) continue;
+        if (kj.mode === 'feed' || kj.mode === 'exit' || kj.mode === 'enter' || kj.feedDelay !== undefined || (kj.mode === 'dive' && kj.diveDown)) continue;
         if (Math.random() > dt * 2) continue;                 // about twice a second it looks
         for (var fi = 0; fi < this.food.length; fi++) {
           var fd = this.food[fi];
@@ -1670,7 +1677,7 @@
     var near = (s.feedNear || 0.7) * Math.min(this.W, this.H);
     for (var j = 0; j < this.fish.length; j++) {
       var k = this.fish[j];
-      if (k.mode === 'exit') continue;
+      if (k.mode === 'exit' || k.mode === 'enter') continue;
       var dk = Math.hypot(k.x - c.x, k.y - c.y);
       var chance = (s.feedJoin === undefined ? 0.85 : s.feedJoin) * (dk < near ? 1 : 0.3);
       if (k.mode === 'feed' || Math.random() > chance) continue;
@@ -1952,6 +1959,85 @@
     }
     this.drawDrops(ctx);
   };
+  /* SWIMMING IN (the app's koi page; koiscreen.html does not use it).
+     enter(o): every koi leaves the pond and waits off the screen; one
+     after another, at random moments over o.over seconds (6), each
+     swims in from a side of its own (left, right or the top: never from
+     under the rocks along the bottom), at a depth of its own (o.zLo …
+     o.zHi below its usual one), toward a spot of its own inside the
+     pond, and once its head is well inside it swims on as usual, rising
+     back to its own depth. A way in that would pass the fountain's
+     landing spot or its poles is not used. */
+  Pond.prototype.enter = function (o) {
+    o = o || {};
+    var r = this.rnd, over = o.over === undefined ? 6 : o.over, me = this;
+    this.waiting = this.fish.concat(this.waiting || []);
+    this.fish = []; this.food = []; this.rings = []; this.laps = []; this.drops = [];
+    var n = this.waiting.length;
+    // each a moment of its own, spread over the time, in a random order
+    var order = this.waiting.map(function (k) { return { k: k, u: r() }; });
+    order.sort(function (a, b) { return a.u - b.u; });
+    order.forEach(function (q, i) { q.k.enterAt = over * (i + r() * 0.8) / Math.max(1, n); });
+    this.waiting.sort(function (a, b) { return a.enterAt - b.enterAt; });
+    this.enterClock = 0;
+    this.enterZ = [o.zLo === undefined ? 0 : o.zLo, o.zHi === undefined ? 0.6 : o.zHi];
+    this.waiting.forEach(function (k) { k.size(); });
+    return me;
+  };
+  Pond.prototype.stepEnter = function (dt) {
+    this.enterClock += dt;
+    while (this.waiting.length && this.waiting[0].enterAt <= this.enterClock) {
+      var k = this.waiting.shift();
+      this.placeEntering(k);
+      this.fish.push(k);
+    }
+  };
+  // a way in for one koi: a point just off the screen and a spot inside
+  Pond.prototype.placeEntering = function (k) {
+    k.size();
+    var r = this.rnd, L = k.L, hw = this.hw, hh = this.hh, best = null;
+    var sides = ['left', 'right', 'top'];
+    for (var t = 0; t < 40; t++) {
+      var side = sides[Math.floor(r() * 3)], sx, sy;
+      var goal = this.randomPoint(L * TUNE.goalIn + L * 0.4);
+      if (side === 'top') { sx = (r() * 2 - 1) * (hw - L * 0.5); sy = -hh - L * 0.35; }
+      else {
+        // (high enough that its way in runs above the rocks)
+        var yIn = (this.oy || 0) + (r() * 2 - 1) * this.ey * 0.85;
+        sx = side === 'left' ? -hw - L * 0.35 : hw + L * 0.35; sy = yIn;
+        var xin = side === 'left' ? -this.ex + L : this.ex - L;
+        if (this.sdf(xin, yIn) > -L * 0.5) continue;
+      }
+      // its way in must stay clear of the fountain's landing spot and its poles,
+      // and of the rocks
+      var ok = true;
+      for (var j = 1; j <= 16 && ok; j++) {
+        var f = j / 16, px = sx + (goal.x - sx) * f, py = sy + (goal.y - sy) * f;
+        var ob = this.obstacle(px, py);
+        if (ob && ob.d > -L * 0.5) ok = false;
+        if (this.fl && py > this.rockLine(px, true).y - L * 0.3) ok = false;
+      }
+      // (and not straight through a koi that has only just come in)
+      if (ok) for (var q = 0; q < this.fish.length && ok; q++) {
+        var o = this.fish[q];
+        if (o.mode === 'enter' && Math.hypot(o.x - sx, o.y - sy) < L * 1.6) ok = false;
+      }
+      best = { x: sx, y: sy, g: goal };
+      if (ok) break;
+    }
+    var a = Math.atan2(best.g.y - best.y, best.g.x - best.x) + (r() - 0.5) * 0.3;
+    k.trail.length = 0; k.C = null; k._bend = null;
+    k.x = best.x; k.y = best.y; k.heading = a;
+    // its body laid out straight behind its head, off the screen
+    var cx = Math.cos(a), cy = Math.sin(a);
+    for (var i = 105; i >= 0; i--) k.trail.push({ x: k.x - cx * L * 0.012 * i, y: k.y - cy * L * 0.012 * i });
+    k.mode = 'enter'; k.goal = best.g; k.goalAge = -30; k.turnSign = 0;
+    k.act = null; k.pickAct('cruise'); k.kick = true; k.gaitT = 0.8 + r() * 0.6;
+    k.v = L * 0.4 * (this.s.speed || 1); k.omega = 0; k.wTurn = 0;
+    var Z = this.enterZ || [0, 0.6];
+    k.z = k.zT = k.zHome + Z[0] + r() * (Z[1] - Z[0]); k.zv = 0;
+    k.food = null; k.feedDelay = undefined; k.restT = undefined; k.dipFrom = null; k.diveDown = false; k.gulps = 0;
+  };
   Pond.prototype.frame = function (dt) {
     var s = this.s, ctx = this.ctx, look = LOOKS.nishiki;
     dt = Math.min(dt, 0.1);
@@ -1959,6 +2045,7 @@
     var steps = 0;
     while (this.acc >= 1 / 120 && steps < 16) {
       this.t += 1 / 120; this.acc -= 1 / 120; steps++;
+      if (this.waiting && this.waiting.length) this.stepEnter(1 / 120);
       for (var i = 0; i < this.fish.length; i++) this.fish[i].step(1 / 120, this.t);
       this.events(1 / 120);
       this.stepFood(1 / 120);
@@ -1997,6 +2084,8 @@
       start: function () { if (running) return; running = true; last = 0; if (!raf) raf = requestAnimationFrame(loop); },
       stop: function () { running = false; if (raf) { cancelAnimationFrame(raf); raf = 0; } },
       reset: function () { pond.resize(); pond.rebuild(); },
+      // the koi leave the pond and swim in from off the screen (see Pond.enter)
+      enter: function (o) { pond.enter(o); },
       feed: function (x, y) { var p = local(x, y); pond.feed(p.x, p.y); },
       set: function (o) {
         for (var k in o) s[k] = o[k];

@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v346';
+const CACHE = 'thankyou-v347';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
@@ -22,6 +22,13 @@ const ASSETS = [
   './inkfluid.js',
   './inkreveal.js',
   './koi.js',
+  './koipond.js',
+  './koipage.js',
+  './koi-rocks/rock01.webp',
+  './koi-rocks/rock02.webp',
+  './koi-rocks/rock03.webp',
+  './koi-rocks/rock04.webp',
+  './koi-bamboo/stalk.webp',
   './textures/waternormals.jpg',
   './manifest.json',
   './presets.json',
