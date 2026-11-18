@@ -43,7 +43,7 @@ var BASE = '';
 var V = null, OPT = {}, root = null, pond = null, pondCv = null, made = false, ready = false, assets = 0;
 var CV = {};                 // the page's canvases: shade, pond, fountain, rocks, fx
 var PIC = {};                // the rocks', their shade's and the fountain's pictures, cut to where they lie
-var active = false, raf = 0, phase = 'off', inkLayer = null, tStart = 0, lastNow = 0, waitReady = 0;
+var koiTimer = 0, active = false, raf = 0, phase = 'off', inkLayer = null, tStart = 0, lastNow = 0, waitReady = 0;
 var KINDS = ['kohaku', 'ogon', 'showa', 'tancho', 'sanke', 'platinum', 'asagi', 'shiro', 'bekko', 'goshiki'];
 
 function kindList() {
@@ -682,7 +682,7 @@ function fnSoundOn() {
   fnSrc.connect(fnGain); fnSrc.start();
   var now = ac.currentTime;
   fnGain.gain.setValueAtTime(0, now);
-  fnGain.gain.linearRampToValueAtTime(FN_SOUND_GAIN * V.fnSound, now + 2);     // fades in over 2 s
+  fnGain.gain.linearRampToValueAtTime(FN_SOUND_GAIN * V.fnSound, now + Math.max(0.05, V.soundFade === undefined ? 2 : V.soundFade));     // fades in over soundFade s
 }
 function fnSoundOff() {
   if (!fnSrc) return;
@@ -802,18 +802,24 @@ function fountainSeeds() {
   out.push({ x: G.cross.x, y: G.cross.y, r: u * 1.8, at: 0.7 });
   return [{ seeds: out, fall: 0.2 }];
 }
-var INK_PARTS = [
-  // id, starts at, lasts (on the reveal's clock: InkReveal.look.speed 0.5 makes it twice as long in seconds)
-  ['rocks', 0, 2.0],
-  ['fountain', 0.9, 1.5]
-];
+// the ink's parts: id, starts at, lasts. KOI_SCREEN gives them in seconds (inkRocksAt, inkRocksDur,
+// inkFnAt, inkFnDur); the ink's own clock runs at InkReveal.look.speed, so they are turned into it here
+function inkParts() {
+  var sp = (OPT.look && OPT.look.speed) || 0.5, n = function (v, d) { return v === undefined ? d : v; };
+  return [
+    ['rocks', n(V.inkRocksAt, 0) * sp, Math.max(0.1, n(V.inkRocksDur, 4)) * sp],
+    ['fountain', n(V.inkFnAt, 1.8) * sp, Math.max(0.1, n(V.inkFnDur, 3)) * sp]
+  ];
+}
 function inkOk() { return typeof InkReveal !== 'undefined' && !OPT.reduceMotion && OPT.look; }
 function startInk(t) {
   try {
     if (OPT.beforeInk) OPT.beforeInk();
     for (var k in OPT.look) InkReveal.look[k] = OPT.look[k];
+    // the last soft fill of each wash (inkFinish, seconds)
+    if (V.inkFinish !== undefined) InkReveal.look.finish = V.inkFinish * InkReveal.look.speed;
     InkReveal.setup(innerWidth, innerHeight);
-    InkReveal.plan(INK_PARTS.map(function (p) {
+    InkReveal.plan(inkParts().map(function (p) {
       return { id: p[0], kind: 'wash', at: p[1], dur: p[2], washes: p[0] === 'rocks' ? rockSeeds() : fountainSeeds() };
     }));
     InkReveal.play(t);
@@ -878,12 +884,16 @@ function begin(t) {
 // the rocks and the fountain are in: the water runs, its sound, and the koi swim in
 function goLive() {
   phase = 'live';
+  CV.fx.style.transition = 'opacity ' + Math.max(0, V.waterFade === undefined ? 1.6 : V.waterFade) + 's ease';   // the fountain's water fades in over waterFade s
   root.classList.add('water-on');
   fnSoundOn();
-  if (pond) {
+  clearTimeout(koiTimer);
+  // the koi start coming in koiAfter s after the ink is done
+  koiTimer = setTimeout(function () {
+    if (!active || !pond) return;
     pond.enter({ over: V.enterOver === undefined ? 7 : V.enterOver, zLo: 0, zHi: V.enterDepth === undefined ? 0.6 : V.enterDepth });
     pond.start();
-  }
+  }, Math.max(0, V.koiAfter || 0) * 1000);
 }
 function start() {
   if (!root) return;
@@ -900,6 +910,7 @@ function start() {
 function stop() {
   if (!active) return;
   active = false;
+  clearTimeout(koiTimer);
   if (raf) { cancelAnimationFrame(raf); raf = 0; }
   if (phase === 'ink') stopInk();
   phase = 'off';
