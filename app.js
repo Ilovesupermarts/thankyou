@@ -10285,9 +10285,15 @@ function repositionTySwipeHint() {
   // The main message panel's swipe hint and dots are the standard: the
   // thank-you screens use exactly the same distance from the bottom.
   repositionHintGroup();
-  if (globalHint && globalHint.style.bottom) tySwipeHint.style.bottom = globalHint.style.bottom;
-  else tySwipeHint.style.bottom = '';
-  if (tyDotsEl) tyDotsEl.style.bottom = (dotsEl && dotsEl.style.bottom) ? dotsEl.style.bottom : '';
+  // The main message's offsets are measured from the stage's bottom edge
+  // (100vh tall); the thank-you screen is fixed to the visible viewport.
+  // Add the difference between the two bottoms so both land on the same
+  // spot on the screen.
+  var tyShift = 0;
+  if (stage) tyShift = thankyouScreen.getBoundingClientRect().bottom - stage.getBoundingClientRect().bottom;
+  function tyBottom(el) { return (el && el.style.bottom) ? (parseFloat(el.style.bottom) + tyShift) + 'px' : ''; }
+  tySwipeHint.style.bottom = tyBottom(globalHint);
+  if (tyDotsEl) tyDotsEl.style.bottom = tyBottom(dotsEl);
 }
 function updateTySwipeHint() {
   if (!tySwipeHint || !tySwipeHintLabel) return;
