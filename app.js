@@ -23972,8 +23972,12 @@ var Hints = (function () {
     if (opts || numpadWas) return;
     if (row.getBoundingClientRect().bottom < bounds().top) { endSeq(); return; }   /* scrolled past it */
     if (!fullyVisible(row)) return;
-    /* while the scroll cue's fade shows, wait until the row (with its box) is above the fade */
-    if (ScrollCue && row.getBoundingClientRect().bottom + 6 > ScrollCue.fadeTop()) return;
+    /* while the scroll cue's fade shows, wait until the row (with its box) is above the fade
+       with a clear gap of one row's height between them */
+    if (ScrollCue && ScrollCue.holding()) {
+      var rr = row.getBoundingClientRect();
+      if (rr.bottom + 6 + rr.height > ScrollCue.fadeTop()) return;
+    }
     show({ kind: '6d', hold: 4000, watch: true,
       done: function () { if (seq === '6d') { done6d = true; clear(); endSeq(); } },
       targets: [{ el: row, shape: 'box', pad: 6, text: '一覧にない対応可能なオプションがあれば、こちらにご記入ください', place: 'above' }] });
