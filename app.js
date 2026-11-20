@@ -23989,7 +23989,7 @@ var Hints = (function () {
   var TICK_FIRST_HOLD = 6500;
   function drawTick(row, done, hold) {
     tickShown = true;
-    show({ kind: 'tick', hold: hold || 4000, watch: true, urgent: true, done: done,
+    show({ kind: 'tick', hold: hold || 3000, watch: true, urgent: true, done: done,
       targets: [{ el: row, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'belowLeft' }] });
   }
   /* After a caption or the keypad hint, the guided hints carry on. Tapping a price skips 6b. */
