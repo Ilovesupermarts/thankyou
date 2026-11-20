@@ -3504,10 +3504,13 @@ function gateShape(i) {
   var D = V.gateDia, clear = V.gateClear, gk = V['gate' + (i + 1) + 'Size'] || 1;
   var span0 = 2 * (V.trailWidth / 2 + V.trailWall + clear), span = span0 / (1 - D) * gk;
   var hk = V.gateHeight * (V['gateH' + (i + 1)] || 1);
-  return WinterTorii.build({ span: span, height: span * hk, dia: span * D, lean: V.gateLean, sori: V.gateSori * span * hk,
+  var o = { span: span, height: span * hk, dia: span * D, lean: V.gateLean, sori: V.gateSori * span * hk,
     overhang: V.gateOverhang * span, nukiAt: V.gateNuki, nemaki: V.gateNemaki, daiwa: V.gateDaiwa, kusabi: V.gateKusabi,
     plaque: V.gatePlaque, seed: V.seed * 31 + i * 7 + 3,
-    snow: V.gateSnowShow ? V.gateSnow : 0, crevice: V.gateCrevice, plaster: V.gatePlaster, snowVary: V.gateSnowVary });
+    snow: V.gateSnowShow ? V.gateSnow : 0, crevice: V.gateCrevice, plaster: V.gatePlaster, snowVary: V.gateSnowVary };
+  var G = WinterTorii.build(o);
+  G.opts = o;                                           // (the bake worker builds the same gate from these)
+  return G;
 }
 function gateLight() { return { dir: S.view.Lc, sun: LT.sun, sky: LT.sky, amb: LT.amb, vis: LT.vis, snow: hex(V.colours.snow), mist: groundHaze() }; }
 /* the snow's colour as the snow ground has it (lit by the sun at a share k of its level-snow strength, rolled off) */
@@ -3607,10 +3610,19 @@ function cropTo(src, x0, y0, x1, y1, soft) {
   g.drawImage(src, x0, y0, c.width, c.height, 0, 0, c.width, c.height);
   return { cnv: c, x: x0, y: y0 };
 }
-function alphaBox(cnv) {                                      // (once per picture, at bake time)
-  var w = cnv.width, h = cnv.height, D = cnv.getContext('2d').getImageData(0, 0, w, h).data, x0 = w, y0 = h, x1 = -1, y1 = -1;
+function alphaBox(cnv, hint) {                                // (once per picture, at bake time) the box of what is drawn on it
+  var W0 = cnv.width, H0 = cnv.height, ax = 0, ay = 0, w = W0, h = H0;
+  if (hint) {                                                 // (only inside hint (device px): reading back the whole layer is slow)
+    ax = clamp(Math.floor(hint.x0), 0, W0); ay = clamp(Math.floor(hint.y0), 0, H0);
+    w = clamp(Math.ceil(hint.x1), 0, W0) - ax; h = clamp(Math.ceil(hint.y1), 0, H0) - ay;
+    if (w <= 0 || h <= 0) return alphaBox(cnv);
+  }
+  var D = cnv.getContext('2d').getImageData(ax, ay, w, h).data, x0 = w, y0 = h, x1 = -1, y1 = -1;
   for (var y = 0; y < h; y++) { var r = y * w * 4; for (var x = 0; x < w; x++) if (D[r + x * 4 + 3] > 0) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
-  return x1 < 0 ? null : { x0: x0, y0: y0, x1: x1 + 1, y1: y1 + 1 };
+  if (x1 < 0) return hint ? alphaBox(cnv) : null;
+  // drawn right up to the edge of the part looked at (and the layer goes on past it): it may reach further, look at all of it
+  if (hint && (x0 === 0 && ax > 0 || y0 === 0 && ay > 0 || x1 === w - 1 && ax + w < W0 || y1 === h - 1 && ay + h < H0)) return alphaBox(cnv);
+  return { x0: ax + x0, y0: ay + y0, x1: ax + x1 + 1, y1: ay + y1 + 1 };
 }
 function alphaBoxWhite(cnv) {                                 // the shadow layer: white where there is no shadow
   var w = cnv.width, h = cnv.height, D = cnv.getContext('2d').getImageData(0, 0, w, h).data, x0 = w, y0 = h, x1 = -1, y1 = -1;
@@ -3625,13 +3637,82 @@ function start() {
   S.t0 = performance.now();
   var cam = { W: W, H: H, hy: VW.hy, F: VW.F, eye: V.eyeHeight }, Lt = gateLight();
   var J = { cam: cam, Lt: Lt, VW: VW, gates: [], lants: [], info: [], linfo: [], steps: [], ms: { shadow: 0, gates: 0, lants: 0 } };
-  J.steps.push(function () { bakeShadows(J); });
   if (V.gateShow) J.order0 = VW.gates.filter(function (g) { return g.z > 1; }).sort(function (a, b) { return b.z - a.z; });
   else J.order0 = [];
-  J.order0.forEach(function (g) { J.steps.push(function () { bakeGate(J, g); }); });
-  J.steps.push(function () { J.lp = (J.LP || []).slice(); });
-  J.steps.push(function () { bakeLanterns(J); });
+  // first the shadows and the ground (on the page); then every gate's and lantern's pixel work is sent to the bake workers
+  // (other processor cores, all at once); each is laid down here, one a frame, as it comes back (its picture the same, pixel
+  // for pixel, as made here). Without workers (or if one fails) each is made here as before.
+  J.steps.push(function () { bakeShadows(J); sendAll(J); });
+  J.order0.forEach(function (g) { var f = function () { bakeGate(J, g); }; f.ready = function () { return heldReady(J.hold['g' + g.i]); }; J.steps.push(f); });
+  J.steps.push(function () { (J.LP || []).forEach(function (Lp) { var f = function () { bakeLantern(J, Lp); }; f.ready = function () { return heldReady(J.hold['l' + Lp.n]); }; J.steps.push(f); }); });
   S.job = J;
+}
+/* ---------- the bake workers (winterbake.js): each gate's and each lantern's pixel work on a core of its own ---------- */
+var POOL = { w: [], free: [], queue: [], off: false, n: 0 };
+function poolSize() { return clamp(Math.round((navigator.hardwareConcurrency || 4) - 2), 1, 4); }
+function poolTask(msg, transfer) {
+  var h = { done: false, fail: false, res: null };
+  if (POOL.off || typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') { h.fail = true; return h; }
+  POOL.queue.push({ msg: msg, transfer: transfer, h: h });
+  poolRun();
+  return h;
+}
+function poolRun() {
+  while (POOL.queue.length) {
+    var w = POOL.free.pop();
+    if (!w && POOL.w.length < poolSize()) {
+      try { w = new Worker('winterbake.js'); } catch (e) { POOL.off = true; note('torii bake worker: ' + e.message + '; made on the page instead'); }
+      if (!w) break;
+      POOL.w.push(w);
+      w.onmessage = function (e) { var me = this, t = me.task; me.task = null; if (t) { var m = e.data; if (m.ok && !m.miss) { t.h.res = m; t.h.done = true; } else { t.h.fail = true; note('torii bake worker (' + t.msg.kind + '): ' + (m.ok ? 'it needed more of the ground picture than it was given' : m.error) + '; made on the page instead'); } } POOL.free.push(me); poolRun(); };
+      w.onerror = function (e) { var me = this, t = me.task; me.task = null; if (t) t.h.fail = true; note('torii bake worker: ERROR ' + (e.message || 'it could not start') + '; made on the page instead'); POOL.off = true; if (e.preventDefault) e.preventDefault();
+        POOL.queue.forEach(function (q) { q.h.fail = true; }); POOL.queue = []; };
+    }
+    if (!w) break;
+    var t = POOL.queue.shift();
+    w.task = t;
+    try { w.postMessage(t.msg, t.transfer || []); } catch (e) { w.task = null; t.h.fail = true; POOL.free.push(w); }
+  }
+}
+function heldReady(h) { return !h || h.done || h.fail; }
+// a cut-out of the ground picture (device px) round the box x0 … x1, y0 … y1 (CSS px), for a worker
+// (k: the scale the drawing reads it at: wintertorii.js reads it at max(1, PR) for a gate and at PR for a lantern)
+function gpCut(GP, x0, y0, x1, y1, k) {
+  var ox = clamp(Math.floor(x0 * k), 0, GP.w), oy = clamp(Math.floor(y0 * k), 0, GP.h), ex = clamp(Math.ceil(x1 * k), 0, GP.w), ey = clamp(Math.ceil(y1 * k), 0, GP.h);
+  var cw = Math.max(1, ex - ox), ch = Math.max(1, ey - oy), d = new Uint8ClampedArray(cw * ch * 4);
+  for (var y = 0; y < ch && oy + y < GP.h; y++) d.set(GP.data.subarray(((oy + y) * GP.w + ox) * 4, ((oy + y) * GP.w + ox + cw) * 4), y * cw * 4);
+  return { data: d, w: GP.w, h: GP.h, ox: ox, oy: oy, cw: cw, ch: ch };
+}
+// the screen box (CSS px) of a square of half size R (m) on the ground round (x, z), from height ya to yb (m)
+function groundBox(x, z, R, ya, yb, cam) {
+  var b = [1e9, 1e9, -1e9, -1e9];
+  [[-R, -R], [R, -R], [-R, R], [R, R]].forEach(function (d2) {
+    var zz = Math.max(1, z + d2[1]);
+    [ya, yb].forEach(function (yy) { var sx = cam.W / 2 + cam.F * (x + d2[0]) / zz, sy = cam.hy - cam.F * (yy - cam.eye) / zz; b[0] = Math.min(b[0], sx); b[1] = Math.min(b[1], sy); b[2] = Math.max(b[2], sx); b[3] = Math.max(b[3], sy); });
+  });
+  return b;
+}
+function plainLook(look) { var o = {}; for (var k in look) if (k !== 'ground' && k !== 'groundPix' && k !== 'px') o[k] = look[k]; return o; }
+function sendAll(J) {
+  J.hold = {};
+  if (POOL.off || typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined' || !TRAIL.build) return;
+  var path = { build: TRAIL.build, hallOpts: TRAIL.hall && TRAIL.hall.ground ? TRAIL.hallOpts : null }, GP = J.look.groundPix;
+  J.order0.forEach(function (g) {
+    var G = g.G, pw = 2 * G.r0 * 1.07, R = pw * 5.2 * 1.5 + 0.5, box = [1e9, 1e9, -1e9, -1e9];
+    WinterTorii.feet(G, g).forEach(function (f) { var b = groundBox(f.x, f.z, R, (g.y0 || 0) - 1.5, (g.y0 || 0) + 3 * pw, J.cam); box = [Math.min(box[0], b[0]), Math.min(box[1], b[1]), Math.max(box[2], b[2]), Math.max(box[3], b[3])]; });
+    var gp = GP ? gpCut(GP, box[0] - 12, box[1] - 12, box[2] + 12, box[3] + 12, Math.max(1, PR)) : null;
+    var lk = plainLook(J.look); lk.hazeAdd = g.air; lk.groundPix = gp;
+    var pl = {}; for (var k in g) if (k !== 'G') pl[k] = g[k];
+    J.hold['g' + g.i] = poolTask({ kind: 'gate', id: ++POOL.n, build: g.Gopts, place: pl, cam: J.cam, Lt: J.Lt, look: lk, path: path }, gp ? [gp.data.buffer] : []);
+  });
+  (J.LP || []).forEach(function (Lp) {
+    var L = lanternJob(J, Lp); Lp.job = L;
+    if (S.LCACHE[L.key]) return;                          // (kept from the last bake: nothing to work out)
+    var pl = Lp.place, b = groundBox(pl.x, pl.z, Lp.h * 0.6 + 2, pl.y0 - 1.5, pl.y0 + Lp.h * 1.15, J.cam);
+    var gp = L.look.groundPix ? gpCut(L.look.groundPix, b[0] - 12, b[1] - 12, b[2] + 12, b[3] + 12, PR || 1) : null;
+    var lk = plainLook(L.look); lk.groundPix = gp;
+    J.hold['l' + Lp.n] = poolTask({ kind: 'lantern', id: ++POOL.n, place: pl, cam: J.cam, Lt: J.Lt, look: lk, path: path }, gp ? [gp.data.buffer] : []);
+  });
 }
 function bakeShadows(J) {
   var t0 = performance.now(), cam = J.cam, Lt = J.Lt, VW = J.VW;
@@ -3649,7 +3730,7 @@ function bakeShadows(J) {
   J.order0.forEach(function (g) {
     var back = 1 - zNear / g.z, air = V.gateAir * back;
     var G = gateShape(g.i), hzv = clamp((1 - Math.exp(-Math.pow(g.z / V.fieldHazeDist, 1.6))) * V.fieldHaze + air, 0, 1);
-    g.G = G; g.hzv = hzv; g.air = air; g.dof = V.gateDof * back;
+    g.G = G; g.Gopts = G.opts; g.hzv = hzv; g.air = air; g.dof = V.gateDof * back;
     if (V.gateShadow > 0 && L[1] > 0.02) {
       var kk = clamp(V.gateShadow * (1 - hzv) * Math.min(1, LT.vis * 1.1), 0, 1);
       s.fillStyle = rgb(ratio.map(function (r) { return 255 * lerp(1, r, kk); }));
@@ -3708,10 +3789,15 @@ function bakeShadows(J) {
   J.ms.shadow = performance.now() - t0;
 }
 function bakeGate(J, g) {
-  var t0 = performance.now(), G = g.G, look = J.look; look.hazeAdd = g.air;
+  var t0 = performance.now(), G = g.G, look = J.look, h = J.hold && J.hold['g' + g.i]; look.hazeAdd = g.air;
   var tmp = layer();
-  var box = WinterTorii.draw(tmp.c, G, g, J.cam, J.Lt, look);       // (it also gives where clumps of snow may let go: box.emit)
-  var bb = alphaBox(tmp.cnv);
+  look.px = h && h.done ? { use: h.res.out, i: 0 } : null;          // (its pixel work done on a bake worker: only laid down here)
+  if (look.px) J.aside = (J.aside || 0) + 1;
+  var box;
+  try { box = WinterTorii.draw(tmp.c, G, g, J.cam, J.Lt, look); }   // (it also gives where clumps of snow may let go: box.emit)
+  finally { look.px = null; }
+  // (where it drew: looked for only inside the box its parts cover, a little larger; the whole layer only if it reaches that edge)
+  var bb = box && box.x1 > box.x0 ? alphaBox(tmp.cnv, { x0: (box.x0 - 10) * PR, y0: (box.y0 - 10) * PR, x1: (box.x1 + 10) * PR, y1: (box.y1 + 10) * PR }) : alphaBox(tmp.cnv);
   if (bb) {
     var pic = cropTo(tmp.cnv, bb.x0 - 3, bb.y0 - 3, bb.x1 + 3, bb.y1 + 3, V.gateSoft + g.dof);
     J.gates.push({ pic: pic, z: g.z, y0: g.y0 || 0, i: g.i, hz: g.hzv, next: 0, parts: [], emit: (box && box.emit) || [] });
@@ -3722,35 +3808,42 @@ function bakeGate(J, g) {
               (g.y0 > 0.05 ? ', on ground ' + g.y0.toFixed(2) + ' m up' : '') + (g.across ? ', moved ' + Math.abs(g.across).toFixed(2) + ' m ' + (g.across > 0 ? 'right' : 'left') : '') +
               (g.tilt ? ', leaned ' + (g.tilt * 180 / PI).toFixed(2) + '°' : '') + ', ' + Math.round(performance.now() - t0) + ' ms');
 }
-function bakeLanterns(J) {                                    // one lantern a step (it calls itself again until all are done)
-  if (!J.lp.length) return;
-  var Lp = J.lp.shift();
-  if (J.lp.length) J.steps.unshift(function () { bakeLanterns(J); });
-  var t0 = performance.now(), pl = Lp.place, y = pl.y0, hzv = Lp.hzv, GP = J.look.groundPix, lv = lampOn();
+function lanternJob(J, Lp) {                                   // a lantern's drawing options and the label it is kept under
+  var pl = Lp.place, GP = J.look.groundPix, lv = lampOn();
   var key = lantKeyBase(!!GP) + JSON.stringify([pl, Lp.h, Lp.n]);
-  if (S.LCACHE[key]) { var o0 = S.LCACHE[key]; o0.used = 1; J.lants.push(o0.item); J.linfo.push(o0.info); return; }
-  var tmp = layer(), wtmp = layer();
   var vr = V.lantVariety, h1 = lantHash(Lp.n), h2 = lantHash(Lp.n + 50);
   var C = { stone: hex(V.colours.lantStone), moss: hex(V.colours.lantMoss), paper: hex(V.colours.lantPaper), flame: hex(V.colours.lantFlame), glow: hex(V.colours.lantGlow) };
-  var bx = WinterTorii.lanternLit(tmp.c, wtmp.c, pl, J.cam, J.Lt, {
+  var look = {
     h: Lp.h, L: lantLook(), tone: 1 + (h1 - 0.5) * 0.2 * vr, moss: V.lantMossAmt * clamp(1 + (h2 - 0.5) * 1.2 * vr, 0, 2), lit: lv * V.lantLight * 0.5,
     colours: C, haze: V.gateHaze * V.fieldHaze, hazeM: V.fieldHazeDist, windowGlow: V.lantWindowGlow,
     pr: PR, ground: groundFn(), seed: Lp.n * 7 + V.seed, weather: V.lantWeather, groundPix: GP,
-    snowLit: V.lantSnowShow ? snowAt(1) : null, snow: V.lantSnow, roofSnow: V.lantSnowRoof, baseSnow: V.lantSnowBase });
+    snowLit: V.lantSnowShow ? snowAt(1) : null, snow: V.lantSnow, roofSnow: V.lantSnowRoof, baseSnow: V.lantSnowBase };
+  return { key: key, look: look, lv: lv, h1: h1 };
+}
+function bakeLantern(J, Lp) {                                 // one lantern a step
+  var t0 = performance.now(), pl = Lp.place, y = pl.y0, hzv = Lp.hzv, L = Lp.job || lanternJob(J, Lp), lv = L.lv, key = L.key, h = J.hold && J.hold['l' + Lp.n];
+  if (S.LCACHE[key]) { var o0 = S.LCACHE[key]; o0.used = 1; J.lants.push(o0.item); J.linfo.push(o0.info); return; }
+  var tmp = layer(), wtmp = layer();
+  L.look.px = h && h.done ? { use: h.res.out, i: 0 } : null;        // (its pixel work done on a bake worker: only laid down here)
+  if (L.look.px) J.aside = (J.aside || 0) + 1;
+  var bx;
+  try { bx = WinterTorii.lanternLit(tmp.c, wtmp.c, pl, J.cam, J.Lt, L.look); } finally { L.look.px = null; }
   var X0 = (bx.x0 - 3) * PR, Y0 = (bx.y0 - 3) * PR, X1 = (bx.x1 + 3) * PR, Y1 = (bx.y1 + 3) * PR;
   var pic = cropTo(tmp.cnv, X0, Y0, X1, Y1, V.gateSoft);
   if (!pic) return;
   var win = lv > 0 ? cropTo(wtmp.cnv, X0, Y0, X1, Y1, 0) : null;
   var item = { n: Lp.n, z: pl.z, x: pic.x, y: pic.y, pic: pic.cnv, win: win ? win.cnv : null,
-               lx: bx.lx, ly: bx.ly, fx: bx.fx, fy: bx.fy, px: bx.px, hz: hzv, seed: h1 * 1000 };
+               lx: bx.lx, ly: bx.ly, fx: bx.fx, fy: bx.fy, px: bx.px, hz: hzv, seed: L.h1 * 1000 };
   J.lants.push(item);
   var ms = Math.round(performance.now() - t0);
   J.ms.lants += ms;
   var inf = 'lantern ' + Lp.n + ' (' + Lp.side + '): ' + pl.z.toFixed(0) + ' m, ' + Lp.h.toFixed(2) + ' m tall, ' + ms + ' ms' + (y > 0.05 || y < -0.05 ? ', on snow ' + y.toFixed(2) + ' m' : '');
   J.linfo.push(inf); S.LCACHE[key] = { item: item, info: inf.replace(/, \d+ ms/, ', kept'), used: 1 };
 }
+function ready() { var J = S.job; return !!J && (!J.steps.length || !J.steps[0].ready || J.steps[0].ready()); }
 function step() {
   var J = S.job; if (!J) return false;
+  if (!ready()) return false;                           // (its worker has not answered yet)
   var f = J.steps.shift();
   try { if (f) f(); } catch (e) { S.job = null; note('ERROR in the torii and lanterns: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); return true; }
   if (J.steps.length) return false;
@@ -3760,7 +3853,7 @@ function step() {
   S.gates = J.gates; S.lants = J.lants; S.shadow = J.shadow; makeDot();
   S.ms = performance.now() - S.t0;
   S.info = J.info.reverse().join(' · '); S.lantInfo = J.linfo.join(' · ');
-  note('torii and stone lanterns: ' + Math.round(S.ms) + ' ms (one piece a frame) · shadows and ground ' + Math.round(J.ms.shadow) + ' ms, gates ' + Math.round(J.ms.gates) + ' ms, lanterns ' + Math.round(J.ms.lants) + ' ms · ' + S.info + (S.lantInfo ? ' · ' + S.lantInfo : ''));
+  note('torii and stone lanterns: ' + Math.round(S.ms) + ' ms (one piece a frame' + (J.aside ? ', ' + J.aside + ' of them worked out on other cores' : '') + ') · shadows and ground ' + Math.round(J.ms.shadow) + ' ms, gates ' + Math.round(J.ms.gates) + ' ms, lanterns ' + Math.round(J.ms.lants) + ' ms · ' + S.info + (S.lantInfo ? ' · ' + S.lantInfo : ''));
   return true;
 }
 /* ---------- the snow falling from the gates (as torii.html: clumps slip over a lip, fall, break up into powder) ---------- */
@@ -3886,7 +3979,7 @@ function span() {                                             // how far the nea
   var zs = []; S.gates.forEach(function (G) { if (G.pic) zs.push(G.z); }); S.lants.forEach(function (L) { zs.push(L.z); });
   return zs.length ? { near: Math.min.apply(null, zs), far: Math.max.apply(null, zs) } : null;
 }
-return { start: start, step: step, draw: draw, drawShadows: drawShadows, span: span, busy: function () { return !!S.job; }, state: function () { return S; },
+return { start: start, step: step, ready: ready, draw: draw, drawShadows: drawShadows, span: span, busy: function () { return !!S.job; }, state: function () { return S; },
          spawnAll: function (n) { S.gates.forEach(function (G) { for (var i = 0; i < (n || 1); i++) spawn(G); }); } };
 })();
 /* ============================================================
@@ -4017,7 +4110,7 @@ var BAKE_VER = 1;                                   // (raise it to throw every 
 var SC_STAGES = ['hill', 'field', 'hall', 'frost', 'pines'];
 var SC = { db: null, ready: false, giveUp: performance.now() + 4000, rec: {}, pic: { hill: 0, field: 0, hall: 0, frost: 0, pines: 0 }, want: {}, deps: {}, files: null };
 var SC_ROOTS = { hill: ['startHill', 'ytFirPaint'], field: ['bakeField'], hall: ['startHall'], pines: ['startPines', 'stepPines'], frost: ['startFrost', 'stepFrost'] };
-var SC_SKIP = ['note', 'stepMs', 'hillReport', 'asideWorker', 'asideStart', 'asideTake', 'asideKept', 'asidePrefetch', 'fieldAside', 'hallAside', 'scSave', 'scSaveAll', 'scKey', 'scDeps', 'scFiles', 'scRestore', 'scTake'];
+var SC_SKIP = ['note', 'stepMs', 'hillReport', 'asideWorker', 'asideStart', 'asideTake', 'asideKept', 'asidePrefetch', 'fieldAside', 'hallAside', 'scSave', 'scSaveAll', 'scKey', 'scDeps', 'scReach', 'scFiles', 'scRestore', 'scTake'];
 var SC_COMMON = ['sceneLight', 'shadeColour', 'lampLevel', 'sunPlace', 'light', 'isNight', 'nightLights', 'blkPlace', 'blkY'];
 /* What a stage's code reads: its functions and every function of this page they call (read from their own text), and in
    them every value of V (and MT, SUN) they read by name. blkPlace('g') brings g's across / up / size; V['trail' + …]
@@ -4053,7 +4146,29 @@ function scDeps(st, roots) {
   var h = 0;
   for (var i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
   if (roots) return { seen: Object.keys(seen).filter(function (k) { try { return typeof eval(k) === 'function'; } catch (e) { return false; } }).map(function (k) { return k + '<' + from[k]; }) };
-  return (SC.deps[st] = { keys: all ? null : Object.keys(keys).sort(), mt: Object.keys(mt).sort(), sun: Object.keys(sun).sort(), code: h, n: Object.keys(seen).length });
+  // (the sun's place on the screen and the lamps' level go into the label only of the pictures whose own code reads them:
+  // the snow ground's and the hall's far snow glow toward the sun, the pagoda's and the hall's windows; the frosted trees,
+  // the pines and the hill's firs read neither, so the sun moving across the sky no longer throws their pictures away)
+  var own = scReach(SC_ROOTS[st]);
+  return (SC.deps[st] = { keys: all ? null : Object.keys(keys).sort(), mt: Object.keys(mt).sort(), sun: Object.keys(sun).sort(), code: h, n: Object.keys(seen).length,
+                          sunX: !!own.sunPlace, lamp: !!own.lampLevel });
+}
+/* Every function of this page reached from roots (as scDeps follows them, the shared light code not added). */
+function scReach(roots) {
+  var seen = {}, todo = roots.slice();
+  while (todo.length) {
+    var n = todo.pop();
+    if (seen[n]) continue;
+    seen[n] = true;
+    if (SC_SKIP.indexOf(n) >= 0) continue;
+    var fn = null;
+    try { fn = eval(n); } catch (e) { fn = null; }
+    if (typeof fn !== 'function' || /\[native code\]/.test(String(fn))) continue;
+    var code = String(fn).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1').replace(/'(?:[^'\\\n]|\\.)*'/g, "''");
+    var re = /\b([A-Za-z_$][\w$]*)\s*\(/g, m;
+    while ((m = re.exec(code))) if (!seen[m[1]] && !/^(if|for|while|switch|return|function|catch|typeof|new)$/.test(m[1])) todo.push(m[1]);
+  }
+  return seen;
 }
 /* The kept pictures are used once both the store is read and the drawing files are measured. */
 var SC_WAIT = { db: false, files: false };
@@ -4085,8 +4200,8 @@ function scKey(st) {
   d.sun.forEach(function (k) { u[k] = SUN[k]; });
   var LT0 = LT, Lt = sceneLight(); LT = Lt;
   var sh = shadeColour(); LT = LT0;
-  return JSON.stringify({ st: st, ver: BAKE_VER, code: d.code, files: scFiles(), V: v, MT: m, SUN: u, LT: Lt, SH: sh, lamp: lampLevel(),
-                          sunX: sunPlace().x, W: W, H: H, PR: PR, cw: cv.width, ch: cv.height }, function (k, x) {
+  return JSON.stringify({ st: st, ver: BAKE_VER, code: d.code, files: scFiles(), V: v, MT: m, SUN: u, LT: Lt, SH: sh, lamp: d.lamp ? lampLevel() : null,
+                          sunX: d.sunX ? sunPlace().x : null, W: W, H: H, PR: PR, cw: cv.width, ch: cv.height }, function (k, x) {
     return typeof x === 'number' ? Math.round(x * 1e4) / 1e4 : x; });
 }
 function scOpen() {
@@ -4208,7 +4323,9 @@ function rebuildAll() {
   buildSky();
   dirty = {};
   // (the plum branches and the flakes' sprites, 'sprites', are cheap and nearest: they come straight after the mountains)
-  stages = V.blockIn && !V.plumShow && !V.sfShow ? ['mtn', 'hill', 'field', 'hall', 'frost', 'pines', 'lake', 'torii'] : ['mtn', 'sprites', 'hill', 'field', 'hall', 'frost', 'pines', 'lake', 'torii'];   // (step 10: the plum branches show with the block-in too)   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
+  // (the torii straight after the snow ground they stand on: their pixel work then runs on other cores while the hall, the
+  // frosted trees and the pines are made here)
+  stages = V.blockIn && !V.plumShow && !V.sfShow ? ['mtn', 'hill', 'field', 'torii', 'hall', 'frost', 'pines', 'lake'] : ['mtn', 'sprites', 'hill', 'field', 'torii', 'hall', 'frost', 'pines', 'lake'];   // (step 10: the plum branches show with the block-in too)   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -4407,7 +4524,7 @@ function frame(now) {
   else if (HALL.job) { try { stepHall(); } catch (e) { HALL.job = null; note('ERROR in the hall: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
   else if (FIELDJ) { try { stepField(); } catch (e) { FIELDJ = null; note('ERROR in the snow ground: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
   else if (FT.job) { try { stepFrost(); } catch (e) { FT.job = null; note('ERROR in the frosted trees: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
-  else if (TORII.busy()) { TORII.step(); }
+  else if (TORII.busy() && TORII.ready()) { TORII.step(); }
   else if (PINES.job) { try { stepPines(); } catch (e) { PINES.job = null; note('ERROR in the pines: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
   else if (stages.length) { if (!SC.ready && SC_STAGES.indexOf(stages[0]) >= 0 && performance.now() < SC.giveUp) { /* (the kept pictures are still being read) */ } else if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
   else { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
