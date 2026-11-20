@@ -6157,6 +6157,7 @@ function returnToStartScreen() {
   startKoiSwim();
   /* back at the start: the next pass through the app gets its hints again */
   if (Hints) { Hints.reset(); Hints.onStartScreen(); }
+  ScrollCue && ScrollCue.reset();
   NavSpring && NavSpring.reset();
 }
 
@@ -8482,6 +8483,7 @@ function confirmName() {
   }
   nameConfirmed = true;
   Hints && Hints.reset();
+  ScrollCue && ScrollCue.reset();
   NavSpring && NavSpring.reset();
 
   therapistDisplayName = entered + 'さん';
@@ -9765,6 +9767,7 @@ function evaluateScrollState(scrollY, vh) {
   }
   updateSummaryVisibility(sY, winH);
   updateIntroHintVisibility(sY, winH);
+  ScrollCue && ScrollCue.update(sY, winH);
 }
 
 /* ============================================================
@@ -24265,7 +24268,155 @@ var NavSpring = (function () {
     if (tyCurrentPanel === TY_TOTAL_PANELS - 1) exitTyToGames();
     else goToTyPanel(tyCurrentPanel + 1);
   });
-  return { play: play, panelChanged: panelChanged, reset: reset };
+  return { play: play, panelChanged: panelChanged, reset: reset, path: simulate };
+})();
+
+/* ============ SCROLL CUE ============
+   The first time the table comes in, the summary bar shows only once nearly all of
+   the table is on screen. The down button hides much earlier (when the table's top
+   passes 60 % of the screen), so in between a small pill sits where the bar will come
+   up, with the down button's words, and the table fades out at the screen's bottom
+   edge, so it is clear the rows go on. Both go when the summary bar first shows.
+
+   Once per therapist: back at the start screen it is ready again (as the hints are).
+   It turns faint while a hint's caption comes down near it, or the keypad is open,
+   and swings down now and then on the down button's spring. It never takes a touch. */
+var ScrollCue = (function () {
+  var el = document.getElementById('scrollCue');
+  if (!el || !tableCard || !summaryBar) return null;
+  var mover = el.querySelector('.nav-move');
+  var RAMP = 500;                 /* ms for the table's fade to come in or go (as the pill's own fade) */
+  var SWING_EVERY = 2600;         /* ms of rest between two swings */
+  var done = false, on = false, faint = false;
+  var floor = 1, target = 1, rampRaf = 0, rampLast = 0;
+  var pollT = 0, swingT = 0, swingRaf = 0, path = null, swingStart = 0;
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function modalOpen() {
+    var s = [tanzakuScreen, alertScreen, confirmScreen, receiptScreen, thankyouScreen, blossomScreen];
+    for (var i = 0; i < s.length; i++) if (s[i] && s[i].classList.contains('visible')) return true;
+    return false;
+  }
+  function wanted() {
+    if (done) return false;
+    if (summaryBar.classList.contains('visible')) { done = true; return false; }
+    if (!nameConfirmed || !tableUnlocked || !tableEnteredView || rejected) return false;
+    if (globalHint && globalHint.classList.contains('shown')) return false;
+    return !modalOpen();
+  }
+
+  /* the table's fade: --cue-end is where the screen's bottom edge falls in each box
+     (from the cached geometry, so no layout is read while scrolling) */
+  function placeMask(sY, winH) {
+    tableCard.style.setProperty('--cue-end', (winH - (_tcDocTop - sY)).toFixed(1) + 'px');
+    if (rejectRow) rejectRow.style.setProperty('--cue-end', (winH - (_rrDocTop - sY)).toFixed(1) + 'px');
+  }
+  function setFloor(v) {
+    floor = v;
+    tableCard.style.setProperty('--cue-floor', v.toFixed(3));
+    if (rejectRow) rejectRow.style.setProperty('--cue-floor', v.toFixed(3));
+  }
+  function rampStep(now) {
+    rampRaf = 0;
+    var dt = Math.min(64, now - (rampLast || now));
+    rampLast = now;
+    var step = dt / RAMP * 0.88;
+    var v = target < floor ? Math.max(target, floor - step) : Math.min(target, floor + step);
+    setFloor(v);
+    if (v !== target) { rampRaf = requestAnimationFrame(rampStep); return; }
+    if (v >= 1) document.body.classList.remove('scroll-cue-on');
+  }
+  function rampTo(t) {
+    target = t;
+    if (t < 1) document.body.classList.add('scroll-cue-on');
+    if (!rampRaf && floor !== target) { rampLast = 0; rampRaf = requestAnimationFrame(rampStep); }
+  }
+
+  /* faint while a hint's caption is near it (6d's caption above the その他 row can come
+     down this far) or the keypad is open */
+  function checkFaint() {
+    var f = !!(numpad && numpad.classList.contains('visible'));
+    if (!f) {
+      var top = el.getBoundingClientRect().top - 24;
+      var caps = document.querySelectorAll('#hintLayer .coach-cap');
+      for (var i = 0; i < caps.length; i++) {
+        var r = caps[i].getBoundingClientRect();
+        if (r.height > 0 && r.bottom > top) { f = true; break; }
+      }
+    }
+    if (f !== faint) { faint = f; el.classList.toggle('faint', f); }
+  }
+
+  /* the down button's spring, pulled up and let go downward */
+  function swingFrame(now) {
+    var i = Math.max(0, Math.floor((now - swingStart) / 1000 * 240));
+    if (!on || i >= path.length) {
+      mover.style.transform = '';
+      swingRaf = 0;
+      if (on) swingT = setTimeout(swing, SWING_EVERY);
+      return;
+    }
+    mover.style.transform = 'translateY(' + (-path[i]).toFixed(2) + 'px)';
+    swingRaf = requestAnimationFrame(swingFrame);
+  }
+  function swing() {
+    swingT = 0;
+    if (!on || still || !mover || !NavSpring || !NavSpring.path) return;
+    if (faint) { swingT = setTimeout(swing, 800); return; }
+    path = NavSpring.path();
+    swingStart = performance.now();
+    swingRaf = requestAnimationFrame(swingFrame);
+  }
+
+  function setOn(v) {
+    if (v === on) return;
+    on = v;
+    el.classList.toggle('shown', v);
+    rampTo(v ? 0.12 : 1);
+    clearInterval(pollT); pollT = 0;
+    clearTimeout(swingT); swingT = 0;
+    if (v) {
+      checkFaint();
+      pollT = setInterval(function () { update(); if (on) checkFaint(); }, 250);
+      swingT = setTimeout(swing, 900);
+    }
+  }
+
+  function update(scrollY, vh) {
+    var w = wanted();
+    if (w || on) {
+      var sY = (scrollY !== undefined) ? scrollY : (window.scrollY || window.pageYOffset || 0);
+      var winH = (vh !== undefined) ? vh : window.innerHeight;
+      placeMask(sY, winH);
+    }
+    setOn(w);
+  }
+
+  /* a new therapist: ready again, and nothing left on screen */
+  function reset() {
+    done = false;
+    on = false;
+    el.classList.remove('shown', 'faint');
+    faint = false;
+    clearInterval(pollT); pollT = 0;
+    clearTimeout(swingT); swingT = 0;
+    if (swingRaf) { cancelAnimationFrame(swingRaf); swingRaf = 0; }
+    if (mover) mover.style.transform = '';
+    if (rampRaf) { cancelAnimationFrame(rampRaf); rampRaf = 0; }
+    target = 1; setFloor(1);
+    document.body.classList.remove('scroll-cue-on');
+  }
+
+  var api = { update: update, reset: reset };
+  /* as the hints: if the cue ever went wrong it must not take the app down with it */
+  function safely(fn) {
+    return function () {
+      try { return fn.apply(null, arguments); }
+      catch (e) { try { done = true; reset(); done = true; } catch (e2) { /* silent */ } }
+    };
+  }
+  for (var name in api) api[name] = safely(api[name]);
+  return api;
 })();
 
 updateGlobalHint();
