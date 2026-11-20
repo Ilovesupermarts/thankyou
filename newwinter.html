@@ -3647,33 +3647,9 @@ function start() {
   J.steps.push(function () { (J.LP || []).forEach(function (Lp) { var f = function () { bakeLantern(J, Lp); }; f.ready = function () { return heldReady(J.hold['l' + Lp.n]); }; J.steps.push(f); }); });
   S.job = J;
 }
-/* ---------- the bake workers (winterbake.js): each gate's and each lantern's pixel work on a core of its own ---------- */
-var POOL = { w: [], free: [], queue: [], off: false, n: 0 };
-function poolSize() { return clamp(Math.round((navigator.hardwareConcurrency || 4) - 2), 1, 4); }
-function poolTask(msg, transfer) {
-  var h = { done: false, fail: false, res: null };
-  if (POOL.off || typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') { h.fail = true; return h; }
-  POOL.queue.push({ msg: msg, transfer: transfer, h: h });
-  poolRun();
-  return h;
-}
-function poolRun() {
-  while (POOL.queue.length) {
-    var w = POOL.free.pop();
-    if (!w && POOL.w.length < poolSize()) {
-      try { w = new Worker('winterbake.js'); } catch (e) { POOL.off = true; note('torii bake worker: ' + e.message + '; made on the page instead'); }
-      if (!w) break;
-      POOL.w.push(w);
-      w.onmessage = function (e) { var me = this, t = me.task; me.task = null; if (t) { var m = e.data; if (m.ok && !m.miss) { t.h.res = m; t.h.done = true; } else { t.h.fail = true; note('torii bake worker (' + t.msg.kind + '): ' + (m.ok ? 'it needed more of the ground picture than it was given' : m.error) + '; made on the page instead'); } } POOL.free.push(me); poolRun(); };
-      w.onerror = function (e) { var me = this, t = me.task; me.task = null; if (t) t.h.fail = true; note('torii bake worker: ERROR ' + (e.message || 'it could not start') + '; made on the page instead'); POOL.off = true; if (e.preventDefault) e.preventDefault();
-        POOL.queue.forEach(function (q) { q.h.fail = true; }); POOL.queue = []; };
-    }
-    if (!w) break;
-    var t = POOL.queue.shift();
-    w.task = t;
-    try { w.postMessage(t.msg, t.transfer || []); } catch (e) { w.task = null; t.h.fail = true; POOL.free.push(w); }
-  }
-}
+/* ---------- the bake workers (winterbake.js, shared with the snow ground and the hall: bakeTask): each gate's and each
+   lantern's pixel work on a core of its own ---------- */
+function poolTask(msg, transfer) { return bakeTask(msg, transfer); }
 function heldReady(h) { return !h || h.done || h.fail; }
 // a cut-out of the ground picture (device px) round the box x0 … x1, y0 … y1 (CSS px), for a worker
 // (k: the scale the drawing reads it at: wintertorii.js reads it at max(1, PR) for a gate and at PR for a lantern)
@@ -3695,7 +3671,7 @@ function groundBox(x, z, R, ya, yb, cam) {
 function plainLook(look) { var o = {}; for (var k in look) if (k !== 'ground' && k !== 'groundPix' && k !== 'px') o[k] = look[k]; return o; }
 function sendAll(J) {
   J.hold = {};
-  if (POOL.off || typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined' || !TRAIL.build) return;
+  if (BAKEPOOL.off || typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined' || !TRAIL.build) return;
   var path = { build: TRAIL.build, hallOpts: TRAIL.hall && TRAIL.hall.ground ? TRAIL.hallOpts : null }, GP = J.look.groundPix;
   J.order0.forEach(function (g) {
     var G = g.G, pw = 2 * G.r0 * 1.07, R = pw * 5.2 * 1.5 + 0.5, box = [1e9, 1e9, -1e9, -1e9];
@@ -3703,7 +3679,7 @@ function sendAll(J) {
     var gp = GP ? gpCut(GP, box[0] - 12, box[1] - 12, box[2] + 12, box[3] + 12, Math.max(1, PR)) : null;
     var lk = plainLook(J.look); lk.hazeAdd = g.air; lk.groundPix = gp;
     var pl = {}; for (var k in g) if (k !== 'G') pl[k] = g[k];
-    J.hold['g' + g.i] = poolTask({ kind: 'gate', id: ++POOL.n, build: g.Gopts, place: pl, cam: J.cam, Lt: J.Lt, look: lk, path: path }, gp ? [gp.data.buffer] : []);
+    J.hold['g' + g.i] = poolTask({ kind: 'gate', build: g.Gopts, place: pl, cam: J.cam, Lt: J.Lt, look: lk, path: path }, gp ? [gp.data.buffer] : []);
   });
   (J.LP || []).forEach(function (Lp) {
     var L = lanternJob(J, Lp); Lp.job = L;
@@ -3711,7 +3687,7 @@ function sendAll(J) {
     var pl = Lp.place, b = groundBox(pl.x, pl.z, Lp.h * 0.6 + 2, pl.y0 - 1.5, pl.y0 + Lp.h * 1.15, J.cam);
     var gp = L.look.groundPix ? gpCut(L.look.groundPix, b[0] - 12, b[1] - 12, b[2] + 12, b[3] + 12, PR || 1) : null;
     var lk = plainLook(L.look); lk.groundPix = gp;
-    J.hold['l' + Lp.n] = poolTask({ kind: 'lantern', id: ++POOL.n, place: pl, cam: J.cam, Lt: J.Lt, look: lk, path: path }, gp ? [gp.data.buffer] : []);
+    J.hold['l' + Lp.n] = poolTask({ kind: 'lantern', place: pl, cam: J.cam, Lt: J.Lt, look: lk, path: path }, gp ? [gp.data.buffer] : []);
   });
 }
 function bakeShadows(J) {
@@ -3996,7 +3972,8 @@ window.winterLab = {
   frost: function () { return FT; },
   mist: function () { return { drift: VMIST.drift, info: VMIST.info, state: typeof WinterMist !== 'undefined' ? WinterMist.state() : 'missing' }; },   // the valley mist (14f), for check scripts                      // the frosted trees (14e), for check scripts
   gustAt: function (x, str) { WS.gusts.push({ dir: 1, x: x, v: 300, str: str || 0.6, hit: {} }); },   // (checks: a gust front starting at x, CSS px)
-  stepBudget: function (ms) { STEP_MS = ms; },             // (check scripts only: the headless browser draws a frame in about 1.5 s)                 // the plum branches (step 10), for check scripts
+  stepBudget: function (ms) { STEP_MS = ms; },
+  bakeWorkers: function (n) { BAKE_N = n; },                 // (check scripts only: how many bake workers, so the bands are tried on a small machine)             // (check scripts only: the headless browser draws a frame in about 1.5 s)                 // the plum branches (step 10), for check scripts
   ytFirPaint: function () { return ytFirPaint.apply(null, arguments); },   // the right bank's fir as the hill and shrine draw it (checks)
   changed: function (what) {
     saveAll();
@@ -4110,7 +4087,7 @@ var BAKE_VER = 1;                                   // (raise it to throw every 
 var SC_STAGES = ['hill', 'field', 'hall', 'frost', 'pines'];
 var SC = { db: null, ready: false, giveUp: performance.now() + 4000, rec: {}, pic: { hill: 0, field: 0, hall: 0, frost: 0, pines: 0 }, want: {}, deps: {}, files: null };
 var SC_ROOTS = { hill: ['startHill', 'ytFirPaint'], field: ['bakeField'], hall: ['startHall'], pines: ['startPines', 'stepPines'], frost: ['startFrost', 'stepFrost'] };
-var SC_SKIP = ['note', 'stepMs', 'hillReport', 'asideWorker', 'asideStart', 'asideTake', 'asideKept', 'asidePrefetch', 'fieldAside', 'hallAside', 'scSave', 'scSaveAll', 'scKey', 'scDeps', 'scReach', 'scFiles', 'scRestore', 'scTake'];
+var SC_SKIP = ['note', 'stepMs', 'hillReport', 'asideWorker', 'asideStart', 'asideField', 'asideHall', 'asideBands', 'bakeTask', 'bakeRun', 'bakeEnd', 'bakeWorkers', 'asideTake', 'asideKept', 'asidePrefetch', 'fieldAside', 'hallAside', 'scSave', 'scSaveAll', 'scKey', 'scDeps', 'scReach', 'scFiles', 'scRestore', 'scTake'];
 var SC_COMMON = ['sceneLight', 'shadeColour', 'lampLevel', 'sunPlace', 'light', 'isNight', 'nightLights', 'blkPlace', 'blkY'];
 /* What a stage's code reads: its functions and every function of this page they call (read from their own text), and in
    them every value of V (and MT, SUN) they read by name. blkPlace('g') brings g's across / up / size; V['trail' + …]
@@ -4359,30 +4336,101 @@ function watchGL() {
    back (asideTake), or, if a worker cannot run or fails, works it out
    itself as before (holder.fail). One worker for each.
    ============================================================ */
-var ASIDE = { w: {}, off: {}, n: 0, wait: {}, pend: {} };
-function asideWorker(kind) {
-  if (ASIDE.off[kind] || typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') return null;
-  if (ASIDE.w[kind]) return ASIDE.w[kind];
-  try {
-    var w = new Worker('winterbake.js');
-    w.onmessage = function (e) {
-      var m = e.data, en = ASIDE.wait[m.id];
-      if (!en) return;
-      delete ASIDE.wait[m.id];
-      var h = en.h;
-      if (!m.ok) { h.fail = true; note('bake worker (' + kind + '): ' + m.error + '; worked out on the page instead'); return; }
-      if (kind === 'field') { h.nPath = m.nPath; h.cpu = m.cpu; h.data = new Uint8ClampedArray(m.data); }
-      else { h.ms = m.ms; h.LW = m.LW; h.LH = m.LH; h.gBack = m.gBack; h.gFront = m.gFront; h.gHit = m.gHit; }
-    };
-    w.onerror = function (e) {
-      note('bake worker (' + kind + '): ERROR ' + (e.message || 'it could not start') + '; worked out on the page instead');
-      ASIDE.off[kind] = true; ASIDE.w[kind] = null;
-      for (var id in ASIDE.wait) if (ASIDE.wait[id].kind === kind) { ASIDE.wait[id].h.fail = true; delete ASIDE.wait[id]; }
-      if (e.preventDefault) e.preventDefault();
-    };
-    ASIDE.w[kind] = w;
-    return w;
-  } catch (e) { ASIDE.off[kind] = true; note('bake worker: ' + e.message + '; worked out on the page instead'); return null; }
+var ASIDE = { pend: {} };
+/* The bake workers (winterbake.js), shared by everything sent to them: as many as the tablet has processor cores to
+   spare (two left for the page and the graphics). Each takes the next piece of work as soon as it is free. */
+var BAKEPOOL = { w: [], free: [], queue: [], off: false, n: 0 };
+var BAKE_N = 0;                                          // (check scripts only: winterLab.bakeWorkers(n))
+function bakeWorkers() { return BAKE_N || clamp(Math.round((navigator.hardwareConcurrency || 4) - 2), 1, 6); }
+// a piece of work: { done, fail, res } (then(h) when it has come back or failed)
+function bakeTask(msg, transfer, then) {
+  var h = { done: false, fail: false, res: null, then: then || null };
+  if (BAKEPOOL.off || typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') { h.fail = true; if (then) then(h); return h; }
+  msg.id = ++BAKEPOOL.n;
+  BAKEPOOL.queue.push({ msg: msg, transfer: transfer || [], h: h });
+  bakeRun();
+  return h;
+}
+function bakeEnd(t, ok, res) { var h = t.h; if (ok) { h.res = res; h.done = true; } else h.fail = true; if (h.then) { try { h.then(h); } catch (e) { note('bake worker: ' + e.message); } } }
+function bakeRun() {
+  while (BAKEPOOL.queue.length) {
+    var w = BAKEPOOL.free.pop();
+    if (!w && BAKEPOOL.w.length < bakeWorkers()) {
+      try { w = new Worker('winterbake.js'); } catch (e) { BAKEPOOL.off = true; note('bake worker: ' + e.message + '; worked out on the page instead'); }
+      if (!w) break;
+      BAKEPOOL.w.push(w);
+      w.onmessage = function (e) {
+        var me = this, t = me.task, m = e.data; me.task = null;
+        BAKEPOOL.free.push(me);
+        if (t) {
+          if (!m.ok) note('bake worker (' + t.msg.kind + '): ' + m.error + '; worked out on the page instead');
+          else if (m.miss) note('bake worker (' + t.msg.kind + '): it needed more of the ground picture than it was given; made on the page instead');
+          bakeEnd(t, m.ok && !m.miss, m);
+        }
+        bakeRun();
+      };
+      w.onerror = function (e) {
+        var me = this, t = me.task; me.task = null;
+        note('bake worker: ERROR ' + (e.message || 'it could not start') + '; worked out on the page instead');
+        BAKEPOOL.off = true; if (e.preventDefault) e.preventDefault();
+        if (t) bakeEnd(t, false);
+        var q = BAKEPOOL.queue; BAKEPOOL.queue = []; q.forEach(function (t2) { bakeEnd(t2, false); });
+      };
+    }
+    if (!w) break;
+    var t = BAKEPOOL.queue.shift();
+    w.task = t;
+    try { w.postMessage(t.msg, t.transfer); } catch (e) { w.task = null; BAKEPOOL.free.push(w); bakeEnd(t, false); }
+  }
+}
+/* The snow ground's rows, and the hall's ground with its edges, each shared out among the bake workers in bands of rows
+   (the hall's edges after its raster, in parts); the pieces are put together here into what one worker would have made. */
+function asideBands() { return clamp(bakeWorkers() - 1, 1, 3); }
+function asideField(h, msg) {
+  var n = asideBands(), left = n, parts = [], cpu = 0, nPath = 0;
+  for (var p = 0; p < n; p++) (function (p) {
+    var m = { kind: 'field', path: msg.path, o: Object.assign({}, msg.o) }; m.o.band = [p, n];
+    bakeTask(m, [], function (t) {
+      if (h.fail) return;
+      if (!t.done) { h.fail = true; return; }
+      parts[p] = t.res; cpu += t.res.cpu; nPath += t.res.nPath;
+      if (--left) return;
+      var gw = parts[0].rows[2], gh = parts[0].rows[3], D = new Uint8ClampedArray(gw * gh * 4);
+      parts.forEach(function (r) { D.set(new Uint8ClampedArray(r.data), r.rows[0] * gw * 4); });
+      h.nPath = nPath; h.cpu = cpu; h.data = D;
+    });
+  })(p);
+}
+function asideHall(h, msg) {
+  var n = asideBands(), left = n, parts = [], ms = 0;
+  for (var p = 0; p < n; p++) (function (p) {
+    var m = { kind: 'hall', path: msg.path, o: Object.assign({}, msg.o) }; m.o.band = [p, n];
+    bakeTask(m, [], function (t) {
+      if (h.fail) return;
+      if (!t.done) { h.fail = true; return; }
+      parts[p] = t.res; ms = Math.max(ms, t.res.ms);
+      if (--left) return;
+      var LW = parts[0].LW, LH = parts[0].LH, gHit = new Uint8Array(LW * LH), gBack = new Float32Array(LW * LH * 8), gFront = new Float32Array(LW * LH * 8);
+      parts.forEach(function (r) { gHit.set(r.gHit, r.band[0] * LW); gBack.set(r.gBack, r.band[0] * LW * 8); gFront.set(r.gFront, r.band[0] * LW * 8); });
+      // then its edges, in parts, on the workers again (each finds the same edges from the whole raster's hit map)
+      var left2 = n, ms2 = 0;
+      for (var q = 0; q < n; q++) (function (q) {
+        var m2 = { kind: 'hall', path: msg.path, o: Object.assign({}, msg.o) }; m2.o.edgePart = [q, n]; m2.o.hitAll = gHit;
+        bakeTask(m2, [], function (t2) {
+          if (h.fail) return;
+          if (!t2.done) { h.fail = true; return; }
+          var ks = t2.res.ks, vals = t2.res.vals;
+          for (var i = 0; i < ks.length; i++) {
+            var k = ks[i] * 8;
+            for (var v = 0; v < 8; v++) { var vb = vals[i * 16 + v], vf = vals[i * 16 + 8 + v]; if (vb === vb) gBack[k + v] = vb; if (vf === vf) gFront[k + v] = vf; }
+          }
+          ms2 = Math.max(ms2, t2.res.ms);
+          if (--left2) return;
+          h.ms = ms + ms2; h.LW = LW; h.LH = LH; h.gBack = gBack; h.gFront = gFront; h.gHit = gHit;
+        });
+      })(q);
+    });
+  })(p);
 }
 // a request (or the one already made with exactly the same options): a holder the stage's job waits on
 function asideStart(kind, msg) {
@@ -4390,12 +4438,9 @@ function asideStart(kind, msg) {
   if (p && p.key === key && !p.h.fail) return p.h;
   var h = { kind: kind };
   ASIDE.pend[kind] = { key: key, h: h };
-  var w = asideWorker(kind);
-  if (!w) { h.fail = true; return h; }
-  var id = ++ASIDE.n;
-  ASIDE.wait[id] = { h: h, kind: kind };
-  msg.id = id; msg.kind = kind;
-  try { w.postMessage(msg); } catch (e) { delete ASIDE.wait[id]; h.fail = true; note('bake worker (' + kind + '): ' + e.message + '; worked out on the page instead'); }
+  if (BAKEPOOL.off || typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') { h.fail = true; return h; }
+  note('bake workers: the ' + (kind === 'field' ? 'snow ground\'s rows' : 'hall\'s ground') + ' shared among ' + asideBands() + ' of them (' + bakeWorkers() + ' workers in all)');
+  if (kind === 'field') asideField(h, msg); else asideHall(h, msg);
   return h;
 }
 function asideTake(kind, msg) { var h = asideStart(kind, msg); ASIDE.pend[kind] = null; return h; }
