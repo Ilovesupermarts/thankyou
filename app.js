@@ -6429,6 +6429,7 @@ function flashCustomRowHint(row) {
 }
 function tryOpenCustomService(row, withHint) {
   if (!row) return;
+  if (ScrollCue && ScrollCue.holding()) return;   /* not while the scroll cue's fade is on the table */
   if (!isAllowedCustomRow(row)) {
     var tapped = row.querySelector('.service-input');
     if (tapped && document.activeElement === tapped) { try { tapped.blur(); } catch (e) {} }
@@ -7019,6 +7020,8 @@ tableCard.addEventListener('click', function(e) {
 tableCard.addEventListener('focusin', function(e) {
   var t = e.target;
   if (!t || !t.classList || !t.classList.contains('service-input')) return;
+  /* not while the scroll cue's fade is on the table */
+  if (ScrollCue && ScrollCue.holding()) { try { t.blur(); } catch (err0) {} return; }
   var row = t.closest('.row');
   if (rejected || !row || refuseIfPending(row)) { try { t.blur(); } catch (err) {} return; }
   if (!isAllowedCustomRow(row)) {
@@ -24407,7 +24410,11 @@ var ScrollCue = (function () {
     document.body.classList.remove('scroll-cue-on');
   }
 
-  var api = { update: update, reset: reset };
+  /* the table's fade is on screen (it stays until it has fully gone): the custom
+     service fields are not to be filled meanwhile */
+  function holding() { return document.body.classList.contains('scroll-cue-on'); }
+
+  var api = { update: update, reset: reset, holding: holding };
   /* as the hints: if the cue ever went wrong it must not take the app down with it */
   function safely(fn) {
     return function () {
