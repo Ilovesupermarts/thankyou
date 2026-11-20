@@ -65,6 +65,28 @@ function norm(v) { var l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, 
 function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
 function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
 function d(o, k, v) { return o[k] === undefined ? v : o[k]; }
+/* The per-pixel parts of a gate's and a lantern's drawing (the snow bodies, the piles at the feet, the lantern), as
+   "pixel sites": with look.px = { make: true, out: [] } each is worked out and its pixels kept in out (a bake worker does
+   this, drawing on a context that draws nothing); with look.px = { use: out, i: 0 } each is taken from there instead of
+   being worked out again, and only the drawing is done. Without look.px, worked out and drawn as always. The same code
+   makes the same numbers wherever it runs, so the picture is the same pixel for pixel. */
+function site(look, fn) {
+  var X = look && look.px;
+  if (X && X.use) { if (X.i < X.use.length) return X.use[X.i++]; throw new Error('a pixel site is missing'); }
+  var r = fn();
+  if (X && X.make) X.out.push(r);
+  return r;
+}
+function making(look) { return !!(look && look.px && look.px.make); }
+/* The ground picture's index of device pixel (gx, gy). A bake worker gets only a cut-out of it (ox, oy, cw, ch): a pixel
+   outside the cut-out is marked (miss), and the page then works that gate or lantern out itself. */
+function gpAt(GP, gx, gy) {
+  if (GP.oy === undefined) return (gy * GP.w + gx) * 4;
+  var x = gx - GP.ox, y = gy - GP.oy;
+  if (x < 0 || y < 0 || x >= GP.cw || y >= GP.ch) { GP.miss = true; return 0; }
+  return (y * GP.cw + x) * 4;
+}
+function toCanvas(im) { var cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; cv.getContext('2d').putImageData(im, 0, 0); return cv; }
 /* convex hull of screen points (monotone chain) */
 function hull(P) {
   P = P.slice().sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
@@ -442,7 +464,7 @@ function draw(c, G, place, cam, Lt, look) {
     var w = T.w(a0, 0, 0), g = look.ground(w[0], w[2]).h - (place.y0 || 0);
     return g < -0.005 ? g - 0.02 : 0;
   }
-  function footDrift(a0) {
+  function footDriftPix(a0) {
     var GR = look.ground, sd = a0 < 0 ? -1 : 1, rs = G.r0 * 1.07, pw = 2 * rs, Hp = 0.95 * pw * fsK;
     var X = place.x, Z = place.z, rx = T.rx, rz = T.rz, fx = T.fx, fz = T.fz, gy0 = place.y0 || 0;
     function toW(a, b) { return [X + a * rx + b * fx, Z + a * rz + b * fz]; }
@@ -588,9 +610,9 @@ function draw(c, G, place, cam, Lt, look) {
       [hMin, hMax].forEach(function (yy) { var pp = T.p([w[0], yy, w[1]]); X0 = Math.min(X0, pp[0]); X1 = Math.max(X1, pp[0]); Y0 = Math.min(Y0, pp[1]); Y1 = Math.max(Y1, pp[1]); });
     });
     X0 = Math.max(0, Math.floor(X0 - 2)); Y0 = Math.max(0, Math.floor(Y0 - 2)); X1 = Math.min(cam.W, Math.ceil(X1 + 2)); Y1 = Math.min(cam.H, Math.ceil(Y1 + 2));
-    if (X1 <= X0 || Y1 <= Y0) return;
+    if (X1 <= X0 || Y1 <= Y0) return null;
     var w = Math.ceil((X1 - X0) * PRD), h = Math.ceil((Y1 - Y0) * PRD);
-    if (w * h > 3e6 || w * h < 1) return;
+    if (w * h > 3e6 || w * h < 1) return null;
     var im = new ImageData(w, h), D = im.data, any = 0;
     // the light of the reference: from the upper right, in front (camera space: x right, y up, z away)
     var LR = norm([0.55, 0.8, 0.3]);
@@ -608,7 +630,7 @@ function draw(c, G, place, cam, Lt, look) {
       var fp = T.p([pc[0], g0, pc[1]]), ppm = cam.F / Math.max(1, Math.hypot(pc[0], pc[1])), hw2 = Math.max(6, 4 * pw * ppm), hv2 = Math.max(3, 1.2 * pw * ppm), smp = [];
       for (var yy3 = fp[1] - hv2; yy3 <= fp[1] + hv2; yy3 += Math.max(1, hv2 / 8)) for (var xx3 = fp[0] - hw2; xx3 <= fp[0] + hw2; xx3 += Math.max(1, hw2 / 24)) {
         var gx3 = Math.round(xx3 * PRD), gy3 = Math.round(yy3 * PRD); if (gx3 < 0 || gy3 < 0 || gx3 >= GPx.w || gy3 >= GPx.h) continue;
-        var k3 = (gy3 * GPx.w + gx3) * 4; smp.push([GPx.data[k3], GPx.data[k3 + 1], GPx.data[k3 + 2], GPx.data[k3] * 0.3 + GPx.data[k3 + 1] * 0.59 + GPx.data[k3 + 2] * 0.11]);
+        var k3 = gpAt(GPx, gx3, gy3); smp.push([GPx.data[k3], GPx.data[k3 + 1], GPx.data[k3 + 2], GPx.data[k3] * 0.3 + GPx.data[k3 + 1] * 0.59 + GPx.data[k3 + 2] * 0.11]);
       }
       if (smp.length > 8) {
         smp.sort(function (u, v) { return u[3] - v[3]; });
@@ -687,7 +709,7 @@ function draw(c, G, place, cam, Lt, look) {
           if (GPx && disc > 0) {
             var tcb = (-qb - Math.sqrt(disc)) / (2 * qa), gxb = Math.round(X0 * PRD) + i, gyb = Math.round(Y0 * PRD) + j;
             if (tcb > hit && gxb >= 0 && gyb >= 0 && gxb < GPx.w && gyb < GPx.h) {
-              var kb2 = (gyb * GPx.w + gxb) * 4, kd2 = (j * w + i) * 4;
+              var kb2 = gpAt(GPx, gxb, gyb), kd2 = (j * w + i) * 4;
               D[kd2] = GPx.data[kb2]; D[kd2 + 1] = GPx.data[kb2 + 1]; D[kd2 + 2] = GPx.data[kb2 + 2]; D[kd2 + 3] = 255; any++;
             }
           }
@@ -720,7 +742,7 @@ function draw(c, G, place, cam, Lt, look) {
           // the ground's level snow (L0), lit by how the pile's slope faces the light: level, it is the ground's colour;
           // turned away, the snow's lavender shade; creases deeper. Only at its thin edge the ground right there shows
           // (it melts into it); nowhere does the ground's detail (the path's wall) show through it
-          var gk2 = (gy2 * GPx.w + gx2) * 4, fLv = smooth(0.3, 0.82, LR[1]), kl2 = clamp(f / fLv, 0, 1), thin = smooth(0.01 * pw, 0.12 * pw, thk);
+          var gk2 = gpAt(GPx, gx2, gy2), fLv = smooth(0.3, 0.82, LR[1]), kl2 = clamp(f / fLv, 0, 1), thin = smooth(0.01 * pw, 0.12 * pw, thk);
           for (ch = 0; ch < 3; ch++) {
             var kq2 = lerp(shC[ch] / litC[ch], 1, kl2);
             kq2 = lerp(kq2, deep[ch] / litC[ch], crease * 0.8); kq2 = lerp(kq2, deep[ch] / litC[ch], cs);
@@ -751,10 +773,15 @@ function draw(c, G, place, cam, Lt, look) {
         i0 = i1;
       }
     }
-    if (!any) return;
-    var cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').putImageData(im, 0, 0);
+    if (!any) return null;
+    return { im: im, X0: X0, Y0: Y0 };
+  }
+  function footDrift(a0) {
+    var R = site(look, function () { return footDriftPix(a0); });
+    if (!R || making(look)) return;
+    var w = R.im.width, h = R.im.height, X0 = R.X0, Y0 = R.Y0;
     c.save(); c.filter = 'blur(' + (1.0 * PRD).toFixed(2) + 'px)'; c.imageSmoothingQuality = 'high';
-    c.drawImage(cv, X0, Y0, w / PRD, h / PRD); c.restore();
+    c.drawImage(toCanvas(R.im), X0, Y0, w / PRD, h / PRD); c.restore();
     grow([[X0, Y0], [X0 + w / PRD, Y0 + h / PRD]]);
   }
   function footSnow(a0) {
@@ -977,12 +1004,15 @@ function draw(c, G, place, cam, Lt, look) {
         if (back) nB++; else nF++;
       }
     }
-    function pic(im, nn) {
-      if (!nn) return null;
-      var cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').putImageData(im, 0, 0);
-      return { cv: cv, x: X0, y: Y0, w: w / PRD, h: h / PRD };
-    }
+    function pic(im, nn) { return nn ? { im: im, x: X0, y: Y0, w: w / PRD, h: h / PRD } : null; }
     return { front: pic(imF, nF), back: pic(imB, nB) };
+  }
+  // a body's pixels, worked out (or taken from look.px), made into pictures to lay down
+  function bodyPics(fn) {
+    var R = site(look, fn);
+    if (!R || making(look)) return null;
+    [R.front, R.back].forEach(function (P2) { if (P2 && !P2.cv) P2.cv = toCanvas(P2.im); });
+    return R;
   }
   function lay(P2) {
     if (!P2) return;
@@ -991,7 +1021,7 @@ function draw(c, G, place, cam, Lt, look) {
     grow([[P2.x, P2.y], [P2.x + P2.w, P2.y + P2.h]]);
   }
   var SNQ = {};
-  if (G.snow) G.snow.heaps.forEach(function (hp) { SNQ[hp.grp] = renderBody(bodyOfHeap(hp)); });
+  if (G.snow) G.snow.heaps.forEach(function (hp) { SNQ[hp.grp] = bodyPics(function () { return renderBody(bodyOfHeap(hp)); }); });
   function snowBack(g) { if (SNQ[g]) lay(SNQ[g].back); }
   function snowFront(g) { if (SNQ[g]) lay(SNQ[g].front); }
   /* snow on a pillar: the windward side plastered in broken patches (it sticks where the wind drives it), and a ring of it
@@ -1030,7 +1060,7 @@ function draw(c, G, place, cam, Lt, look) {
   }
   function rimSnow(sd) {
     var B = bodyOfRim(sd); if (!B) return;
-    var R = renderBody(B); if (R) { lay(R.front); lay(R.back); }
+    var R = bodyPics(function () { return renderBody(B); }); if (R) { lay(R.front); lay(R.back); }
   }
 
   // 1. the undersides of the two upper beams (seen from below: drawn first, the rest lies over them)
@@ -1410,7 +1440,7 @@ function vn3(x, y, z) {
   return lerp(a, b, e) * 2 - 1;
 }
 function fbm3(x, y, z, o) { var s = 0, a = 0.5, t = 0; for (var i = 0; i < o; i++) { s += a * vn3(x, y, z); t += a; x *= 2.03; y *= 2.03; z *= 2.03; a *= 0.5; } return s / t; }
-function drawLanternLit(c, wc, place, cam, Lt, look) {
+function lanternPix(place, cam, Lt, look, hasWin) {
   var h = look.h, L = look.L || {}, PRD = look.pr || 1, seed = look.seed || 1;
   var PN = painter(null, place, cam, Lt, { haze: look.haze, hazeM: look.hazeM, vivid: 0 }), T = PN.T;
   var C = look.colours, tone = look.tone || 1, moss = look.moss || 0, lit = look.lit || 0, wk = d(look, 'weather', 1);
@@ -1576,10 +1606,10 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
   X0 = Math.max(0, Math.floor(X0 - 2)); Y0 = Math.max(0, Math.floor(Y0 - 2)); X1 = Math.min(cam.W, Math.ceil(X1 + 2)); Y1 = Math.min(cam.H, Math.ceil(Y1 + 2));
   var lb = T.p(T.w(0, 0.67 * h, 0)), ft = T.p(T.w(0, 0, 0)), pxh = h * cam.F / Math.max(0.5, place.z);
   var out = { x0: X0, y0: Y0, x1: X1, y1: Y1, lx: lb[0], ly: lb[1], fx: ft[0], fy: ft[1], px: pxh };
-  if (X1 <= X0 || Y1 <= Y0) return out;
+  if (X1 <= X0 || Y1 <= Y0) return { out: out };
   var W2 = Math.ceil((X1 - X0) * PRD), H2 = Math.ceil((Y1 - Y0) * PRD);
-  if (W2 * H2 > 4e6) return out;
-  var im = new ImageData(W2, H2), D = im.data, wim = lit > 0 && wc ? new ImageData(W2, H2) : null;
+  if (W2 * H2 > 4e6) return { out: out };
+  var im = new ImageData(W2, H2), D = im.data, wim = lit > 0 && hasWin ? new ImageData(W2, H2) : null;
   // the eye and the sun in the lantern's own space
   var E = T.locP([0, cam.eye, 0]), Ls = norm(T.loc(Lt.dir[0], Lt.dir[1], Lt.dir[2])), sunOn = Lt.dir[1] > 0.02;
   var LR = norm([0.55, 0.8, 0.3]);                            // the reference's light on the snow (as the gates' drifts)
@@ -1594,7 +1624,7 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
     var GPa = look.groundPix, fx0 = Math.round(ft[0] * PRD), fy0 = Math.round(ft[1] * PRD), rr0 = Math.max(4, Math.round(pxh * 0.25 * PRD)), sa = [0, 0, 0], na = 0;
     for (var yy0 = fy0 - 2; yy0 <= fy0 + Math.round(rr0 * 0.3); yy0 += 2) for (var xx0 = fx0 - rr0; xx0 <= fx0 + rr0; xx0 += 2) {
       if (xx0 < 0 || yy0 < 0 || xx0 >= GPa.w || yy0 >= GPa.h) continue;
-      var ka = (yy0 * GPa.w + xx0) * 4; if (GPa.data[ka + 3] < 200) continue;
+      var ka = gpAt(GPa, xx0, yy0); if (GPa.data[ka + 3] < 200) continue;
       sa[0] += GPa.data[ka]; sa[1] += GPa.data[ka + 1]; sa[2] += GPa.data[ka + 2]; na++;
     }
     if (na > 4) gAvg = [sa[0] / na, sa[1] / na, sa[2] / na];
@@ -1632,7 +1662,7 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
       // where its slopes turn from the light, so where it thins out it is the ground itself: no edge
       var GP = look.groundPix, gx = Math.round(X0 * PRD) + i, gyy = Math.round(Y0 * PRD) + j;
       if (gx >= 0 && gyy >= 0 && gx < GP.w && gyy < GP.h) {
-        var gk = (gyy * GP.w + gx) * 4, gcol = [GP.data[gk], GP.data[gk + 1], GP.data[gk + 2]];
+        var gk = gpAt(GP, gx, gyy), gcol = [GP.data[gk], GP.data[gk + 1], GP.data[gk + 2]];
         // (no crease where it thins to the ground: there it is the ground's own colour)
         col = snowOnGround(gcol, nx, ny, nz, lerp(1, ao, smooth(0.01, 0.08, Hh)));
       }
@@ -1766,14 +1796,15 @@ function drawLanternLit(c, wc, place, cam, Lt, look) {
     if (acc[3] > 0) { D[k0] = acc[0] / acc[3]; D[k0 + 1] = acc[1] / acc[3]; D[k0 + 2] = acc[2] / acc[3]; }
     D[k0 + 3] = 255 * acc[3] / 4;
   }
-  if (!any) return out;
-  var cv = document.createElement('canvas'); cv.width = W2; cv.height = H2; cv.getContext('2d').putImageData(im, 0, 0);
-  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(cv, Math.round(X0 * PRD), Math.round(Y0 * PRD)); c.restore();
-  if (wim) {
-    var wv = document.createElement('canvas'); wv.width = W2; wv.height = H2; wv.getContext('2d').putImageData(wim, 0, 0);
-    wc.save(); wc.setTransform(1, 0, 0, 1, 0, 0); wc.drawImage(wv, Math.round(X0 * PRD), Math.round(Y0 * PRD)); wc.restore();
-  }
-  return out;
+  if (!any) return { out: out };
+  return { out: out, im: im, wim: wim, X0: X0, Y0: Y0 };
+}
+function drawLanternLit(c, wc, place, cam, Lt, look) {
+  var R = site(look, function () { return lanternPix(place, cam, Lt, look, !!wc); }), PRD = look.pr || 1;
+  if (!R.im || making(look)) return R.out;
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(toCanvas(R.im), Math.round(R.X0 * PRD), Math.round(R.Y0 * PRD)); c.restore();
+  if (R.wim) { wc.save(); wc.setTransform(1, 0, 0, 1, 0, 0); wc.drawImage(toCanvas(R.wim), Math.round(R.X0 * PRD), Math.round(R.Y0 * PRD)); wc.restore(); }
+  return R.out;
 }
 /* its shadow on the snow: every piece's points sent along the sun down to the snow, each piece's hull filled */
 function lanternShadow(c, place, cam, Lt, h, L) {

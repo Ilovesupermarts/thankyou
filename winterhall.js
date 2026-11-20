@@ -1410,8 +1410,29 @@ function job(o) {
     return true;
   });
   // (o.groundOnly, for a bake worker: the ground's raster and its edges only, worked out at once and handed back)
+  // (o.band = [p, n]: only the p-th of n bands of rows, the raster alone, handed back as that band's rows; o.edgePart =
+  // [p, n] with o.hitAll, the whole raster's hit map: the p-th of n parts of its edges, handed back as the pixels' new
+  // values (NaN: left as the raster made it). Several bake workers then share the work; the page puts the pieces
+  // together, the same numbers as one worker makes.)
   if (o.groundOnly) return { run: function () {
     var t0 = performance.now();
+    if (o.band) {
+      var b0 = Math.floor(LH * o.band[0] / o.band[1]), b1 = Math.floor(LH * (o.band[0] + 1) / o.band[1]);
+      rasterRows('g', b0, b1);
+      return { band: [b0, b1], gHit: gHit.slice(b0 * LW, b1 * LW), gBack: gBack.slice(b0 * LW * 8, b1 * LW * 8), gFront: gFront.slice(b0 * LW * 8, b1 * LW * 8),
+               ms: performance.now() - t0, LW: LW, LH: LH };
+    }
+    if (o.edgePart) {
+      gHit.set(o.hitAll);
+      var EA = findEdges('g'), e0 = Math.floor(EA.length * o.edgePart[0] / o.edgePart[1]), e1 = Math.floor(EA.length * (o.edgePart[0] + 1) / o.edgePart[1]);
+      var ks = new Int32Array(e1 - e0), vals = new Float32Array((e1 - e0) * 16).fill(NaN);
+      gBack.fill(NaN); gFront.fill(NaN);
+      for (var q2 = e0; q2 < e1; q2++) {
+        var kq = EA[q2]; edgeOne('g', kq); ks[q2 - e0] = kq;
+        for (var v = 0; v < 8; v++) { vals[(q2 - e0) * 16 + v] = gBack[kq * 8 + v]; vals[(q2 - e0) * 16 + 8 + v] = gFront[kq * 8 + v]; }
+      }
+      return { ks: ks, vals: vals, ms: performance.now() - t0, LW: LW, LH: LH };
+    }
     rasterRows('g', 0, LH); var E = findEdges('g'); for (var q = 0; q < E.length; q++) edgeOne('g', E[q]);
     return { gHit: gHit, gBack: gBack, gFront: gFront, ms: performance.now() - t0, LW: LW, LH: LH };
   } };

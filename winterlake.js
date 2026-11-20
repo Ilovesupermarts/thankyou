@@ -398,7 +398,7 @@ function groundJob(c, o) {
     drawBanks(c, o);
     c.restore();
   }
-  var j = 0, done = false, cpu = 0;
+  var j = 0, done = false, cpu = 0, bandEnd = gh;
   // (o.rowsOnly: the rows' pixels only, no picture: for a bake worker, which hands back pixels(). o.pixelsFrom: a holder
   // { data, nPath, cpu } whose data (the same rows, worked out by such a worker) arrives later: the job waits for it and
   // then finishes as usual; holder.fail: work the rows out here after all. Without either: as before.)
@@ -411,11 +411,15 @@ function groundJob(c, o) {
         if (!PF.data) return false;
         D.set(PF.data); nPath = PF.nPath; cpu += PF.cpu; j = gh; PF.data = null;
       }
-      while (j < gh) { row(j++); if (performance.now() > lim) { cpu += performance.now() - t0; return false; } }
+      // (o.band = [p, n], with o.rowsOnly: only the p-th of n bands of rows, for one of several bake workers: pixels()
+      // then holds that band's rows alone)
+      if (o.band && j === 0) { j = Math.floor(gh * o.band[0] / o.band[1]); bandEnd = Math.floor(gh * (o.band[0] + 1) / o.band[1]); }
+      while (j < bandEnd) { row(j++); if (performance.now() > lim) { cpu += performance.now() - t0; return false; } }
       if (o.rowsOnly) { done = true; cpu += performance.now() - t0; return true; }
       finish(); done = true; cpu += performance.now() - t0; return true;
     },
-    pixels: function () { return D; },
+    pixels: function () { return o.band ? D.subarray(Math.floor(gh * o.band[0] / o.band[1]) * gw * 4, bandEnd * gw * 4) : D; },
+    rows: function () { return o.band ? [Math.floor(gh * o.band[0] / o.band[1]), bandEnd, gw, gh] : [0, gh, gw, gh]; },
     cancel: function () { done = true; },
     info: function () { return { rows: gh, pathPixels: nPath, cpu: cpu }; },
     // (for checking: what the line of sight through a point of the screen (CSS px) meets)
