@@ -23532,9 +23532,10 @@ setInterval(applyTimeTheme, 5 * 60 * 1000);
                            or the writing screen has closed)
                        keypad  the first time the keypad appears, a box
                            round it with a caption under it, until she
-                           keys in her first digit. When the keypad opens
+                           keys in her first digit or 2 seconds have gone
+                           by. When the keypad opens
                            at the same moment as her first selection, the
-                           caption goes first, stays 6.5 seconds, and the
+                           caption goes first, stays 5.5 seconds, and the
                            keypad hint follows it
                      plus a caption on the shake when a price is
                      missing or the custom rows are filled out of order.
@@ -23986,7 +23987,7 @@ var Hints = (function () {
   /* ---------- 6c: the first service she selects ---------- */
   /* How long the caption stays when the keypad hint is waiting behind it: time to notice it,
      read its 16 characters and take them in, with the fades included. */
-  var TICK_FIRST_HOLD = 6500;
+  var TICK_FIRST_HOLD = 5500;
   function drawTick(row, done, hold) {
     tickShown = true;
     show({ kind: 'tick', hold: hold || 3000, watch: true, urgent: true, done: done,
@@ -24025,7 +24026,8 @@ var Hints = (function () {
   /* ---------- keypad hint ---------- */
   function drawKeypadHint() {
     kpPending = true;
-    show({ kind: 'kp', urgent: true,
+    /* fades off by itself after 2 s if nothing has been keyed in (a digit ends it sooner) */
+    show({ kind: 'kp', urgent: true, hold: 2000, fadeAfter: true,
       targets: [{ el: numpad, shape: 'box', pad: 10, text: '入力後、「決定」をタップ', place: 'below' }] });
   }
   function onNumpadShown() {
