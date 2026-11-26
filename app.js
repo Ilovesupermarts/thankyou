@@ -8358,6 +8358,19 @@ function triggerKoiStart() {
     koiPushTimer(setTimeout(function() {
       var nameText = (therapistDisplayName || '心').replace(/さん$/, '');
       var arrivalTime = renderIntroGlyph(nameText) * 1000 + 220;
+      /* The loading message keeps its place (24px under where the name stands when centred on the
+         screen), and the name is moved up so it is centred between the screen's top and the top of
+         the loading message. Both worked out now, before the name is drawn. */
+      var introBarTop = window.innerHeight * 0.7;
+      var ncEl = document.getElementById('nameColumn'), barEl = document.getElementById('introProgress');
+      if (ncEl) {
+        ncEl.style.transform = '';
+        var ncR = ncEl.getBoundingClientRect();
+        introBarTop = ncR.bottom + 24;
+        if (barEl) introBarTop = Math.max(0, Math.min(window.innerHeight - barEl.offsetHeight - 16, introBarTop));
+        var ncShift = introBarTop / 2 - (ncR.top + ncR.bottom) / 2;
+        if (ncShift < 0) ncEl.style.transform = 'translateY(' + ncShift.toFixed(1) + 'px)';
+      }
       if (introOverlay) introOverlay.classList.add('active');
       var holdTime = 1200;
       nameLandsAt = performance.now() + arrivalTime;
@@ -8388,9 +8401,7 @@ function triggerKoiStart() {
       }
       koiPushTimer(setTimeout(function() {
         if (!bar || !barOn) return;
-        var nc = document.getElementById('nameColumn');
-        var top = nc ? nc.getBoundingClientRect().bottom + 24 : window.innerHeight * 0.7;
-        bar.style.top = Math.max(0, Math.min(window.innerHeight - bar.offsetHeight - 16, top)) + 'px';
+        bar.style.top = introBarTop + 'px';
         bar.classList.add('show');
         barTick();
       }, arrivalTime));
