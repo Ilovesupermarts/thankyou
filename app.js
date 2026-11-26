@@ -10381,6 +10381,17 @@ function activateTyPanel(index) {
     if (i === index) tyPanels[i].classList.add('active');
     else if (i < index) tyPanels[i].classList.add('leaving');
   }
+  /* The message comes in phrase by phrase, as the main message panels do: its text is split into
+     the same phrases (the first time, and again after the first panel's text is rewritten) and
+     each fades in sideways at its own moment (playPanelPhraseReveal). */
+  clearPanelPhraseTimers();
+  var target = tyPanels[index];
+  var content = target && target.querySelector('.ty-panel-content');
+  if (!content) return;
+  if (!content.querySelector('.panel-phrase')) wrapPhrasesRecursively(content);
+  resetPanelPhrases(target);
+  void target.offsetWidth;
+  playPanelPhraseReveal(target);
 }
 function goToTyPanel(index) {
   var clamped = Math.max(0, Math.min(TY_TOTAL_PANELS - 1, index));
