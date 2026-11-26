@@ -10375,12 +10375,56 @@ function applyTyPanel1Content() {
     tyPanel1Content.innerHTML = TY_PANEL1_DEFAULT_HTML;
   }
 }
+/* The thank-you text keeps the lines it has as plain text: each text node is split where the
+   browser breaks its lines now (found from each character's place on the screen), so when it is
+   then split into phrases no phrase crosses a line break and every line breaks where it did. */
+function splitTextAtLineBreaks(root) {
+  var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+  var nodes = [], n;
+  while ((n = walker.nextNode())) if ((n.nodeValue || '').trim() !== '') nodes.push(n);
+  var range = document.createRange();
+  for (var k = 0; k < nodes.length; k++) {
+    var node = nodes[k], text = node.nodeValue, cuts = [], lastTop = null, lastH = 0;
+    for (var i = 0; i < text.length; i++) {
+      range.setStart(node, i);
+      range.setEnd(node, i + 1);
+      var rects = range.getClientRects();
+      if (!rects.length) continue;
+      var r = rects[0];
+      if (r.width === 0 && r.height === 0) continue;
+      if (lastTop !== null && r.top > lastTop + Math.max(lastH, r.height) * 0.5) cuts.push(i);
+      lastTop = r.top;
+      lastH = r.height;
+    }
+    /* end the line there too: once split into smaller pieces more could fit on a line than the
+       browser's own whole-phrase breaking let fit before */
+    for (var c = cuts.length - 1; c >= 0; c--) {
+      var rest = node.splitText(cuts[c]);
+      rest.parentNode.insertBefore(document.createElement('br'), rest);
+    }
+  }
+  range.detach && range.detach();
+}
 function activateTyPanel(index) {
   for (var i = 0; i < tyPanels.length; i++) {
     tyPanels[i].classList.remove('active', 'leaving');
     if (i === index) tyPanels[i].classList.add('active');
     else if (i < index) tyPanels[i].classList.add('leaving');
   }
+  /* The message comes in phrase by phrase, as the main message panels do: its text is split into
+     the same phrases (the first time, and again after the first panel's text is rewritten) and
+     each fades in sideways at its own moment (playPanelPhraseReveal). */
+  clearPanelPhraseTimers();
+  var target = tyPanels[index];
+  var content = target && target.querySelector('.ty-panel-content');
+  if (!content) return;
+  if (!content.querySelector('.panel-phrase')) {
+    splitTextAtLineBreaks(content);
+    wrapPhrasesRecursively(content);
+  }
+  resetPanelPhrases(target);
+  void target.offsetWidth;
+  playPanelPhraseReveal(target);
 }
 function goToTyPanel(index) {
   var clamped = Math.max(0, Math.min(TY_TOTAL_PANELS - 1, index));
