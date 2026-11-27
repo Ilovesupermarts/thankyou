@@ -1,4 +1,4 @@
-// node poem-60fps.js OUT MODE DUR  (MODE 1 = ink wash, 0 = brush; DUR = pvLineDur s). The repo served on :8765.
+// node poem-60fps.js OUT MODE DUR [TIMES]  (MODE 1 = ink wash, 0 = brush; DUR = pvLineDur s; TIMES = comma list of seconds). The repo served on :8765.
 // Pictures of the poem's first column under an even 60-frames-a-second clock (the sandbox is too slow to show the ink otherwise).
 // virtual 60 fps clock: every frame advances exactly 1/60 s, whatever the machine's speed
 const { chromium } = require('playwright');
@@ -15,12 +15,12 @@ const errs=[];p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://localhost:8765/koiscreen.html');
 await p.evaluate(()=>window.__stop=0);
 await p.waitForTimeout(3000);
-const r=await p.evaluate(()=>{const c=document.querySelector('.pv-col').getBoundingClientRect();return {x:c.left-20,y:c.top-20,w:c.width+40,h:c.height+40}});
+const r=await p.evaluate((pd)=>{window.__pad=pd;const c=document.querySelector('.pv-col').getBoundingClientRect();const P=+(window.__pad||20);return {x:Math.max(0,c.left-P*2.5),y:Math.max(0,c.top-P),w:c.width+P*3.5,h:c.height+P*2}},+(process.env.PAD||20));
 // writing starts pvAt (0.2 s, a real-time timer) after load: find the virtual time when it starts
 await p.evaluate(()=>window.__stop=1e9);
 await p.waitForFunction(()=>document.querySelector('#pv.writing'),null,{timeout:60000});
 const vs=await p.evaluate(()=>window.__vt());
-const times=[0.2,0.5,0.8,1.1,1.4,1.7,2.0,2.4,2.8,3.4];
+const times=process.argv[5]?process.argv[5].split(',').map(Number):[0.2,0.5,0.8,1.1,1.4,1.7,2.0,2.4,2.8,3.4];
 for(const [i,tt] of times.entries()){
   await p.evaluate(s=>window.__stop=s,vs+tt*1000);
   await p.waitForFunction(s=>window.__vt()>=s,vs+tt*1000,{timeout:120000,polling:50});

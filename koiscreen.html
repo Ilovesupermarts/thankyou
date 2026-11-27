@@ -131,8 +131,9 @@
   }
   /* a column painted in by the rocks' ink wash (pvLineMode 1): hidden here
      while the wash is drawn over it on #pvFx, shown when its wash is done */
-  .pv-col.wash { opacity: 0; transition: opacity 0.6s ease; }
+  .pv-col.wash { opacity: 0; }
   .pv-col.wash.in, .pv.done .pv-col.wash { opacity: 1; }
+  .pv .pv-col.wash.kept { opacity: 0; }
   #pvFx { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 5; }
   @keyframes pvBrush {
     0%   { opacity: 0; -webkit-mask-position: 0 86%; mask-position: 0 86%; }
@@ -294,7 +295,7 @@
     pvName: '桜庭', pvShow: 1, pvX: 0.1, pvY: 0.16, pvSize: 0.034, pvTitle: 1.3, pvPitch: 1.8, pvTitleDrop: 1.3,
     pvGap: 2, pvSeal: 1.35, pvGlow: 1, pvInk: '#3F2A22', pvRed: '#B8402E',
     pvAt: 0.8, pvWriteMax: 16, pvStagger: 0.11, pvColPause: 0.35, pvBrush: 1.2, pvDry: 1.7,
-    pvLineMode: 1, pvLineDur: 2.2, pvLineGap: 1.1
+    pvLineMode: 1, pvLineDur: 2.2, pvLineGap: 1.1, pvStain: 0.6, pvDry: 1.6, pvShadow: 1
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
   try {
@@ -1226,6 +1227,11 @@
     }
     pvEl.classList.toggle('off', !V.pvShow);
   }
+  function pvRgb(h) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim());
+    if (!m) return [63, 42, 34];
+    var n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
   // build the characters (each its own span, so each can be brushed in)
   function pvBuild() {
     var vs = PondVerse.make(V.pvName || '');
@@ -1238,6 +1244,7 @@
                         { c: 'rgba(250, 228, 210, ' + Math.min(1, 0.7 * g).toFixed(2) + ')', blur: 18 * g }] : [];
     var items = [], plain = [], t = 0.15, GAP = 0.2;
     var still = [];
+    var useInk = V.pvLineMode >= 0.5 && typeof InkReveal !== 'undefined';
     // write: each character written stroke by stroke (the pond's name);
     // else shown whole inside its column, which comes in as one (the poem)
     function chars(box, list, em, write) {
@@ -1250,7 +1257,15 @@
           it = InkWrite.item(el, c.ch, { em: em, dpr: dpr, font: PV_FONT, weight: 400, vertical: true,
                                          colour: c.red ? V.pvRed : V.pvInk, glow: glow });
         }
-        if (it && !write) { box.appendChild(el); el._pvIt = it; still.push(it); return; }
+        if (it && !write) {
+          // (painted in by the ink wash: a soft shadow of its own ink round each
+          // letter, kept for good, the same one the wash draws while it is wet)
+          if (useInk && V.pvShadow > 0) {
+            var sc = pvRgb(c.red ? V.pvRed : V.pvInk), sa = Math.min(1, 0.55 * V.pvShadow);
+            it.glow = glow.concat([{ c: 'rgba(' + sc.join(',') + ',' + sa.toFixed(2) + ')', blur: 4.8 }]);
+          }
+          box.appendChild(el); el._pvIt = it; still.push(it); return;
+        }
         if (it) { box.appendChild(el); t = InkWrite.plan(it, t) + GAP; items.push(it); return; }
         // no stroke data (strokes.js not loaded): brushed in as text, the old way
         var sp = document.createElement('span');
@@ -1269,7 +1284,6 @@
     // rocks' ink wash (pvLineMode 1) or a brush sweep down it (0), pvLineGap s
     // apart, each over pvLineDur s
     var dur = Math.max(0.3, V.pvLineDur), cols = [];
-    var useInk = V.pvLineMode >= 0.5 && typeof InkReveal !== 'undefined';
     vs.cols.forEach(function (col) {
       if (!col.length) return;
       var d = document.createElement('div');
@@ -1372,17 +1386,20 @@
      stands, cut to its wet ink on #pvFx; when its wash is done the column
      itself is shown and #pvFx cleared there. */
   var pvFx = document.getElementById('pvFx'), PW = { raf: 0, on: false, layer: null, last: 0 };
-  function pvWashStop() {
+  // keep: the wash has finished and its last picture stays on #pvFx (the
+  // finished columns are this picture, not the page's own: no hand-over)
+  function pvWashStop(keep) {
     if (PW.raf) { cancelAnimationFrame(PW.raf); PW.raf = 0; }
     if (PW.on) {
       PW.on = false;
-      (PW.cols || []).forEach(function (C) { C.mask = C.wet = C.blur = C.pic = C.picG = C.bleed = null; });
+      (PW.cols || []).forEach(function (C) { C.mask = C.wet = C.blur = C.pic = C.picG = C.picD = C.picGlow = null; });
       if (PW.ink && typeof InkReveal !== 'undefined') InkReveal.stop();
       PW.ink = false;
       if (typeof InkFluid !== 'undefined' && InkFluid.release) InkFluid.release();
     }
     if (PW.layer) PW.layer.width = PW.layer.height = 1;
-    pvFx.width = pvFx.height = 1;
+    if (PW.glowLayer) PW.glowLayer.width = PW.glowLayer.height = 1;
+    if (!keep) pvFx.width = pvFx.height = 1;
   }
   function pvColPicture(C, pr) {
     var r = C.el.getBoundingClientRect(), pad = r.width * 0.4;
@@ -1402,10 +1419,31 @@
     });
     C.pic = pic; C.picG = picG;
     if (C.kind === 'ink') {
-      // the letters bled a little in their own ink, for while they are wet
-      var bl = C.bleed = document.createElement('canvas'); bl.width = pic.width; bl.height = pic.height;
-      var bg = bl.getContext('2d'); bg.filter = 'blur(' + (2.4 * pr).toFixed(1) + 'px)'; bg.drawImage(picG, 0, 0);
-      bg.filter = 'none'; bg.globalAlpha = 0.7; bg.drawImage(picG, 0, 0); bg.globalAlpha = 1;
+      // the letters with their soft shadow of ink (as the column has it for
+      // good), without the pale glow: what the wash paints
+      // drawn exactly as InkWrite draws the dry character on the page (each glow
+      // pass also lays the letter, then the letter once more), split in two: the
+      // pale glow alone (C.picGlow, faded in as the ink dries, never inked) and
+      // the letters with their soft ink shadow (C.picD, what the wash paints),
+      // so that when the column itself takes over nothing changes
+      var pd = C.picD = document.createElement('canvas'); pd.width = pic.width; pd.height = pic.height;
+      var pg = C.picGlow = document.createElement('canvas'); pg.width = pic.width; pg.height = pic.height;
+      var dg = pd.getContext('2d'), gl = pg.getContext('2d'), OFF = 10000;
+      C.el.querySelectorAll('canvas.pv-c').forEach(function (cv) {
+        var b = cv.getBoundingClientRect(), it = cv._pvIt, x = b.left * pr - C.R.x, y = b.top * pr - C.R.y, w = b.width * pr, h = b.height * pr;
+        if (!it) return;
+        var k = w / Math.max(1, cv.width);              // (the shadows' blur in this picture's pixels)
+        it.glow.forEach(function (g, i) {
+          var dark = V.pvShadow > 0 && i === it.glow.length - 1;
+          if (dark) { dg.save(); dg.shadowColor = g.c; dg.shadowBlur = g.blur * it.dpr * k; dg.drawImage(it.glyph, x, y, w, h); dg.restore(); }
+          else {
+            gl.save(); gl.shadowColor = g.c; gl.shadowBlur = g.blur * it.dpr * k; gl.shadowOffsetX = OFF;
+            gl.drawImage(it.glyph, x - OFF, y, w, h); gl.restore();
+            dg.drawImage(it.glyph, x, y, w, h);
+          }
+        });
+        dg.drawImage(it.glyph, x, y, w, h);
+      });
     }
     C.box = r;
   }
@@ -1421,13 +1459,15 @@
     pvFx.width = Math.round(innerWidth * pr); pvFx.height = Math.round(innerHeight * pr);
     if (!PW.layer) PW.layer = document.createElement('canvas');
     PW.layer.width = pvFx.width; PW.layer.height = pvFx.height;
+    if (!PW.glowLayer) PW.glowLayer = document.createElement('canvas');
+    PW.glowLayer.width = pvFx.width; PW.glowLayer.height = pvFx.height;
     cols.forEach(function (C, i) { pvColPicture(C, pr); C.id = 'pvcol' + i; C.shown = false; C.seed = i * 7.31 + 1; });
     var inks = cols.filter(function (C) { return C.kind === 'ink'; });
     if (inks.length) {
       try {
         for (var k in INK_LOOK) InkReveal.look[k] = INK_LOOK[k];
         for (k in PV_INK) InkReveal.look[k] = PV_INK[k];
-        InkReveal.look.finish = 0.35 * sp;
+        InkReveal.look.finish = Math.max(0.05, V.pvDry) * sp;   // (the stain drying away, in the ink's own clock)
         InkReveal.setup(innerWidth, innerHeight);
         InkReveal.plan(inks.map(function (C) {
           // small drops one after another, strictly top to bottom over the column's time
@@ -1517,41 +1557,51 @@
     var t = now / 1000, dt = Math.min(0.05, PW.last ? t - PW.last : 0); PW.last = t;
     if (PW.ink) InkReveal.update(t, dt);
     var c = pvFx.getContext('2d'), l = PW.layer.getContext('2d'), left = 0, el = t - PW.t0;
+    // (the ink's stain spreads past each column's box: the whole overlay is
+    // cleared once a frame and every column still coming in drawn again)
+    if (PW.ink) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, pvFx.width, pvFx.height); }
     PW.cols.forEach(function (C) {
       if (C.shown) return;
       var R = C.R;
-      c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(R.x, R.y, R.w, R.h);
+      if (!PW.ink) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(R.x, R.y, R.w, R.h); }
       if (C.kind === 'brush') {
         if (pvBrushFrame(C, c, el)) { C.el.classList.add('in'); C.shown = true; c.clearRect(R.x, R.y, R.w, R.h); return; }
         left++; return;
       }
       var st = InkReveal.state(C.id);
       if (st === 2) {
-        // the wash is done: the column itself (with its glow) fades in over the
-        // dry letters drawn here, which then go
-        if (!C.doneAt) { C.doneAt = el; C.el.classList.add('in'); }
-        if (el - C.doneAt > 0.7) { C.shown = true; return; }
-        left++;
-        c.drawImage(C.picG, R.x, R.y);
+        // the wash is done (its stain dried away, every letter shown): the
+        // finished letters, with their glow and shadow, stay drawn here as they
+        // were on the last frame (handing over to the page's own column showed
+        // as a jump: the browser scales its letters a little differently)
+        c.drawImage(C.picGlow, R.x, R.y); c.drawImage(C.picD, R.x, R.y);
+        C.dry = true;
         return;
       }
       left++;
       if (st === 0) return;
-      // the letters, cut to the wet ink and inked while wet (only on the strokes)
+      // the ink's own stain on the paper, spreading down the column with its
+      // ragged wet edges, darker where it pools, drying away as it finishes
+      if (V.pvStain > 0) InkReveal.inkOnto(c, C.id, PW.pr, null, Math.min(1, V.pvStain));
+      // the letters (with their soft shadow), shown where the ink has been and
+      // inked while wet
       l.setTransform(1, 0, 0, 1, 0, 0); l.globalCompositeOperation = 'source-over'; l.clearRect(R.x, R.y, R.w, R.h);
-      l.drawImage(C.picG, R.x, R.y);
-      InkReveal.composite(c, PW.layer, C.id, PW.pr, R);
-      // and bleeding a little into the paper while wet, drying sharp
-      var wet = 1 - Math.max(0, Math.min(1, (el - C.start - C.dur * 0.5) / (C.dur * 0.9)));
-      if (wet > 0.01) {
-        l.clearRect(R.x, R.y, R.w, R.h);
-        l.globalAlpha = wet; l.drawImage(C.bleed, R.x, R.y); l.globalAlpha = 1;
-        InkReveal.composite(c, PW.layer, C.id, PW.pr, R);
+      l.drawImage(C.picD, R.x, R.y);
+      // (the pale glow comes in as the ink dries, only where the ink has been,
+      // and is never inked: inked, it showed as a box round each letter)
+      var dry = 1 - InkReveal.soft(C.id);
+      if (dry > 0.003) {
+        var lg = PW.glowLayer.getContext('2d');
+        lg.setTransform(1, 0, 0, 1, 0, 0); lg.globalCompositeOperation = 'source-over'; lg.clearRect(R.x, R.y, R.w, R.h);
+        lg.drawImage(C.picGlow, R.x, R.y);
+        InkReveal.composite(c, PW.glowLayer, C.id, PW.pr, R, dry, true);
       }
+      InkReveal.composite(c, PW.layer, C.id, PW.pr, R);
     });
     if (!left || (PW.ink && !InkReveal.running() && !PW.cols.some(function (C) { return !C.shown && C.kind === 'brush'; }))) {
-      PW.cols.forEach(function (C) { C.el.classList.add('in'); });
-      pvWashStop(); return;
+      var keep = PW.ink;
+      PW.cols.forEach(function (C) { C.el.classList.add(C.kind === 'ink' && keep ? 'kept' : 'in'); });
+      pvWashStop(keep); return;
     }
     PW.raf = requestAnimationFrame(pvWashFrame);
   }
@@ -1701,6 +1751,9 @@
     { k: 'pvSeal', l: 'Seal: size (× the poem’s character size)', min: 0.5, max: 2.5, step: 0.05, re: 'pv' },
     { k: 'pvGlow', l: 'Soft pale glow round the characters', min: 0, max: 2, step: 0.05, re: 'pv' },
     { k: 'pvAt', l: 'Writing starts this long after the ink transition is done (s)', min: 0, max: 10, step: 0.1, re: 'pvt' },
+    { k: 'pvStain', l: 'Poem ink wash: how dark the ink stain on the paper (0 = none)', min: 0, max: 1, step: 0.05, re: 'pvt' },
+    { k: 'pvDry', l: 'Poem ink wash: how long the stain takes to dry away (s)', min: 0.2, max: 4, step: 0.1, re: 'pvt' },
+    { k: 'pvShadow', l: 'Poem ink wash: soft ink shadow round the letters (0 = none)', min: 0, max: 2, step: 0.05, re: 'pvt' },
     { k: 'pvLineMode', l: 'Poem: each column comes in by (1 = the rocks’ ink wash, 0 = a brush sweep down it)', min: 0, max: 1, step: 1, re: 'pvt' },
     { k: 'pvLineDur', l: 'Poem: each column comes in over (s)', min: 0.3, max: 8, step: 0.1, re: 'pvt' },
     { k: 'pvLineGap', l: 'Poem: the next column starts this long after the one before (s)', min: 0, max: 6, step: 0.1, re: 'pvt' },

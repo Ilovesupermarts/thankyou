@@ -36,9 +36,12 @@
      InkReveal.update(t, dt)          once a frame
      InkReveal.state(ids)             0 not started, 1 appearing, 2 done (for one id or a list)
      InkReveal.alpha(id)              0..1 for a part that fades instead of washing
-     InkReveal.composite(dst, layer, ids, pr)
+     InkReveal.composite(dst, layer, ids, pr, rect, a, plain)
                                       cut a layer (full-size canvas, pr device px a CSS px)
-                                      to the parts' wet paper, ink it, draw it onto dst
+                                      to the parts' wet paper, ink it (not if plain), draw it
+                                      onto dst (at alpha a)
+     InkReveal.inkOnto(dst, id, pr, rect, a)
+                                      the part's wet ink itself drawn on dst (its stain on the paper)
      InkReveal.maskInPlace(c, ids, pr, oy)
                                       the same on a canvas of its own (oy: its top, CSS px)
      InkReveal.look                   the settings (see LOOK)
@@ -455,10 +458,10 @@ function update(t, dt) {
 
 /* Cut a canvas to its parts' wet paper and ink it: a part that is done shows whole, one
    not started not at all, one appearing where its paper has been wet. */
-function cut(c, ids, pr, oy, rect) {
+function cut(c, ids, pr, oy, rect, plain) {
   var sts = ids.map(function (id) { var P = byId[id]; return P && P.kind === 'wash' ? partState(P) : 2; });
   if (sts.every(function (s) { return s === 2; })) return;
-  if (gpu) { cutGpu(c, ids, sts, pr, oy, rect); return; }
+  if (gpu) { cutGpu(c, ids, sts, pr, oy, rect, plain); return; }
   var sw = gw * cs * pr, sh = gh * cs * pr, dy = -(oy || 0) * pr, M, live = [];
   ids.forEach(function (id, k) { if (sts[k] === 1) live.push(byId[id]); });
   if (ids.length === 1) M = live.length ? live[0].mask.cnv : null;
@@ -483,10 +486,10 @@ function cut(c, ids, pr, oy, rect) {
   if (M) c.drawImage(M, 0, 0, gw, gh, 0, dy, sw, sh);
   else c.clearRect(0, 0, c.canvas.width, c.canvas.height);
   c.globalCompositeOperation = 'source-atop';
-  live.forEach(function (P) { c.drawImage(P.tint.cnv, 0, 0, gw, gh, 0, dy, sw, sh); });
+  if (!plain) live.forEach(function (P) { c.drawImage(P.tint.cnv, 0, 0, gw, gh, 0, dy, sw, sh); });
   c.restore();
 }
-function cutGpu(c, ids, sts, pr, oy, rect) {
+function cutGpu(c, ids, sts, pr, oy, rect, plain) {
   var F = snap ? snap.cnv : InkFluid.canvas, tw = InkFluid.tileW, th = InkFluid.tileH, dy = -(oy || 0) * pr, dw = W * pr, dh = H * pr;
   var live = [];
   ids.forEach(function (id, k) { if (sts[k] === 1) live.push(byId[id]); });
@@ -515,25 +518,42 @@ function cutGpu(c, ids, sts, pr, oy, rect) {
     c.drawImage(scratchG.cnv, 0, 0, tw, th, 0, dy, dw, dh);
   }
   c.globalCompositeOperation = 'source-atop';
-  live.forEach(function (P) { tile(P, 1, c, 0, dy, dw, dh); });
+  if (!plain) live.forEach(function (P) { tile(P, 1, c, 0, dy, dw, dh); });
   c.restore();
 }
 /* A layer (the size of dst) cut to its parts' wet paper and inked, then drawn onto dst.
    (The caller leaves out the drawing of parts not started.) A fading part is drawn faded.
    rect (device px, optional): the part is known to lie inside it, so only that much is worked on. */
-function composite(dst, layer, ids, pr, rect) {
+function composite(dst, layer, ids, pr, rect, a, plain) {
   var c0 = performance.now();
   if (typeof ids === 'string') ids = [ids];
   var fade = ids.length === 1 && byId[ids[0]] && byId[ids[0]].kind === 'fade';
-  if (!fade) cut(layer.getContext('2d'), ids, pr, 0, rect);
+  if (!fade) cut(layer.getContext('2d'), ids, pr, 0, rect, plain);
   dst.save();
   dst.setTransform(1, 0, 0, 1, 0, 0);
   dst.globalCompositeOperation = 'source-over';
-  dst.globalAlpha = fade ? alpha(ids[0]) : 1;
+  dst.globalAlpha = (fade ? alpha(ids[0]) : 1) * (a == null ? 1 : a);
   if (rect) dst.drawImage(layer, rect.x, rect.y, rect.w, rect.h, rect.x, rect.y, rect.w, rect.h);
   else dst.drawImage(layer, 0, 0);
   dst.restore();
   compMs = compMs ? compMs + (performance.now() - c0 - compMs) * 0.1 : performance.now() - c0;
+}
+/* The wet ink itself (the part's tint: dark where the ink lies thick, at its
+   edges and while wet, fading as the part finishes), drawn straight onto dst,
+   not cut to a picture: the stain the wash leaves on the paper. rect: device px. */
+function inkOnto(dst, id, pr, rect, a) {
+  var P = byId[id];
+  if (!P || P.kind !== 'wash' || partState(P) !== 1) return;
+  dst.save();
+  dst.setTransform(1, 0, 0, 1, 0, 0);
+  if (rect) { dst.beginPath(); dst.rect(rect.x, rect.y, rect.w, rect.h); dst.clip(); }
+  dst.globalCompositeOperation = 'source-over';
+  dst.globalAlpha = a == null ? 1 : a;
+  dst.imageSmoothingEnabled = true; dst.imageSmoothingQuality = 'high';
+  if (gpu) {
+    if (P.slot >= 0) dst.drawImage(snap ? snap.cnv : InkFluid.canvas, InkFluid.tileW, InkFluid.slotY(P.slot), InkFluid.tileW, InkFluid.tileH, 0, 0, W * pr, H * pr);
+  } else if (P.tint) dst.drawImage(P.tint.cnv, 0, 0, gw, gh, 0, 0, gw * cs * pr, gh * cs * pr);
+  dst.restore();
 }
 function maskInPlace(c, ids, pr, oy) { cut(c, typeof ids === 'string' ? [ids] : ids, pr, oy); }
 function stats() {
@@ -545,5 +565,5 @@ function stats() {
 }
 
 window.InkReveal = { look: LOOK, setup: setup, plan: plan, play: play, stop: stop, update: update, state: state, alpha: alpha,
-                     composite: composite, maskInPlace: maskInPlace, soft: soft, release: release, held: held, running: running, clock: clock, stats: stats };
+                     composite: composite, inkOnto: inkOnto, maskInPlace: maskInPlace, soft: soft, release: release, held: held, running: running, clock: clock, stats: stats };
 })();
