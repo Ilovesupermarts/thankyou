@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pond Verse Review</title>
+<!-- ============================================================
+     pondverse-review.html — the review page for pondverse.js (the pond's
+     name and its two-line poem made from the therapist's name).
+     1. Checks: every line against the rules (starts with its syllable or
+        kanji, one comma, line 2 never names the water).
+     2. Every line, with its plain English meaning (pondverse-gloss.js),
+        for a native speaker to read and mark.
+     3. About 500 common names run through the engine, each flagged when a
+        word still repeats, a plain line had to be used, or a kanji's
+        reading is not known; plus a box to try any name.
+     Not part of the app: not linked from index.html, not in sw.js.
+     ============================================================ -->
+<style>
+  :root { --bg: #FBF7F2; --fg: #2E2420; --dim: #8A7A72; --line: #E5DAD0; --red: #B8402E; --warn: #FFF0D6; --bad: #FDE3DE; --card: #FFFFFF; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1C1816; --fg: #EFE6DE; --dim: #A2948A; --line: #3A322D; --red: #E0735F; --warn: #3A3020; --bad: #43261F; --card: #26201D; }
+  }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif; padding: 16px; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 4px 0 4px; }
+  h2 { font-size: 18px; margin: 28px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  .dim { color: var(--dim); font-size: 13px; }
+  .jp { font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif; font-size: 16px; }
+  .en { color: var(--dim); font-size: 12.5px; }
+  .red { color: var(--red); font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; color: var(--dim); font-weight: 600; position: sticky; top: 0; background: var(--bg); }
+  tr.flag td { background: var(--warn); }
+  tr.bad td { background: var(--bad); }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 9px; background: var(--line); margin: 1px 2px 1px 0; }
+  .tag.w { background: #F2C66D; color: #3A2A00; }
+  .tag.b { background: #E8907F; color: #3A0E06; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 8px 0; }
+  input[type=text] { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); min-width: 0; }
+  .try { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 10px 0; }
+  .wrap { overflow-x: auto; }
+  .num { font-variant-numeric: tabular-nums; }
+  @media (max-width: 700px) { body { padding: 12px 16px; } th, td { padding: 5px 4px; } }
+</style>
+</head>
+<body>
+<h1>Pond Verse Review</h1>
+<div class="dim">Every line the koi pond's name and poem can use, with its English meaning, and about 500 names run through it. Mark anything that does not sound natural.</div>
+
+<div class="try">
+  <div class="bar"><b>Try a name</b><input type="text" id="tryName" value="朝美" placeholder="名前"><span class="dim">(さん is left off)</span></div>
+  <div id="tryOut"></div>
+</div>
+
+<h2>1. Checks on every line</h2>
+<div id="checks"></div>
+
+<h2>2. Names</h2>
+<div class="bar">
+  <label><input type="checkbox" id="onlyFlag"> Show only names with a flag</label>
+  <input type="text" id="nameFilter" placeholder="Filter (name or word)">
+  <span id="nameStats" class="dim"></span>
+</div>
+<div class="wrap"><table id="names"><thead><tr><th>Name</th><th>Taken from it</th><th>Pond name</th><th>Line 1</th><th>Line 2</th><th>Flags</th></tr></thead><tbody></tbody></table></div>
+
+<h2>3. Every line</h2>
+<div class="bar"><input type="text" id="lineFilter" placeholder="Filter (syllable, kanji or word)"></div>
+<div class="wrap"><table id="lines"><thead><tr><th>Starts with</th><th>Line 1 (water, light, garden)</th><th>Line 2 (koi, unwinding)</th><th>Its own pond name</th></tr></thead><tbody></tbody></table></div>
+
+<script src="pondverse.js"></script>
+<script src="pondverse-gloss.js"></script>
+<script>
+(function () {
+  'use strict';
+  var P = PondVerse, G = window.PONDVERSE_GLOSS || {};
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+  function gloss(t) { return G[t] || G[t + ' '] || '(no meaning written yet)'; }
+  function jpCells(cells) { return cells.map(function (c) { return c.red ? '<span class="red">' + esc(c.ch) + '</span>' : esc(c.ch); }).join(''); }
+  function lineHtml(t) { return t ? '<div class="jp">' + esc(t) + '</div><div class="en">' + esc(gloss(t)) + '</div>' : '<span class="dim">–</span>'; }
+
+  /* ---------- 1. checks ---------- */
+  var WATER = /水|みず|みなも|池|いけ/;
+  var problems = [];
+  function check(t, key, which, where) {
+    if (!t) return;
+    if (t.indexOf(key) !== 0) problems.push([where, t, 'does not start with ' + key]);
+    if ((t.match(/、/g) || []).length !== 1) problems.push([where, t, 'needs exactly one comma']);
+    if (which === 'l2' && WATER.test(t.slice(key.length))) problems.push([where, t, 'line 2 names the water']);
+    if (!G[t]) problems.push([where, t, 'no English meaning written']);
+  }
+  Object.keys(P.L1).forEach(function (k) { check(P.L1[k], k, 'l1', 'line 1 · ' + k); check(P.L1B[k], k, 'l1', 'line 1, second · ' + k); });
+  Object.keys(P.L2).forEach(function (k) { check(P.L2[k], k, 'l2', 'line 2 · ' + k); check(P.L2B[k], k, 'l2', 'line 2, second · ' + k); });
+  Object.keys(P.K).forEach(function (k) { check(P.K[k].l1, k, 'l1', 'kanji line 1 · ' + k); check(P.K[k].l2, k, 'l2', 'kanji line 2 · ' + k); });
+  Object.keys(P.KB).forEach(function (k) { check(P.KB[k].l1, k, 'l1', 'kanji line 1, second · ' + k); check(P.KB[k].l2, k, 'l2', 'kanji line 2, second · ' + k); });
+  var nLines = 0;
+  [P.L1, P.L1B, P.L2, P.L2B].forEach(function (T) { nLines += Object.keys(T).length; });
+  Object.keys(P.K).forEach(function (k) { if (P.K[k].l1) nLines++; if (P.K[k].l2) nLines++; });
+  Object.keys(P.KB).forEach(function (k) { if (P.KB[k].l1) nLines++; if (P.KB[k].l2) nLines++; });
+  document.getElementById('checks').innerHTML = problems.length
+    ? '<table><thead><tr><th>Where</th><th>Line</th><th>Problem</th></tr></thead><tbody>' + problems.map(function (p) {
+        return '<tr class="bad"><td>' + esc(p[0]) + '</td><td class="jp">' + esc(p[1]) + '</td><td>' + esc(p[2]) + '</td></tr>'; }).join('') + '</tbody></table>'
+    : '<div>All <b class="num">' + nLines + '</b> lines pass: each starts with its syllable or kanji, has one comma, has an English meaning, and no line 2 names the water.</div>';
+
+  /* ---------- 2. names ---------- */
+  var SURNAMES = ('佐藤 鈴木 高橋 田中 伊藤 渡辺 山本 中村 小林 加藤 吉田 山田 佐々木 山口 松本 井上 木村 林 斎藤 清水 山崎 森 池田 橋本 阿部 石川 山下 中島 石井 小川 前田 岡田 長谷川 藤田 後藤 近藤 村上 遠藤 青木 坂本 斉藤 福田 太田 西村 藤井 金子 岡本 藤原 中野 三浦 原田 中川 松田 竹内 小野 田村 中山 和田 石田 森田 上田 原 柴田 酒井 工藤 横山 宮崎 宮本 内田 高木 安藤 島田 谷口 大野 高田 丸山 今井 河野 藤本 村田 武田 上野 杉山 増田 小山 大塚 平野 菅原 久保 松井 千葉 岩崎 桜井 木下 野口 松尾 菊地 野村 新井 渡部 佐野 杉本 古川 大西 浜田 市川 吉川 中西 小島 水野 桑原 荒木 北村 平田 西田 菅野 永井 久保田 松下 大橋 小松 熊谷 本田 服部 吉村 岩田 川口 辻 原口 樋口 秋山 田口 永田 小池 中田 松岡 山内 安田 中原 川上 北川 大島 関 早川 星野 黒田 堀 岡崎 五十嵐 森本 飯田 片山 西川 川村 宮田 鈴村 白石 小西 内藤 堀内 松村 大川 富田 浅野 森下 足立 田辺 平井 坂口 本間 武藤 大久保 高野 宮下 島村 河合 吉岡 堤 須藤 牧野 小田 小澤 福島 南 東 西 北 桜庭 春日 日高 宮川 栗田 新田 柳田 梅田 竹田 花田 月岡 星 雪村 春山 夏目 秋田 冬木 若林 若松 錦織 鶴田 亀井 鷹野 鳩山 鹿島 熊田 犬飼 馬場 牛田 羽田 翼 澄川 泉 滝沢 湖山 潮田 岬 峰 丘 苑田 菊池 萩原 桂 椿 檜山 桐生 柏木 楠 欅田 芦田 稲垣 麦島 米田 豆田 竜田 辰巳 寅田 卯月 午 申田 酉 戌井 亥 我妻 成田 元木 正木 則本 典田 法月 道下 達川 勇 雄島 男鹿 夫木').split(' ');
+  var GIVEN = ('美咲 結衣 陽菜 葵 凛 結愛 さくら 愛 美月 花 優花 心 彩 真央 美優 七海 舞 遥 莉子 杏 楓 椿 茜 梓 環 瞳 栞 詩 唯 千尋 恵 恵美 恵子 智子 知子 陽子 花子 美花 春花 裕子 洋子 久美子 由美子 真由美 麻衣 麻美 亜美 歩美 有希 有紀 友美 幸子 幸恵 明美 直美 典子 和子 京子 純子 雅子 礼子 律子 玲奈 怜 麗 蘭 瑠璃 留美 琉花 璃子 莉奈 梨花 利恵 音羽 乃愛 穂乃果 帆花 歩 芽依 萌 菫 薫 霞 柚 千夏 千秋 百合 万里 八重 五月 四葉 一花 七瀬 恋 華 紅葉 朱里 藍 碧 翠 虹 光 輝美 照子 灯 晃子 昌子 秀美 英子 栄子 恭子 康子 泰子 安奈 寛子 啓子 慶子 景子 鶴子 美羽 翼 澄香 泉 渚 汐里 浪江 波留 雨音 霧子 露香 霜月 岳子 朝美 夕子 宵子 暁美 曙 錦 若菜 静香 涼子 凪 澪 雫 夢 祈 祐子 侑 優子 柊 椋 鞠子 毬乃 鈴 琴音 笛子 舟子 桜子 雪乃 春香 夏美 秋子 冬美 美鈴 美里 美和 美紀 美穂 美奈 美保 美加 美代 美幸 美雪 美香 美緒 美桜 真理 真美 真紀 真由 真琴 千里 千代 千絵 千晴 愛美 愛子 愛梨 彩花 彩乃 彩香 結子 結花 咲 咲良 咲希 優奈 優美 優衣 陽向 陽葵 陽子 心春 心愛 晴 晴美 明日香 明里 朋美 朋子 紀子 紀香 早苗 早紀 沙織 沙耶 紗希 紗英 亜希 亜紀 絵美 絵里 佳奈 佳子 香織 香奈 奈々 奈緒 菜摘 菜々子 里奈 里美 理沙 理恵').split(' ');
+  var KANA = ('かな みき ゆき あや まい りな えり さき みほ なな しずか ゆい めい れい ゆう けい ゆうこ きょうこ しょうこ あい もも はるか ひなた つばさ みずき みづき あすか ちひろ まどか のぞみ ひかり かおり さやか あかね なつみ ちあき まりこ ゆかり すみれ あおい さくら ほのか ひより こはる サクラ ケイコ アヤ ミキ ユイ リコ エマ').split(' ');
+  var seenN = {}, NAMES = [];
+  SURNAMES.concat(GIVEN, KANA).forEach(function (n) { if (n && !seenN[n]) { seenN[n] = 1; NAMES.push(n); } });
+
+  function analyse(n) {
+    var r = P.make(n), flags = [];
+    var title = r.title.map(function (c) { return c.ch; }).join('').replace(/の?池$/, '');
+    var own = {}; Array.from(r.name).forEach(function (c) { own[c] = 1; });
+    var rep = P.clash(r.lines[0], title, own).concat(P.clash(r.lines[1], title, own), P.clash(r.lines[1], r.lines[0], own));
+    if (rep.length) flags.push(['w', 'repeats ' + rep.join(' ')]);
+    var plain0 = !r.cols[0].some(function (c) { return c.red; }), plain1 = !r.cols[2].some(function (c) { return c.red; });
+    if (plain0) flags.push(['b', 'line 1 plain']);
+    if (plain1) flags.push(['w', 'line 2 plain']);
+    r.units.forEach(function (u) { if (u.from === 'unknown') flags.push(['b', 'reading of ' + u.ch + ' not known']); });
+    if (r.units.length < 2) flags.push(['', 'one syllable only']);
+    return { r: r, flags: flags };
+  }
+  var rows = NAMES.map(function (n) { return { n: n, a: analyse(n) }; });
+  function lineCells(cols, i) { return '<div class="jp">' + jpCells(cols[i]) + jpCells(cols[i + 1]) + '</div><div class="en">' + esc(gloss(cols[i].concat(cols[i + 1]).map(function (c) { return c.ch; }).join(''))) + '</div>'; }
+  function nameRow(x) {
+    var r = x.a.r, f = x.a.flags;
+    var cls = f.some(function (t) { return t[0] === 'b'; }) ? 'bad' : f.some(function (t) { return t[0] === 'w'; }) ? 'flag' : '';
+    var title = r.title.map(function (c) { return c.ch; }).join('');
+    return '<tr class="' + cls + '"><td class="jp">' + esc(x.n) + '</td><td class="dim">' + r.units.map(function (u) { return esc((u.ch || '·') + (u.kana && u.kana !== u.ch ? ' ' + u.kana : '')); }).join('<br>') +
+      '</td><td><div class="jp">' + jpCells(r.title) + '</div><div class="en">' + esc(gloss(title)) + '</div></td><td>' + lineCells(r.cols, 0) + '</td><td>' + lineCells(r.cols, 2) + '</td><td>' +
+      f.map(function (t) { return '<span class="tag ' + t[0] + '">' + esc(t[1]) + '</span>'; }).join('') + '</td></tr>';
+  }
+  function drawNames() {
+    var only = document.getElementById('onlyFlag').checked, q = document.getElementById('nameFilter').value.trim();
+    var list = rows.filter(function (x) {
+      if (only && !x.a.flags.some(function (t) { return t[0]; })) return false;
+      if (q && (x.n + x.a.r.lines.join('') + x.a.r.title.map(function (c) { return c.ch; }).join('')).indexOf(q) < 0) return false;
+      return true;
+    });
+    document.querySelector('#names tbody').innerHTML = list.map(nameRow).join('');
+    var nRep = rows.filter(function (x) { return x.a.flags.some(function (t) { return /^repeats/.test(t[1]); }); }).length;
+    var nPlain = rows.filter(function (x) { return x.a.flags.some(function (t) { return /plain/.test(t[1]); }); }).length;
+    var nUnk = rows.filter(function (x) { return x.a.flags.some(function (t) { return /not known/.test(t[1]); }); }).length;
+    document.getElementById('nameStats').textContent = rows.length + ' names · ' + nRep + ' still repeat a word · ' + nPlain + ' use a plain line · ' + nUnk + ' have a kanji with no known reading · showing ' + list.length;
+  }
+  document.getElementById('onlyFlag').addEventListener('change', drawNames);
+  document.getElementById('nameFilter').addEventListener('input', drawNames);
+  drawNames();
+
+  /* ---------- 3. every line ---------- */
+  var lineRows = [];
+  Object.keys(P.L1).forEach(function (k) { lineRows.push({ k: k, l1: [P.L1[k], P.L1B[k]], l2: [P.L2[k], P.L2B[k]], t: P.T1[k] }); });
+  Object.keys(P.K).forEach(function (k) {
+    var b = P.KB[k] || {};
+    lineRows.push({ k: k, l1: [P.K[k].l1, b.l1], l2: [P.K[k].l2, b.l2], t: P.K[k].t });
+  });
+  function cellList(list) { return list.filter(Boolean).map(function (t, i) { return (i ? '<div class="dim" style="margin-top:6px">second choice</div>' : '') + lineHtml(t); }).join('') || '<span class="dim">–</span>'; }
+  function drawLines() {
+    var q = document.getElementById('lineFilter').value.trim();
+    document.querySelector('#lines tbody').innerHTML = lineRows.filter(function (x) {
+      return !q || (x.k + x.l1.join('') + x.l2.join('') + (x.t || '')).indexOf(q) >= 0;
+    }).map(function (x) {
+      return '<tr><td class="jp" style="font-size:20px">' + esc(x.k) + '</td><td>' + cellList(x.l1) + '</td><td>' + cellList(x.l2) + '</td><td>' + (x.t ? lineHtml(x.t) : '<span class="dim">–</span>') + '</td></tr>';
+    }).join('');
+  }
+  document.getElementById('lineFilter').addEventListener('input', drawLines);
+  drawLines();
+
+  /* ---------- try a name ---------- */
+  function tryName() {
+    var n = document.getElementById('tryName').value, x = { n: n, a: analyse(n) };
+    document.getElementById('tryOut').innerHTML = n.trim() ? '<table><tbody>' + nameRow(x) + '</tbody></table>' : '';
+  }
+  document.getElementById('tryName').addEventListener('input', tryName);
+  tryName();
+})();
+</script>
+</body>
+</html>
