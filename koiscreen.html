@@ -1138,8 +1138,48 @@
       trInkLay(rocksCv, TR.pic.rocks, TR.pic.rR, 'rocks');
       if (TR.pic.fn) trInkLay(fnCv, TR.pic.fn, TR.pic.fR, 'fountain');
       if (!InkReveal.running() || t - TR.tInk > 60) { trInkStop(); trShowAll(); trLive(); return; }
+      // the poem may start before the transition is done (pvAt below 0): as early
+      // as the last brush stroke of the rocks and the fountain has ended, when all
+      // that is left is their last soft fill. The ink can serve only one at a
+      // time (its water settings are shared), so the rest of that fill is then
+      // finished here by a plain fade, and the poem's own ink starts at once.
+      if (V.pvAt < 0) {
+        var sp = INK_LOOK.speed, clk = InkReveal.clock();
+        var strokesEnd = Math.max(V.inkRocksAt + Math.max(0.1, V.inkRocksDur), V.inkFnAt + Math.max(0.1, V.inkFnDur)) * sp;
+        var rem = (strokesEnd + V.inkFinish * sp - clk) / sp;
+        if (clk >= strokesEnd && rem <= -V.pvAt) { trHandOver(t, Math.max(0.05, rem)); return; }
+      }
       TR.raf = requestAnimationFrame(trFrame);
     }
+    if (TR.phase === 'fade') {
+      // the rest of the rocks' and fountain's last fill, as a plain fade from the
+      // last frame of the ink to the finished pictures
+      var u = Math.min(1, (t - TR.fade.t0) / TR.fade.dur), a = u * u * (3 - 2 * u);
+      TR.fade.list.forEach(function (F) {
+        var c = F.cv.getContext('2d');
+        c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(F.R.x, F.R.y, F.R.w, F.R.h);
+        c.drawImage(F.snap, F.R.x, F.R.y);
+        c.globalAlpha = a; c.drawImage(F.pic, F.R.x, F.R.y); c.globalAlpha = 1;
+      });
+      if (u >= 1) { TR.fade = null; trShowAll(); trLive(); return; }
+      TR.raf = requestAnimationFrame(trFrame);
+    }
+  }
+  // the poem starts early: the ink's last frame of the rocks and the fountain is
+  // kept, the ink let go, and the remaining fill done as a fade over `rem` s
+  function trHandOver(t, rem) {
+    var P = TR.pic, list = [];
+    [[shadeCv, P.shade, P.rR], [rocksCv, P.rocks, P.rR], [fnCv, P.fn, P.fR]].forEach(function (L) {
+      if (!L[1] || !L[2]) return;
+      var R = L[2], sn = document.createElement('canvas'); sn.width = Math.max(1, R.w); sn.height = Math.max(1, R.h);
+      sn.getContext('2d').drawImage(L[0], R.x, R.y, R.w, R.h, 0, 0, R.w, R.h);
+      list.push({ cv: L[0], pic: L[1], R: R, snap: sn });
+    });
+    trInkStop();
+    TR.fade = { t0: t, dur: rem, list: list };
+    TR.phase = 'fade'; TR.pvEarly = true;
+    pvWrite(0);
+    TR.raf = requestAnimationFrame(trFrame);
   }
   // the rocks and the fountain are in: the water and its sound fade in, then the koi swim in
   function trLive() {
@@ -1147,7 +1187,8 @@
     TR.noWater = false;
     fxEl.style.transition = 'opacity ' + Math.max(0, V.waterFade) + 's ease'; fxEl.style.opacity = 1;
     TR.sound = 1; fnSoundLevel(Math.max(0.05, V.soundFade));
-    pvWrite(V.pvAt);
+    if (!TR.pvEarly) pvWrite(V.pvAt);
+    TR.pvEarly = false;
     clearTimeout(TR.timer);
     TR.timer = setTimeout(function () {
       pond.enter({ over: V.enterOver, zLo: 0, zHi: V.enterDepth });
@@ -1158,6 +1199,7 @@
   function trSkip() {
     if (TR.raf) { cancelAnimationFrame(TR.raf); TR.raf = 0; }
     if (TR.phase === 'ink') trInkStop();
+    TR.fade = null; TR.pvEarly = false;
     trShowAll();                         // (everything back as it was; the redraw then replaces what changed)
     document.body.classList.remove('tr-hold');
     TR.phase = 'off'; TR.noWater = false; TR.sound = 1; fxEl.style.opacity = 1; fnSoundLevel(0.4);
@@ -1167,6 +1209,8 @@
   function trPlay() {
     if (TR.raf) { cancelAnimationFrame(TR.raf); TR.raf = 0; }
     if (TR.phase === 'ink') { trInkStop(); trShowAll(); }
+    if (TR.phase === 'fade') { TR.fade = null; trShowAll(); }
+    TR.pvEarly = false;
     clearTimeout(TR.timer);
     pond.stop();
     var pc = canvas.getContext('2d'); pc.setTransform(1, 0, 0, 1, 0, 0); pc.clearRect(0, 0, canvas.width, canvas.height);
@@ -1787,7 +1831,7 @@
     { k: 'pvGap', l: 'Space round the thin upright line (× the poem’s character size)', min: 0.2, max: 4, step: 0.05, re: 'pv' },
     { k: 'pvSeal', l: 'Seal: size (× the poem’s character size)', min: 0.5, max: 2.5, step: 0.05, re: 'pv' },
     { k: 'pvGlow', l: 'Soft pale glow round the characters', min: 0, max: 2, step: 0.05, re: 'pv' },
-    { k: 'pvAt', l: 'Writing starts this long after the ink transition is done (s)', min: 0, max: 10, step: 0.1, re: 'pvt' },
+    { k: 'pvAt', l: 'Writing starts this long after the ink transition is done (s; below 0 = before it is done, at most as early as the rocks\u2019 and fountain\u2019s last brush stroke)', min: -3, max: 10, step: 0.1, re: 'pvt' },
     { k: 'pvStain', l: 'Poem ink wash: how dark the ink stain on the paper (0 = none)', min: 0, max: 1, step: 0.05, re: 'pvt' },
     { k: 'pvDry', l: 'Poem ink wash: how long the stain takes to dry away (s)', min: 0.2, max: 4, step: 0.1, re: 'pvt' },
     { k: 'pvEmerge', l: 'Poem ink wash: how slowly each letter comes in where the ink has reached it (s)', min: 0.05, max: 1.5, step: 0.05, re: 'pvt' },
