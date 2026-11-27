@@ -1477,12 +1477,13 @@
         InkReveal.look.finish = Math.max(0.05, V.pvDry) * sp;   // (the stain drying away, in the ink's own clock)
         InkReveal.setup(innerWidth, innerHeight);
         InkReveal.plan(inks.map(function (C) {
-          // small drops one after another, strictly top to bottom over the column's time
-          var r = C.box, w = Math.max(8, r.width), seeds = [], n = Math.max(4, Math.ceil(r.height / (w * 0.32)));
+          // small drops (0.38 × the column's width, so the wet edge visibly crosses each
+          // letter) one after another, strictly top to bottom over the column's time
+          var r = C.box, w = Math.max(8, r.width), seeds = [], n = Math.max(6, Math.ceil(r.height / (w * 0.2)));
           for (var j = 0; j <= n; j++) {
             var u = j / n;
             seeds.push({ x: r.left + r.width / 2 + Math.sin(j * 1.7 + C.seed) * 0.12 * w, y: r.top + u * r.height,
-                         r: w * 0.6, at: u * C.dur * 0.8 * sp });
+                         r: w * 0.38, at: u * C.dur * 0.8 * sp });
           }
           return { id: C.id, kind: 'wash', at: C.start * sp, dur: C.dur * sp, washes: [{ seeds: seeds, fall: 0.1 }] };
         }));
@@ -1586,18 +1587,29 @@
         return;
       }
       left++;
-      // where the ink has been, cut from the wet paper (not inked)
+      // how much of each stroke shows follows the ink itself, pixel by pixel:
+      // each frame the wet ink lying there (thin at the spreading edge, thick
+      // where it pools, with the paper's grain) is soaked a little more into
+      // what has come in so far, so a letter fills in unevenly as the stain
+      // spreads across it; toward the end of the wash (as it starts to dry)
+      // the wash's own mask fills in whatever is left
+      if (!C.acc) { C.acc = document.createElement('canvas'); C.acc.width = R.w; C.acc.height = R.h; C.accT = 0; }
+      var ac = C.acc.getContext('2d'), tau = Math.max(0.05, V.pvEmerge), ddt = Math.max(dt, 1 / 120);
       var mg = PW.maskLayer.getContext('2d');
       mg.setTransform(1, 0, 0, 1, 0, 0); mg.globalCompositeOperation = 'source-over'; mg.clearRect(R.x, R.y, R.w, R.h);
-      mg.fillStyle = '#000'; mg.fillRect(R.x, R.y, R.w, R.h);
-      if (st === 1) InkReveal.maskInPlace(mg, C.id, PW.pr, 0);
-      // the letters come in gradually where the ink has been: each frame the
-      // ink's mask is laid a little more strongly over what has come in so far
-      // (pvEmerge s), so a letter emerges out of the wash with the wash's own
-      // ragged shape, never all at once
-      if (!C.acc) { C.acc = document.createElement('canvas'); C.acc.width = R.w; C.acc.height = R.h; C.accT = 0; }
-      var ac = C.acc.getContext('2d'), k = 1 - Math.exp(-Math.max(dt, 1 / 120) / Math.max(0.05, V.pvEmerge));
-      ac.globalAlpha = k; ac.drawImage(PW.maskLayer, R.x, R.y, R.w, R.h, 0, 0, R.w, R.h); ac.globalAlpha = 1;
+      if (st === 1) {
+        InkReveal.inkOnto(mg, C.id, PW.pr, R, 1);
+        // (the ink's darkest is about 0.75: soaked in fully in about pvEmerge s)
+        ac.globalAlpha = Math.min(1, ddt / (tau * 0.75)); ac.drawImage(PW.maskLayer, R.x, R.y, R.w, R.h, 0, 0, R.w, R.h);
+        mg.clearRect(R.x, R.y, R.w, R.h);
+      }
+      var late = st === 2 ? 1 : 1 - InkReveal.soft(C.id);
+      if (late > 0.003) {
+        mg.fillStyle = '#000'; mg.fillRect(R.x, R.y, R.w, R.h);
+        if (st === 1) InkReveal.maskInPlace(mg, C.id, PW.pr, 0);
+        ac.globalAlpha = late * (1 - Math.exp(-ddt / tau)); ac.drawImage(PW.maskLayer, R.x, R.y, R.w, R.h, 0, 0, R.w, R.h);
+      }
+      ac.globalAlpha = 1;
       if (st === 2) {
         // (the wash's last fill has shown everything: the letters finish coming in)
         C.accT += dt;
