@@ -7,7 +7,7 @@
 <title>Koi Pond Screen Lab</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Yuji+Syuku&display=swap" rel="stylesheet">
 
 <!-- ============================================================
      koiscreen.html — test bed for a calm screen: the whole screen is a
@@ -106,15 +106,17 @@
     40%  { filter: blur(2.4px); transform: scale(1.015); text-shadow: 0 0 26px rgba(255, 246, 230, 0.45); }
     100% { filter: blur(0);     transform: scale(1);     text-shadow: var(--pv-glow); }
   }
-  /* her seal: the first character of her name, stamped in vermilion */
+  /* her seal: the first character of her name, stamped in vermilion, drawn
+     as the receipt's seal is (index.html #receiptStamp): an SVG with the same
+     rough ink filters (uneven, speckled edges and grain), a thick square
+     border, the character in a brush font scaled to fill the square so it
+     touches the border (pvSealFit) */
   .pv-seal {
     display: inline-block; writing-mode: horizontal-tb; -webkit-writing-mode: horizontal-tb;
-    box-sizing: border-box; text-align: center; font-weight: 700; letter-spacing: 0;
-    color: var(--pv-red, #B8402E); border: 0.09em solid var(--pv-red, #B8402E); border-radius: 0.1em;
-    background: rgba(255, 248, 240, 0.25);
+    color: var(--pv-red, #B8402E); mix-blend-mode: multiply;
     opacity: 0;
   }
-  .pv-seal::after { content: attr(data-seal); }
+  .pv-seal svg { display: block; width: 100%; height: 100%; overflow: visible; }
   .pv.writing .pv-seal { animation: pvStamp 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
   .pv.done .pv-seal { opacity: 0.92; }
   @keyframes pvStamp {
@@ -1171,10 +1173,9 @@
     }
     var seal = pvEl.querySelector('.pv-seal');
     if (seal) {
-      // the box is pvSeal × the poem's character size; its character fills 0.72 of it
-      seal.style.fontSize = (V.pvSeal * 0.72 / V.pvTitle).toFixed(3) + 'em';
-      seal.style.width = seal.style.height = seal.style.lineHeight = (1 / 0.72).toFixed(3) + 'em';
-      seal.style.marginTop = (0.5 / 0.72).toFixed(3) + 'em';
+      // the box is pvSeal × the poem's character size (in the name's em)
+      seal.style.width = seal.style.height = (V.pvSeal / V.pvTitle).toFixed(3) + 'em';
+      seal.style.marginTop = (0.36 / V.pvTitle).toFixed(3) + 'em';
     }
     pvEl.classList.toggle('off', !V.pvShow);
   }
@@ -1209,11 +1210,63 @@
     chars(nm, vs.title);
     var seal = document.createElement('span'); seal.className = 'pv-seal';
     seal.setAttribute('data-seal', vs.seal);
+    seal.innerHTML = pvSealSvg();
+    pvSealFit(seal, vs.seal);
     seal.style.animationDelay = (t + Math.max(0.1, V.pvBrush) * 0.6).toFixed(2) + 's';
     nm.appendChild(seal);
     pvEl.appendChild(nm);
     PV.total = t + Math.max(V.pvBrush, V.pvDry) + 1;
     pvLayout();
+  }
+  // her seal, as the receipt's: the same two ink filters (index.html, #receiptStamp)
+  var PV_SEAL_FONT = '"Yuji Syuku", "Zen Antique", "Shippori Mincho", serif';
+  var PV_SEAL_IN = 8.5;     // where the border's inner edge is (the box is 0 … 100)
+  function pvSealSvg() {
+    return '<svg viewBox="0 0 100 100" focusable="false">' +
+      '<defs>' +
+        '<filter id="pvInkRough" x="-5%" y="-5%" width="110%" height="110%">' +
+          '<feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4" result="blot"/>' +
+          '<feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" seed="9" result="grain"/>' +
+          '<feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="21" result="wob"/>' +
+          '<feDisplacementMap in="SourceGraphic" in2="wob" scale="2.4" xChannelSelector="R" yChannelSelector="G" result="rough"/>' +
+          '<feColorMatrix in="blot" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.0 1.4" result="blotA"/>' +
+          '<feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.2 1.75" result="grainA"/>' +
+          '<feComposite in="blotA" in2="grainA" operator="in" result="mask"/>' +
+          '<feComposite in="rough" in2="mask" operator="in"/>' +
+        '</filter>' +
+        '<filter id="pvInkLight" x="-5%" y="-5%" width="110%" height="110%">' +
+          '<feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="2" seed="13" result="g"/>' +
+          '<feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.5 1.72" result="ga"/>' +
+          '<feComposite in="SourceGraphic" in2="ga" operator="in"/>' +
+        '</filter>' +
+      '</defs>' +
+      '<rect x="4.5" y="4.5" width="91" height="91" rx="3" fill="none" stroke="currentColor" stroke-width="8" filter="url(#pvInkRough)"/>' +
+      '<text x="0" y="0" font-size="100" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" filter="url(#pvInkLight)"></text>' +
+    '</svg>';
+  }
+  // the character scaled (a little more one way than the other if it must, as
+  // seal carvers do, at most 1.35 times) so its ink fills the square up to the
+  // border on every side, and centred on its ink, not on its letter box
+  function pvSealFit(seal, ch) {
+    var tx = seal.querySelector('text'); if (!tx) return;
+    tx.textContent = ch;
+    function fit() {
+      var c = document.createElement('canvas').getContext('2d');
+      c.font = '100px ' + PV_SEAL_FONT;
+      var m = c.measureText(ch);
+      var L = m.actualBoundingBoxLeft, R = m.actualBoundingBoxRight, A = m.actualBoundingBoxAscent, D = m.actualBoundingBoxDescent;
+      var w = L + R, h = A + D;
+      if (!(w > 1 && h > 1)) return;
+      var T = 100 - 2 * PV_SEAL_IN + 1.6;          // (the ink's stroke reaches 0.8 past its outline each side)
+      var s = Math.min(T / w, T / h);
+      var sx = Math.min(T / w, s * 1.35), sy = Math.min(T / h, s * 1.35);
+      var cx = (R - L) / 2, cy = (D - A) / 2;
+      tx.setAttribute('font-family', PV_SEAL_FONT);
+      tx.setAttribute('transform', 'translate(50 50) scale(' + sx.toFixed(4) + ' ' + sy.toFixed(4) + ') translate(' + (-cx).toFixed(2) + ' ' + (-cy).toFixed(2) + ')');
+      tx.setAttribute('stroke-width', (1.6 / Math.min(sx, sy)).toFixed(2));
+    }
+    fit();
+    if (document.fonts && document.fonts.load) document.fonts.load('100px "Yuji Syuku"', ch).then(fit, function () {});
   }
   function pvHide() {
     if (!pvEl) return;
