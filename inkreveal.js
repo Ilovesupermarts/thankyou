@@ -40,8 +40,9 @@
                                       cut a layer (full-size canvas, pr device px a CSS px)
                                       to the parts' wet paper, ink it (not if plain), draw it
                                       onto dst (at alpha a)
-     InkReveal.inkOnto(dst, id, pr, rect, a)
-                                      the part's wet ink itself drawn on dst (its stain on the paper)
+     InkReveal.inkOnto(dst, id, pr, rect, a, op)
+                                      the part's wet ink itself drawn on dst (its stain on the paper;
+                                      op: how it is laid on, 'source-over' unless given)
      InkReveal.maskInPlace(c, ids, pr, oy)
                                       the same on a canvas of its own (oy: its top, CSS px)
      InkReveal.look                   the settings (see LOOK)
@@ -541,13 +542,13 @@ function composite(dst, layer, ids, pr, rect, a, plain) {
 /* The wet ink itself (the part's tint: dark where the ink lies thick, at its
    edges and while wet, fading as the part finishes), drawn straight onto dst,
    not cut to a picture: the stain the wash leaves on the paper. rect: device px. */
-function inkOnto(dst, id, pr, rect, a) {
+function inkOnto(dst, id, pr, rect, a, op) {
   var P = byId[id];
   if (!P || P.kind !== 'wash' || partState(P) !== 1) return;
   dst.save();
   dst.setTransform(1, 0, 0, 1, 0, 0);
   if (rect) { dst.beginPath(); dst.rect(rect.x, rect.y, rect.w, rect.h); dst.clip(); }
-  dst.globalCompositeOperation = 'source-over';
+  dst.globalCompositeOperation = op || 'source-over';
   dst.globalAlpha = a == null ? 1 : a;
   dst.imageSmoothingEnabled = true; dst.imageSmoothingQuality = 'high';
   if (gpu) {
