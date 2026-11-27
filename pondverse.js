@@ -302,6 +302,11 @@ var PondVerse = (function () {
     '澤': { l1: '澤のせせらぎ、池にそそいで', l2: '澤の音きいて、鯉がたゆたう' }
   };
 
+  /* pond names for name kanji whose own word is plainer (real words only;
+     used after every kanji of her name has been tried in K: 美月 stays
+     月影の池, 海音 → 音色の池) */
+  var KT2 = { '石': '石庭の池', '岩': '岩陰の池', '野': '野辺の池', '空': '空色の池', '秋': '秋霧の池', '美': '美景の池', '優': '優美の池', '光': '光彩の池', '白': '白露の池', '青': '青楓の池', '緑': '緑風の池', '金': '金波の池', '音': '音色の池', '明': '明鏡の池', '蓮': '蓮花の池', '雨': '雨音の池', '川': '川音の池', '波': '波音の池' };
+
   /* ---------- the first syllable of each name kanji's reading ----------
      "字かな" or "字かな/かな": the second is used when the kanji is not the
      first of the name (藤 ふじ at the start: 藤田; とう after: 佐藤). Voiced
@@ -497,9 +502,16 @@ var PondVerse = (function () {
     if (!title && u1 && K[u1.ch] && K[u1.ch].t) title = K[u1.ch].t;
     // (else her second kanji's own: 美月 → 月影の池)
     if (!title && u2 && K[u2.ch] && K[u2.ch].t) title = K[u2.ch].t;
-    if (!title && u1 && T1[u1.kana]) title = T1[u1.kana];
+    // (else any other kanji of her name that has its own: 海音 → 音色の池)
+    if (!title) Array.from(name).some(function (c) { if (K[c] && K[c].t) { title = K[c].t; return true; } return false; });
+    if (!title) Array.from(name).some(function (c) { if (KT2[c]) { title = KT2[c]; return true; } return false; });
+    // a pond name from her first syllable: when that syllable is only a guess
+    // (a kanji name not in NAMES: 海音 is あまね, かのん …, not う) it is kept,
+    // but not coloured, so a wrong guess does not show
+    var sure = !Array.from(name).some(isKanji) || !!NAMES[name], guessed = false;
+    if (!title && u1 && T1[u1.kana]) { title = T1[u1.kana]; guessed = !sure; }
     if (!title) title = PLAIN_TITLE;
-    if (title !== PLAIN_TITLE) {
+    if (title !== PLAIN_TITLE && !guessed) {
       // red: as many first characters as come from her name
       var tc = Array.from(title), nc = Array.from(hira.replace(/づ/g, 'ず').replace(/ぢ/g, 'じ'));
       while (red < tc.length && red < nc.length && tc[red] === nc[red]) red++;
@@ -543,12 +555,14 @@ var PondVerse = (function () {
       title: cells(title, red),
       cols: [cells(A[0], a.red), cells(A[1], 0), cells(B[0], b.red), cells(B[1], 0)],
       lines: [a.text, b.text],
+      plainTitle: title === PLAIN_TITLE,
+      guessedTitle: guessed,
       units: U,
       repeats: echo(titleWords, a.text).concat(clash(a.text, titleWords, own), echo(titleWords, b.text),
         clash(b.text, titleWords, own), clash(b.text, a.text, own))
     };
   }
 
-  return { make: make, units: units, clash: clash, echo: echo, L1: L1, L2: L2, K: K, L1B: L1B, L2B: L2B, KB: KB, T1: T1, PAIRS: PAIRS };
+  return { make: make, units: units, clash: clash, echo: echo, L1: L1, L2: L2, K: K, L1B: L1B, L2B: L2B, KB: KB, KT2: KT2, T1: T1, PAIRS: PAIRS };
 })();
 if (typeof module !== 'undefined') module.exports = PondVerse;
