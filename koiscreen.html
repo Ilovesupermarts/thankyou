@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
 <title>Koi Pond Screen Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&display=swap" rel="stylesheet">
 
 <!-- ============================================================
      koiscreen.html — test bed for a calm screen: the whole screen is a
@@ -57,6 +60,68 @@
   /* (until the ink transition has taken its copies of the rocks and the fountain) */
   body.tr-hold #rocks, body.tr-hold #rockShade, body.tr-hold #fountain, body.tr-hold #fnFx, body.tr-hold #pond { opacity: 0; }
   #rocks, #rockShade, #fountain, #fnFx { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+
+  /* ---------- the pond's name and poem (section 3f) ----------
+     Vertical, read right to left: the poem's two lines (each split at its
+     comma into two columns), a thin upright line, then the pond's name
+     with her seal under it. Each character is brushed in like the name on
+     the name screen (the app's inkBrush / inkDry: brushed from the top
+     down behind a soft edge while the wet ink blooms, then dries sharp).
+     Taps pass through it to the water. */
+  .pv {
+    position: fixed; z-index: 4; pointer-events: none;
+    writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+    color: var(--pv-ink, #3F2A22); white-space: nowrap;
+  }
+  .pv.off { display: none; }
+  .pv-col { display: block; font-weight: 600; letter-spacing: 0.06em; }
+  .pv-rule { display: block; width: 0; border-left: 1px solid var(--pv-rule, rgba(120, 72, 52, 0.35)); }
+  .pv-name { display: block; font-weight: 600; letter-spacing: 0.1em; }
+  .pv-c {
+    display: inline-block; padding: 0.3em; margin: -0.3em;
+    text-shadow: var(--pv-glow);
+    opacity: 0;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 58%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 58%);
+    -webkit-mask-size: 100% 320%; mask-size: 100% 320%;
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    -webkit-mask-position: 0 86%; mask-position: 0 86%;
+  }
+  .pv-c.red { color: var(--pv-red, #B8402E); }
+  .pv.writing .pv-c {
+    animation-name: pvBrush, pvDry;
+    animation-duration: var(--pv-brush, 1.2s), var(--pv-dry, 1.7s);
+    animation-timing-function: cubic-bezier(0.45, 0.05, 0.35, 1), cubic-bezier(0.3, 0.6, 0.3, 1);
+    animation-fill-mode: both, both;
+  }
+  .pv.done .pv-c { opacity: 1; -webkit-mask-position: 0 0; mask-position: 0 0; }
+  @keyframes pvBrush {
+    0%   { opacity: 0; -webkit-mask-position: 0 86%; mask-position: 0 86%; }
+    12%  { opacity: 1; }
+    100% { opacity: 1; -webkit-mask-position: 0 0; mask-position: 0 0; }
+  }
+  @keyframes pvDry {
+    0%   { filter: blur(6px);   transform: scale(1.035); text-shadow: 0 0 30px rgba(255, 246, 230, 0.55); }
+    40%  { filter: blur(2.4px); transform: scale(1.015); text-shadow: 0 0 26px rgba(255, 246, 230, 0.45); }
+    100% { filter: blur(0);     transform: scale(1);     text-shadow: var(--pv-glow); }
+  }
+  /* her seal: the first character of her name, stamped in vermilion */
+  .pv-seal {
+    display: inline-block; writing-mode: horizontal-tb; -webkit-writing-mode: horizontal-tb;
+    box-sizing: border-box; text-align: center; font-weight: 700; letter-spacing: 0;
+    color: var(--pv-red, #B8402E); border: 0.09em solid var(--pv-red, #B8402E); border-radius: 0.1em;
+    background: rgba(255, 248, 240, 0.25);
+    opacity: 0;
+  }
+  .pv-seal::after { content: attr(data-seal); }
+  .pv.writing .pv-seal { animation: pvStamp 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+  .pv.done .pv-seal { opacity: 0.92; }
+  @keyframes pvStamp {
+    0%   { opacity: 0;    transform: scale(1.35); filter: blur(3px); }
+    55%  { opacity: 0.95; transform: scale(0.97); filter: blur(0); }
+    100% { opacity: 0.92; transform: scale(1);    filter: blur(0); }
+  }
 
   /* ---------- panel ---------- */
   .kp-panel {
@@ -129,6 +194,7 @@
 <canvas id="fountain"></canvas>
 <canvas id="rocks"></canvas>
 <canvas id="fnFx"></canvas>
+<div class="pv off" id="pv" aria-hidden="true"></div>
 
 <button class="kp-show" id="kpShow" type="button" aria-label="Show settings">⚙</button>
 <div class="kp-panel" id="kpPanel">
@@ -143,6 +209,7 @@
 <script src="inkfluid.js"></script>
 <script src="inkreveal.js"></script>
 <script src="koipond.js"></script>
+<script src="pondverse.js"></script>
 <script>
 (function () {
   'use strict';
@@ -176,7 +243,11 @@
     maxDpr: 2,
     // the ink transition (section 3e): seconds
     inkPlay: 1, inkStart: 0.9, inkRocksAt: 0, inkRocksDur: 4, inkFnAt: 1.8, inkFnDur: 3, inkFinish: 1.9,
-    waterFade: 1.6, soundFade: 2, koiAfter: 0, enterOver: 7, enterDepth: 0.6
+    waterFade: 1.6, soundFade: 2, koiAfter: 0, enterOver: 7, enterDepth: 0.6,
+    // the pond's name and poem (section 3f)
+    pvName: '桜庭', pvShow: 1, pvX: 0.1, pvY: 0.16, pvSize: 0.034, pvTitle: 1.3, pvPitch: 1.8, pvTitleDrop: 1.3,
+    pvGap: 2, pvSeal: 1.35, pvGlow: 1, pvInk: '#3F2A22', pvRed: '#B8402E',
+    pvAt: 0.8, pvStagger: 0.11, pvColPause: 0.35, pvBrush: 1.2, pvDry: 1.7
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
   try {
@@ -1028,6 +1099,7 @@
     TR.noWater = false;
     fxEl.style.transition = 'opacity ' + Math.max(0, V.waterFade) + 's ease'; fxEl.style.opacity = 1;
     TR.sound = 1; fnSoundLevel(Math.max(0.05, V.soundFade));
+    pvWrite(V.pvAt);
     clearTimeout(TR.timer);
     TR.timer = setTimeout(function () {
       pond.enter({ over: V.enterOver, zLo: 0, zHi: V.enterDepth });
@@ -1041,6 +1113,7 @@
     trShowAll();                         // (everything back as it was; the redraw then replaces what changed)
     document.body.classList.remove('tr-hold');
     TR.phase = 'off'; TR.noWater = false; TR.sound = 1; fxEl.style.opacity = 1; fnSoundLevel(0.4);
+    if (!PV.timer && !pvEl.classList.contains('writing')) pvWrite(0, true);
     if (pond) pond.start();
   }
   function trPlay() {
@@ -1051,10 +1124,116 @@
     var pc = canvas.getContext('2d'); pc.setTransform(1, 0, 0, 1, 0, 0); pc.clearRect(0, 0, canvas.width, canvas.height);
     TR.noWater = true; fxEl.style.transition = 'none'; fxEl.style.opacity = 0;
     TR.sound = 0; fnSoundLevel(0.3);
+    pvHide();
     TR.phase = 'wait'; TR.taken = false; TR.last = 0;
     if (!TR.raf) TR.raf = requestAnimationFrame(trFrame);
   }
   if (V.inkPlay) { document.body.classList.add('tr-hold'); trPlay(); }
+
+
+  /* ============================================================
+     3f. THE POND'S NAME AND POEM
+     Made from the therapist's name (in the app: the one typed on the
+     name screen; here the panel's name box) by pondverse.js: a pond name
+     and a two-line hidden-name poem (折句), her syllables in vermilion,
+     her seal (the first character of her name, as typed). Laid out as the
+     user's picture: upper left, vertical, read right to left; the poem's
+     lines split at their commas into four columns, a thin line, the pond's
+     name with the seal under it. Written in when the ink transition is
+     done (pvAt s later), each character brushed in one after another as
+     the name screen's name is (pvStagger s apart, a pause between
+     columns), the seal stamped last. Sizes follow the screen's height.
+     ============================================================ */
+  var pvEl = document.getElementById('pv'), PV = { timer: 0, verse: null };
+  function pvGlow() {
+    var g = Math.max(0, V.pvGlow);
+    return '0 0 ' + (8 * g).toFixed(1) + 'px rgba(255, 248, 240, ' + Math.min(1, 0.92 * g).toFixed(2) + '), 0 0 ' +
+           (18 * g).toFixed(1) + 'px rgba(250, 228, 210, ' + Math.min(1, 0.7 * g).toFixed(2) + ')';
+  }
+  function pvLayout() {
+    var H = innerHeight, f = Math.max(8, V.pvSize * H);
+    pvEl.style.left = (V.pvX * innerWidth).toFixed(1) + 'px';
+    pvEl.style.top = (V.pvY * H).toFixed(1) + 'px';
+    pvEl.style.fontSize = f.toFixed(1) + 'px';
+    pvEl.style.setProperty('--pv-ink', V.pvInk);
+    pvEl.style.setProperty('--pv-red', V.pvRed);
+    pvEl.style.setProperty('--pv-glow', pvGlow());
+    pvEl.style.setProperty('--pv-brush', Math.max(0.1, V.pvBrush) + 's');
+    pvEl.style.setProperty('--pv-dry', Math.max(0.1, V.pvDry) + 's');
+    pvEl.querySelectorAll('.pv-col').forEach(function (c) { c.style.lineHeight = V.pvPitch; });
+    var rule = pvEl.querySelector('.pv-rule');
+    if (rule) rule.style.margin = '0 ' + (V.pvGap * 0.5).toFixed(2) + 'em';
+    var nm = pvEl.querySelector('.pv-name');
+    if (nm) {
+      nm.style.fontSize = V.pvTitle + 'em';
+      nm.style.lineHeight = 1.5;
+      nm.style.paddingTop = (V.pvTitleDrop / V.pvTitle).toFixed(3) + 'em';
+    }
+    var seal = pvEl.querySelector('.pv-seal');
+    if (seal) {
+      // the box is pvSeal × the poem's character size; its character fills 0.72 of it
+      seal.style.fontSize = (V.pvSeal * 0.72 / V.pvTitle).toFixed(3) + 'em';
+      seal.style.width = seal.style.height = seal.style.lineHeight = (1 / 0.72).toFixed(3) + 'em';
+      seal.style.marginTop = (0.5 / 0.72).toFixed(3) + 'em';
+    }
+    pvEl.classList.toggle('off', !V.pvShow);
+  }
+  // build the characters (each its own span, so each can be brushed in)
+  function pvBuild() {
+    var vs = PondVerse.make(V.pvName || '');
+    PV.verse = vs;
+    pvEl.innerHTML = '';
+    var t = 0, st = Math.max(0, V.pvStagger);
+    function chars(box, list) {
+      list.forEach(function (c) {
+        var sp = document.createElement('span');
+        sp.className = 'pv-c' + (c.red ? ' red' : '');
+        sp.textContent = c.ch;
+        sp.style.animationDelay = t.toFixed(2) + 's, ' + t.toFixed(2) + 's';
+        box.appendChild(sp);
+        if (c.ch !== '、') t += st;
+      });
+    }
+    var poem = document.createElement('div'); poem.className = 'pv-poem';
+    poem.style.display = 'block';
+    vs.cols.forEach(function (col) {
+      if (!col.length) return;
+      var d = document.createElement('div'); d.className = 'pv-col';
+      chars(d, col); poem.appendChild(d);
+      t += Math.max(0, V.pvColPause);
+    });
+    pvEl.appendChild(poem);
+    var rule = document.createElement('div'); rule.className = 'pv-rule'; pvEl.appendChild(rule);
+    var nm = document.createElement('div'); nm.className = 'pv-name';
+    t += Math.max(0, V.pvColPause);
+    chars(nm, vs.title);
+    var seal = document.createElement('span'); seal.className = 'pv-seal';
+    seal.setAttribute('data-seal', vs.seal);
+    seal.style.animationDelay = (t + Math.max(0.1, V.pvBrush) * 0.6).toFixed(2) + 's';
+    nm.appendChild(seal);
+    pvEl.appendChild(nm);
+    PV.total = t + Math.max(V.pvBrush, V.pvDry) + 1;
+    pvLayout();
+  }
+  function pvHide() {
+    if (!pvEl) return;
+    clearTimeout(PV.timer); PV.timer = 0;
+    pvEl.classList.remove('writing', 'done');
+  }
+  // write it in (after `wait` s); now = true: show it written, at once
+  function pvWrite(wait, now) {
+    if (!pvEl) return;
+    pvHide();
+    pvBuild();
+    if (now) { pvEl.classList.add('done'); return; }
+    PV.timer = setTimeout(function () {
+      PV.timer = 0;
+      void pvEl.offsetWidth;            // (so the brush starts again from the top)
+      pvEl.classList.add('writing');
+    }, Math.max(0, wait) * 1000);
+  }
+  addEventListener('resize', pvLayout);
+  if (!V.inkPlay) pvWrite(V.pvAt);
 
   /* ============================================================
      4. THE PANEL
@@ -1147,7 +1326,24 @@
     { k: 'soundFade', l: 'Its sound fades in over', min: 0.1, max: 8, step: 0.1, re: 'ink' },
     { k: 'koiAfter', l: 'The koi start coming in this long after the ink is done', min: 0, max: 10, step: 0.1, re: 'ink' },
     { k: 'enterOver', l: 'The koi come in one after another over', min: 0, max: 20, step: 0.5, re: 'ink' },
-    { k: 'enterDepth', l: 'How much deeper than usual they may be as they come in (they rise back)', min: 0, max: 0.9, step: 0.05, re: 'ink' }
+    { k: 'enterDepth', l: 'How much deeper than usual they may be as they come in (they rise back)', min: 0, max: 0.9, step: 0.05, re: 'ink' },
+    { g: 'The pond’s name and poem (from her name)' },
+    { custom: 'pv' },
+    { k: 'pvShow', l: 'Show it (1 = on, 0 = off)', min: 0, max: 1, step: 1, re: 'pv' },
+    { k: 'pvX', l: 'Position: left edge of the pond’s name (share of the screen’s width)', min: 0, max: 0.6, step: 0.0025, re: 'pv' },
+    { k: 'pvY', l: 'Position: top of the poem (share of the screen’s height)', min: 0, max: 0.6, step: 0.0025, re: 'pv' },
+    { k: 'pvSize', l: 'Poem: character size (share of the screen’s height)', min: 0.012, max: 0.07, step: 0.0005, re: 'pv' },
+    { k: 'pvPitch', l: 'Poem: column spacing (× character size)', min: 1, max: 3, step: 0.05, re: 'pv' },
+    { k: 'pvTitle', l: 'Pond’s name: character size (× the poem’s)', min: 0.8, max: 2.5, step: 0.05, re: 'pv' },
+    { k: 'pvTitleDrop', l: 'Pond’s name: starts this much lower than the poem (× the poem’s character size)', min: 0, max: 6, step: 0.1, re: 'pv' },
+    { k: 'pvGap', l: 'Space round the thin upright line (× the poem’s character size)', min: 0.2, max: 4, step: 0.05, re: 'pv' },
+    { k: 'pvSeal', l: 'Seal: size (× the poem’s character size)', min: 0.5, max: 2.5, step: 0.05, re: 'pv' },
+    { k: 'pvGlow', l: 'Soft pale glow round the characters', min: 0, max: 2, step: 0.05, re: 'pv' },
+    { k: 'pvAt', l: 'Writing starts this long after the ink transition is done (s)', min: 0, max: 10, step: 0.1, re: 'pvt' },
+    { k: 'pvStagger', l: 'Time between characters (s)', min: 0, max: 0.6, step: 0.01, re: 'pvt' },
+    { k: 'pvColPause', l: 'Extra pause before each column (s)', min: 0, max: 2, step: 0.05, re: 'pvt' },
+    { k: 'pvBrush', l: 'Each character: brushed in over (s)', min: 0.2, max: 4, step: 0.05, re: 'pvt' },
+    { k: 'pvDry', l: 'Each character: the wet ink dries over (s)', min: 0.2, max: 5, step: 0.05, re: 'pvt' }
   ];
 
   function mixPanel() {
@@ -1182,7 +1378,39 @@
 
   mixPanel();
   var inputs = {};
+  // the name box, the two colours and "write it again" (the pond's name and poem)
+  function pvPanel() {
+    var w = document.createElement('div');
+    w.innerHTML =
+      '<div class="kp-row"><label>Her name (as typed on the name screen; さん is left off)</label>' +
+      '<input type="text" id="pvName" style="grid-column:1/3;font:16px/1.4 serif;padding:6px 8px;border:1px solid rgba(120,90,80,.3);border-radius:8px"></div>' +
+      '<div class="kp-note" id="pvSays"></div>' +
+      '<div class="kp-row"><label>Colours: the ink, and her characters and seal</label>' +
+      '<span style="grid-column:1/3;display:flex;gap:10px"><input type="color" id="pvInk"><input type="color" id="pvRed"></span></div>' +
+      '<div class="kp-foot" style="margin-top:6px"><button class="kp-btn" type="button" id="pvAgain">Write it again</button></div>';
+    body.appendChild(w);
+    var nameIn = w.querySelector('#pvName'), ink = w.querySelector('#pvInk'), red = w.querySelector('#pvRed');
+    nameIn.value = V.pvName; ink.value = V.pvInk; red.value = V.pvRed;
+    var nt = 0;
+    nameIn.addEventListener('input', function () {
+      V.pvName = nameIn.value; save();
+      clearTimeout(nt); nt = setTimeout(function () { pvWrite(0); pvSays(); }, 350);
+    });
+    ink.addEventListener('input', function () { V.pvInk = ink.value; save(); pvLayout(); });
+    red.addEventListener('input', function () { V.pvRed = red.value; save(); pvLayout(); });
+    w.querySelector('#pvAgain').addEventListener('click', function () { pvWrite(0); pvSays(); });
+    pvSays();
+  }
+  // what was taken from her name (so the panel shows why the poem is as it is)
+  function pvSays() {
+    var el = document.getElementById('pvSays'); if (!el) return;
+    var vs = PondVerse.make(V.pvName || '');
+    el.textContent = vs.units.length
+      ? 'From her name: ' + vs.units.map(function (u) { return (u.ch || '') + (u.kana && u.kana !== u.ch ? ' (' + u.kana + ')' : '') + (u.from === 'unknown' ? ' – reading not known: a plain line' : ''); }).join(' · ') + '. Seal: ' + vs.seal
+      : 'Type her name.';
+  }
   CTL.forEach(function (c) {
+    if (c.custom === 'pv') { pvPanel(); return; }
     if (c.g) { var h = document.createElement('div'); h.className = 'kp-group'; h.textContent = c.g; body.appendChild(h); return; }
     var row = document.createElement('div'); row.className = 'kp-row';
     row.innerHTML = '<label>' + c.l + '</label><input type="range" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '"><output></output>';
@@ -1195,6 +1423,8 @@
       else if (c.re === 'fountain') drawFountain();
       else if (c.re === 'sound') fnSoundLevel();
       else if (c.re === 'ink') { /* (used the next time it plays) */ }
+      else if (c.re === 'pv') pvLayout();
+      else if (c.re === 'pvt') pvWrite(0);
       else { var o = {}; o[c.k === 'rkGap' ? 'floorGap' : c.k] = V[c.k]; pond.set(o); if (c.re === 'reset') pond.reset(); if (c.k === 'maxDpr' || c.k === 'length' || c.k === 'sizeVary') { drawRocks(); drawFountain(); } }
     });
     inputs[c.k] = { inp: inp, out: out };
@@ -1251,7 +1481,7 @@
     head.addEventListener('pointerup', function () { on = false; });
   })();
 
-  window.koiLab = { V: V, pond: pond, play: trPlay, tr: TR };
+  window.koiLab = { V: V, pond: pond, play: trPlay, tr: TR, verse: function () { return PV.verse; }, write: pvWrite };
 })();
 </script>
 </body>
