@@ -81,7 +81,7 @@
   function lineHtml(t) { return t ? '<div class="jp">' + esc(t) + '</div><div class="en">' + esc(gloss(t)) + '</div>' : '<span class="dim">–</span>'; }
 
   /* ---------- 1. checks ---------- */
-  var WATER = /水|みず|みなも|池|いけ/;
+  var WATER = /水|みず|みなも|池|いけ|海|浜/;
   var problems = [];
   function check(t, key, which, where) {
     if (!t) return;
@@ -104,7 +104,7 @@
     : '<div>All <b class="num">' + nLines + '</b> lines pass: each starts with its syllable or kanji, has one comma, has an English meaning, and no line 2 names the water.</div>';
 
   /* ---------- 2. names ---------- */
-  var SURNAMES = ('佐藤 鈴木 高橋 田中 伊藤 渡辺 山本 中村 小林 加藤 吉田 山田 佐々木 山口 松本 井上 木村 林 斎藤 清水 山崎 森 池田 橋本 阿部 石川 山下 中島 石井 小川 前田 岡田 長谷川 藤田 後藤 近藤 村上 遠藤 青木 坂本 斉藤 福田 太田 西村 藤井 金子 岡本 藤原 中野 三浦 原田 中川 松田 竹内 小野 田村 中山 和田 石田 森田 上田 原 柴田 酒井 工藤 横山 宮崎 宮本 内田 高木 安藤 島田 谷口 大野 高田 丸山 今井 河野 藤本 村田 武田 上野 杉山 増田 小山 大塚 平野 菅原 久保 松井 千葉 岩崎 桜井 木下 野口 松尾 菊地 野村 新井 渡部 佐野 杉本 古川 大西 浜田 市川 吉川 中西 小島 水野 桑原 荒木 北村 平田 西田 菅野 永井 久保田 松下 大橋 小松 熊谷 本田 服部 吉村 岩田 川口 辻 原口 樋口 秋山 田口 永田 小池 中田 松岡 山内 安田 中原 川上 北川 大島 関 早川 星野 黒田 堀 岡崎 五十嵐 森本 飯田 片山 西川 川村 宮田 鈴村 白石 小西 内藤 堀内 松村 大川 富田 浅野 森下 足立 田辺 平井 坂口 本間 武藤 大久保 高野 宮下 島村 河合 吉岡 堤 須藤 牧野 小田 小澤 福島 南 東 西 北 桜庭 春日 日高 宮川 栗田 新田 柳田 梅田 竹田 花田 月岡 星 雪村 春山 夏目 秋田 冬木 若林 若松 錦織 鶴田 亀井 鷹野 鳩山 鹿島 熊田 犬飼 馬場 牛田 羽田 翼 澄川 泉 滝沢 湖山 潮田 岬 峰 丘 苑田 菊池 萩原 桂 椿 檜山 桐生 柏木 楠 欅田 芦田 稲垣 麦島 米田 豆田 竜田 辰巳 寅田 卯月 午 申田 酉 戌井 亥 我妻 成田 元木 正木 則本 典田 法月 道下 達川 勇 雄島 男鹿 夫木').split(' ');
+  var SURNAMES = ('佐藤 鈴木 高橋 田中 伊藤 渡辺 山本 中村 小林 加藤 吉田 山田 佐々木 山口 松本 井上 木村 林 斎藤 清水 山崎 森 池田 橋本 阿部 石川 山下 中島 石井 小川 前田 岡田 長谷川 藤田 後藤 近藤 村上 遠藤 青木 坂本 斉藤 福田 太田 西村 藤井 金子 岡本 藤原 中野 三浦 原田 中川 松田 竹内 小野 田村 中山 和田 石田 森田 上田 原 柴田 酒井 工藤 横山 宮崎 宮本 内田 高木 安藤 島田 谷口 大野 高田 丸山 今井 河野 藤本 村田 武田 上野 杉山 増田 小山 大塚 平野 菅原 久保 松井 千葉 岩崎 桜井 木下 野口 松尾 菊地 野村 新井 渡部 佐野 杉本 古川 大西 浜田 市川 吉川 中西 小島 水野 桑原 荒木 北村 平田 西田 菅野 永井 久保田 松下 大橋 小松 熊谷 本田 服部 吉村 岩田 川口 辻 原口 樋口 秋山 田口 永田 小池 中田 松岡 山内 安田 中原 川上 北川 大島 関 早川 星野 黒田 堀 岡崎 五十嵐 森本 飯田 片山 西川 川村 宮田 鈴村 白石 小西 内藤 堀内 松村 大川 富田 浅野 森下 足立 田辺 平井 坂口 本間 武藤 大久保 高野 宮下 島村 河合 吉岡 堤 須藤 牧野 小田 小澤 福島 南 東 西 北 桜庭 春日 日高 宮川 栗田 新田 柳田 梅田 竹田 花田 月岡 星 雪村 春山 夏目 秋田 冬木 若林 若松 錦織 鶴田 亀井 鷹野 鳩山 鹿島 熊田 犬飼 馬場 牛田 羽田 翼 澄川 泉 滝沢 湖山 潮田 岬 峰 丘 苑田 菊池 萩原 桂 椿 檜山 桐生 柏木 楠 欅田 芦田 稲垣 麦島 米田 豆田 竜田 辰巳 寅田 卯月 申田 戌井 我妻 成田 元木 正木 則本 典田 法月 道下 達川 勇 雄島 男鹿 夫木').split(' ');
   var GIVEN = ('美咲 結衣 陽菜 葵 凛 結愛 さくら 愛 美月 花 優花 心 彩 真央 美優 七海 舞 遥 莉子 杏 楓 椿 茜 梓 環 瞳 栞 詩 唯 千尋 恵 恵美 恵子 智子 知子 陽子 花子 美花 春花 裕子 洋子 久美子 由美子 真由美 麻衣 麻美 亜美 歩美 有希 有紀 友美 幸子 幸恵 明美 直美 典子 和子 京子 純子 雅子 礼子 律子 玲奈 怜 麗 蘭 瑠璃 留美 琉花 璃子 莉奈 梨花 利恵 音羽 乃愛 穂乃果 帆花 歩 芽依 萌 菫 薫 霞 柚 千夏 千秋 百合 万里 八重 五月 四葉 一花 七瀬 恋 華 紅葉 朱里 藍 碧 翠 虹 光 輝美 照子 灯 晃子 昌子 秀美 英子 栄子 恭子 康子 泰子 安奈 寛子 啓子 慶子 景子 鶴子 美羽 翼 澄香 泉 渚 汐里 浪江 波留 雨音 霧子 露香 霜月 岳子 朝美 夕子 宵子 暁美 曙 錦 若菜 静香 涼子 凪 澪 雫 夢 祈 祐子 侑 優子 柊 椋 鞠子 毬乃 鈴 琴音 笛子 舟子 桜子 雪乃 春香 夏美 秋子 冬美 美鈴 美里 美和 美紀 美穂 美奈 美保 美加 美代 美幸 美雪 美香 美緒 美桜 真理 真美 真紀 真由 真琴 千里 千代 千絵 千晴 愛美 愛子 愛梨 彩花 彩乃 彩香 結子 結花 咲 咲良 咲希 優奈 優美 優衣 陽向 陽葵 陽子 心春 心愛 晴 晴美 明日香 明里 朋美 朋子 紀子 紀香 早苗 早紀 沙織 沙耶 紗希 紗英 亜希 亜紀 絵美 絵里 佳奈 佳子 香織 香奈 奈々 奈緒 菜摘 菜々子 里奈 里美 理沙 理恵').split(' ');
   var KANA = ('かな みき ゆき あや まい りな えり さき みほ なな しずか ゆい めい れい ゆう けい ゆうこ きょうこ しょうこ あい もも はるか ひなた つばさ みずき みづき あすか ちひろ まどか のぞみ ひかり かおり さやか あかね なつみ ちあき まりこ ゆかり すみれ あおい さくら ほのか ひより こはる サクラ ケイコ アヤ ミキ ユイ リコ エマ').split(' ');
   var seenN = {}, NAMES = [];
@@ -112,13 +112,13 @@
 
   function analyse(n) {
     var r = P.make(n), flags = [];
-    var title = r.title.map(function (c) { return c.ch; }).join('').replace(/の?池$/, '');
-    var own = {}; Array.from(r.name).forEach(function (c) { own[c] = 1; });
-    var rep = P.clash(r.lines[0], title, own).concat(P.clash(r.lines[1], title, own), P.clash(r.lines[1], r.lines[0], own));
+    var rep = r.repeats;
     if (rep.length) flags.push(['w', 'repeats ' + rep.join(' ')]);
     var plain0 = !r.cols[0].some(function (c) { return c.red; }), plain1 = !r.cols[2].some(function (c) { return c.red; });
     if (plain0) flags.push(['b', 'line 1 plain']);
-    if (plain1) flags.push(['w', 'line 2 plain']);
+    // a one-kanji name read with ん second (凛, 蓮, 杏): the plain koi line is meant
+    var nEnd = r.units[1] && r.units[1].kana === 'ん';
+    if (plain1) flags.push(nEnd ? ['', 'line 2 plain (ん)'] : ['w', 'line 2 plain']);
     r.units.forEach(function (u) { if (u.from === 'unknown') flags.push(['b', 'reading of ' + u.ch + ' not known']); });
     if (r.units.length < 2) flags.push(['', 'one syllable only']);
     return { r: r, flags: flags };
@@ -142,7 +142,7 @@
     });
     document.querySelector('#names tbody').innerHTML = list.map(nameRow).join('');
     var nRep = rows.filter(function (x) { return x.a.flags.some(function (t) { return /^repeats/.test(t[1]); }); }).length;
-    var nPlain = rows.filter(function (x) { return x.a.flags.some(function (t) { return /plain/.test(t[1]); }); }).length;
+    var nPlain = rows.filter(function (x) { return x.a.flags.some(function (t) { return t[0] && /plain/.test(t[1]); }); }).length;
     var nUnk = rows.filter(function (x) { return x.a.flags.some(function (t) { return /not known/.test(t[1]); }); }).length;
     document.getElementById('nameStats').textContent = rows.length + ' names · ' + nRep + ' still repeat a word · ' + nPlain + ' use a plain line · ' + nUnk + ' have a kanji with no known reading · showing ' + list.length;
   }
