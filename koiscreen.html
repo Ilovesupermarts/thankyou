@@ -71,14 +71,14 @@
   .pv {
     position: fixed; z-index: 4; pointer-events: none;
     writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+    font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     color: var(--pv-ink, #3F2A22); white-space: nowrap;
   }
   .pv.off { display: none; }
-  .pv-col { display: block; font-weight: 600; letter-spacing: 0.06em; }
+  .pv-col { display: block; font-weight: 400; letter-spacing: 0.06em; }
   .pv-rule { display: block; width: 0; border-left: 1px solid var(--pv-rule, rgba(120, 72, 52, 0.35)); }
-  .pv-name { display: block; font-weight: 600; letter-spacing: 0.1em; }
-  .pv-c {
+  .pv-name { display: block; font-weight: 400; letter-spacing: 0.1em; }
+  span.pv-c {
     display: inline-block; padding: 0.3em; margin: -0.3em;
     text-shadow: var(--pv-glow);
     opacity: 0;
@@ -88,14 +88,14 @@
     -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
     -webkit-mask-position: 0 86%; mask-position: 0 86%;
   }
-  .pv-c.red { color: var(--pv-red, #B8402E); }
-  .pv.writing .pv-c {
+  span.pv-c.red { color: var(--pv-red, #B8402E); }
+  .pv.writing span.pv-c {
     animation-name: pvBrush, pvDry;
     animation-duration: var(--pv-brush, 1.2s), var(--pv-dry, 1.7s);
     animation-timing-function: cubic-bezier(0.45, 0.05, 0.35, 1), cubic-bezier(0.3, 0.6, 0.3, 1);
     animation-fill-mode: both, both;
   }
-  .pv.done .pv-c { opacity: 1; -webkit-mask-position: 0 0; mask-position: 0 0; }
+  .pv.done span.pv-c { opacity: 1; -webkit-mask-position: 0 0; mask-position: 0 0; }
   @keyframes pvBrush {
     0%   { opacity: 0; -webkit-mask-position: 0 86%; mask-position: 0 86%; }
     12%  { opacity: 1; }
@@ -106,6 +106,9 @@
     40%  { filter: blur(2.4px); transform: scale(1.015); text-shadow: 0 0 26px rgba(255, 246, 230, 0.45); }
     100% { filter: blur(0);     transform: scale(1);     text-shadow: var(--pv-glow); }
   }
+  /* a character written stroke by stroke (inkwrite.js): its canvas is 1.6 em,
+     the character's 1 em cell in its middle */
+  canvas.pv-c { display: inline-block; width: 1.6em; height: 1.6em; margin: -0.3em; vertical-align: middle; }
   /* her seal: the first character of her name, stamped in vermilion, drawn
      as the receipt's seal is (index.html #receiptStamp): an SVG with the same
      rough ink filters (uneven, speckled edges and grain), a thick square
@@ -212,6 +215,8 @@
 <script src="inkreveal.js"></script>
 <script src="koipond.js"></script>
 <script src="pondverse.js"></script>
+<script src="strokes.js"></script>
+<script src="inkwrite.js"></script>
 <script>
 (function () {
   'use strict';
@@ -249,7 +254,7 @@
     // the pond's name and poem (section 3f)
     pvName: '桜庭', pvShow: 1, pvX: 0.1, pvY: 0.16, pvSize: 0.034, pvTitle: 1.3, pvPitch: 1.8, pvTitleDrop: 1.3,
     pvGap: 2, pvSeal: 1.35, pvGlow: 1, pvInk: '#3F2A22', pvRed: '#B8402E',
-    pvAt: 0.8, pvStagger: 0.11, pvColPause: 0.35, pvBrush: 1.2, pvDry: 1.7
+    pvAt: 0.8, pvWriteMax: 16, pvStagger: 0.11, pvColPause: 0.35, pvBrush: 1.2, pvDry: 1.7
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
   try {
@@ -1115,7 +1120,7 @@
     trShowAll();                         // (everything back as it was; the redraw then replaces what changed)
     document.body.classList.remove('tr-hold');
     TR.phase = 'off'; TR.noWater = false; TR.sound = 1; fxEl.style.opacity = 1; fnSoundLevel(0.4);
-    if (!PV.timer && !pvEl.classList.contains('writing')) pvWrite(0, true);
+    if (PV.state !== 'writing' && PV.state !== 'waiting') pvWrite(0, true);
     if (pond) pond.start();
   }
   function trPlay() {
@@ -1183,39 +1188,60 @@
   function pvBuild() {
     var vs = PondVerse.make(V.pvName || '');
     PV.verse = vs;
+    InkWrite.stop();
     pvEl.innerHTML = '';
-    var t = 0, st = Math.max(0, V.pvStagger);
-    function chars(box, list) {
+    var f = Math.max(8, V.pvSize * innerHeight), dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    var g = Math.max(0, V.pvGlow);
+    var glow = g > 0 ? [{ c: 'rgba(255, 248, 240, ' + Math.min(1, 0.92 * g).toFixed(2) + ')', blur: 8 * g },
+                        { c: 'rgba(250, 228, 210, ' + Math.min(1, 0.7 * g).toFixed(2) + ')', blur: 18 * g }] : [];
+    var items = [], plain = [], t = 0.15, GAP = 0.2;
+    function chars(box, list, em) {
       list.forEach(function (c) {
+        var it = null, el = null;
+        if (InkWrite.ready() && InkWrite.has(c.ch)) {
+          el = document.createElement('canvas');
+          el.className = 'pv-c' + (c.red ? ' red' : '');
+          el.textContent = c.ch;
+          it = InkWrite.item(el, c.ch, { em: em, dpr: dpr, font: PV_FONT, weight: 400, vertical: true,
+                                         colour: c.red ? V.pvRed : V.pvInk, glow: glow });
+        }
+        if (it) { box.appendChild(el); t = InkWrite.plan(it, t) + GAP; items.push(it); return; }
+        // no stroke data (strokes.js not loaded): brushed in as text, the old way
         var sp = document.createElement('span');
         sp.className = 'pv-c' + (c.red ? ' red' : '');
         sp.textContent = c.ch;
-        sp.style.animationDelay = t.toFixed(2) + 's, ' + t.toFixed(2) + 's';
         box.appendChild(sp);
-        if (c.ch !== '、') t += st;
+        plain.push({ el: sp, start: t });
+        t += Math.max(0, V.pvStagger) + GAP;
       });
     }
     var poem = document.createElement('div'); poem.className = 'pv-poem';
     poem.style.display = 'block';
+    pvEl.appendChild(poem);
     vs.cols.forEach(function (col) {
       if (!col.length) return;
       var d = document.createElement('div'); d.className = 'pv-col';
-      chars(d, col); poem.appendChild(d);
+      poem.appendChild(d);
+      chars(d, col, f);
       t += Math.max(0, V.pvColPause);
     });
-    pvEl.appendChild(poem);
     var rule = document.createElement('div'); rule.className = 'pv-rule'; pvEl.appendChild(rule);
     var nm = document.createElement('div'); nm.className = 'pv-name';
+    pvEl.appendChild(nm);
     t += Math.max(0, V.pvColPause);
-    chars(nm, vs.title);
+    chars(nm, vs.title, f * V.pvTitle);
+    // longer than pvWriteMax: the whole writing sped up to fit
+    var k = t > V.pvWriteMax ? V.pvWriteMax / t : 1;
+    if (k < 1) { InkWrite.scale(items, 0, k); plain.forEach(function (p) { p.start *= k; }); t *= k; }
+    plain.forEach(function (p) { p.el.style.animationDelay = p.start.toFixed(2) + 's, ' + p.start.toFixed(2) + 's'; });
     var seal = document.createElement('span'); seal.className = 'pv-seal';
     seal.setAttribute('data-seal', vs.seal);
     seal.innerHTML = pvSealSvg();
     pvSealFit(seal, vs.seal);
-    seal.style.animationDelay = (t + Math.max(0.1, V.pvBrush) * 0.6).toFixed(2) + 's';
+    seal.style.animationDelay = (t + 0.5).toFixed(2) + 's';
     nm.appendChild(seal);
-    pvEl.appendChild(nm);
-    PV.total = t + Math.max(V.pvBrush, V.pvDry) + 1;
+    PV.items = items;
+    PV.total = t + 1.5;
     pvLayout();
   }
   // her seal, as the receipt's: the same two ink filters (index.html, #receiptStamp)
@@ -1268,24 +1294,44 @@
     fit();
     if (document.fonts && document.fonts.load) document.fonts.load('100px "Yuji Syuku"', ch).then(fit, function () {});
   }
+  var PV_FONT = '"Yuji Syuku", "Shippori Mincho", serif';
   function pvHide() {
     if (!pvEl) return;
     clearTimeout(PV.timer); PV.timer = 0;
+    if (typeof InkWrite !== 'undefined') InkWrite.stop();
     pvEl.classList.remove('writing', 'done');
+    PV.state = 'off';
   }
-  // write it in (after `wait` s); now = true: show it written, at once
+  // write it in (after `wait` s); now = true: show it written, at once.
+  // The brush font is loaded first (its characters are what the brush uncovers).
   function pvWrite(wait, now) {
     if (!pvEl) return;
     pvHide();
-    pvBuild();
-    if (now) { pvEl.classList.add('done'); return; }
-    PV.timer = setTimeout(function () {
-      PV.timer = 0;
-      void pvEl.offsetWidth;            // (so the brush starts again from the top)
-      pvEl.classList.add('writing');
-    }, Math.max(0, wait) * 1000);
+    var job = PV.job = {};
+    var fontOk = document.fonts && document.fonts.load
+      ? document.fonts.load('40px "Yuji Syuku"', PondVerse.make(V.pvName || '').lines.join('') + PondVerse.make(V.pvName || '').title.map(function (c) { return c.ch; }).join('')).catch(function () {})
+      : Promise.resolve();
+    fontOk.then(function () {
+      if (PV.job !== job) return;
+      pvBuild();
+      if (now) { InkWrite.finish(PV.items); pvEl.classList.add('done'); PV.state = 'done'; return; }
+      PV.state = 'waiting';
+      PV.timer = setTimeout(function () {
+        PV.timer = 0;
+        if (PV.job !== job) return;
+        void pvEl.offsetWidth;            // (so the CSS parts start again from the top)
+        pvEl.classList.add('writing');
+        PV.state = 'writing';
+        InkWrite.play(PV.items, function () { if (PV.job === job) PV.state = 'done'; });
+      }, Math.max(0, wait) * 1000);
+    });
   }
-  addEventListener('resize', pvLayout);
+  // a look or size setting changed: written again at once in the new look
+  // (or from the start, if it was being written)
+  function pvRefresh() {
+    if (PV.state === 'writing' || PV.state === 'waiting') pvWrite(0); else pvWrite(0, true);
+  }
+  addEventListener('resize', function () { if (PV.state && PV.state !== 'off') pvRefresh(); });
   if (!V.inkPlay) pvWrite(V.pvAt);
 
   /* ============================================================
@@ -1393,10 +1439,11 @@
     { k: 'pvSeal', l: 'Seal: size (× the poem’s character size)', min: 0.5, max: 2.5, step: 0.05, re: 'pv' },
     { k: 'pvGlow', l: 'Soft pale glow round the characters', min: 0, max: 2, step: 0.05, re: 'pv' },
     { k: 'pvAt', l: 'Writing starts this long after the ink transition is done (s)', min: 0, max: 10, step: 0.1, re: 'pvt' },
-    { k: 'pvStagger', l: 'Time between characters (s)', min: 0, max: 0.6, step: 0.01, re: 'pvt' },
+    { k: 'pvWriteMax', l: 'Writing it all takes at most (s; each character is brushed stroke by stroke, as the name on the name screen)', min: 3, max: 40, step: 0.5, re: 'pvt' },
+    { k: 'pvStagger', l: 'Characters with no stroke data: time between them (s)', min: 0, max: 0.6, step: 0.01, re: 'pvt' },
     { k: 'pvColPause', l: 'Extra pause before each column (s)', min: 0, max: 2, step: 0.05, re: 'pvt' },
-    { k: 'pvBrush', l: 'Each character: brushed in over (s)', min: 0.2, max: 4, step: 0.05, re: 'pvt' },
-    { k: 'pvDry', l: 'Each character: the wet ink dries over (s)', min: 0.2, max: 5, step: 0.05, re: 'pvt' }
+    { k: 'pvBrush', l: 'Characters with no stroke data: brushed in over (s)', min: 0.2, max: 4, step: 0.05, re: 'pvt' },
+    { k: 'pvDry', l: 'Characters with no stroke data: the wet ink dries over (s)', min: 0.2, max: 5, step: 0.05, re: 'pvt' }
   ];
 
   function mixPanel() {
@@ -1449,8 +1496,8 @@
       V.pvName = nameIn.value; save();
       clearTimeout(nt); nt = setTimeout(function () { pvWrite(0); pvSays(); }, 350);
     });
-    ink.addEventListener('input', function () { V.pvInk = ink.value; save(); pvLayout(); });
-    red.addEventListener('input', function () { V.pvRed = red.value; save(); pvLayout(); });
+    ink.addEventListener('input', function () { V.pvInk = ink.value; save(); pvLayout(); pvRefresh(); });
+    red.addEventListener('input', function () { V.pvRed = red.value; save(); pvLayout(); pvRefresh(); });
     w.querySelector('#pvAgain').addEventListener('click', function () { pvWrite(0); pvSays(); });
     pvSays();
   }
@@ -1476,7 +1523,7 @@
       else if (c.re === 'fountain') drawFountain();
       else if (c.re === 'sound') fnSoundLevel();
       else if (c.re === 'ink') { /* (used the next time it plays) */ }
-      else if (c.re === 'pv') pvLayout();
+      else if (c.re === 'pv') { if (c.k === 'pvX' || c.k === 'pvY' || c.k === 'pvShow') pvLayout(); else pvRefresh(); }
       else if (c.re === 'pvt') pvWrite(0);
       else { var o = {}; o[c.k === 'rkGap' ? 'floorGap' : c.k] = V[c.k]; pond.set(o); if (c.re === 'reset') pond.reset(); if (c.k === 'maxDpr' || c.k === 'length' || c.k === 'sizeVary') { drawRocks(); drawFountain(); } }
     });
