@@ -505,13 +505,13 @@ var PondVerse = (function () {
     // (else any other kanji of her name that has its own: 海音 → 音色の池)
     if (!title) Array.from(name).some(function (c) { if (K[c] && K[c].t) { title = K[c].t; return true; } return false; });
     if (!title) Array.from(name).some(function (c) { if (KT2[c]) { title = KT2[c]; return true; } return false; });
-    // a pond name from her first syllable only when that syllable is known: a
-    // name typed in kana, or one in NAMES. For a kanji name the reading is a
-    // guess (海音 is あまね, かのん …, not う), so it takes the plain name, uncoloured
-    var sure = !Array.from(name).some(isKanji) || !!NAMES[name];
-    if (!title && sure && u1 && T1[u1.kana]) title = T1[u1.kana];
+    // a pond name from her first syllable: when that syllable is only a guess
+    // (a kanji name not in NAMES: 海音 is あまね, かのん …, not う) it is kept,
+    // but not coloured, so a wrong guess does not show
+    var sure = !Array.from(name).some(isKanji) || !!NAMES[name], guessed = false;
+    if (!title && u1 && T1[u1.kana]) { title = T1[u1.kana]; guessed = !sure; }
     if (!title) title = PLAIN_TITLE;
-    if (title !== PLAIN_TITLE) {
+    if (title !== PLAIN_TITLE && !guessed) {
       // red: as many first characters as come from her name
       var tc = Array.from(title), nc = Array.from(hira.replace(/づ/g, 'ず').replace(/ぢ/g, 'じ'));
       while (red < tc.length && red < nc.length && tc[red] === nc[red]) red++;
@@ -556,6 +556,7 @@ var PondVerse = (function () {
       cols: [cells(A[0], a.red), cells(A[1], 0), cells(B[0], b.red), cells(B[1], 0)],
       lines: [a.text, b.text],
       plainTitle: title === PLAIN_TITLE,
+      guessedTitle: guessed,
       units: U,
       repeats: echo(titleWords, a.text).concat(clash(a.text, titleWords, own), echo(titleWords, b.text),
         clash(b.text, titleWords, own), clash(b.text, a.text, own))
