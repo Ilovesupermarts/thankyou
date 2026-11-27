@@ -76,7 +76,15 @@
   }
   .pv.off { display: none; }
   .pv-col { display: block; font-weight: 400; letter-spacing: 0.06em; }
-  .pv-rule { display: block; width: 0; border-left: 1px solid var(--pv-rule, rgba(120, 72, 52, 0.35)); }
+  .pv-rule { display: block; width: 0; border-left: 1px solid var(--pv-rule, rgba(120, 72, 52, 0.35)); opacity: 0; }
+  /* the thin line is drawn in, top to bottom, only once the pond's name has
+     fully come in (its delay is set by pvBuild) */
+  .pv.writing .pv-rule { animation: pvRule 0.9s cubic-bezier(0.45, 0.05, 0.35, 1) both; }
+  .pv.done .pv-rule { opacity: 1; }
+  @keyframes pvRule {
+    0%   { opacity: 0; clip-path: inset(0 0 100% 0); }
+    100% { opacity: 1; clip-path: inset(0 0 0 0); }
+  }
   .pv-name { display: block; font-weight: 400; letter-spacing: 0.1em; }
   span.pv-c {
     display: inline-block; padding: 0.3em; margin: -0.3em;
@@ -1229,11 +1237,18 @@
     var nm = document.createElement('div'); nm.className = 'pv-name';
     pvEl.appendChild(nm);
     t += Math.max(0, V.pvColPause);
+    var nItems = items.length, nPlain = plain.length;
     chars(nm, vs.title, f * V.pvTitle);
     // longer than pvWriteMax: the whole writing sped up to fit
     var k = t > V.pvWriteMax ? V.pvWriteMax / t : 1;
     if (k < 1) { InkWrite.scale(items, 0, k); plain.forEach(function (p) { p.start *= k; }); t *= k; }
     plain.forEach(function (p) { p.el.style.animationDelay = p.start.toFixed(2) + 's, ' + p.start.toFixed(2) + 's'; });
+    // the divider: drawn only when the pond's name has fully come in (its last
+    // character written and its ink dried)
+    var nameIn = 0;
+    items.slice(nItems).forEach(function (it) { nameIn = Math.max(nameIn, it.end + InkWrite.dryAfter); });
+    plain.slice(nPlain).forEach(function (p) { nameIn = Math.max(nameIn, p.start + Math.max(V.pvBrush, V.pvDry)); });
+    rule.style.animationDelay = nameIn.toFixed(2) + 's';
     var seal = document.createElement('span'); seal.className = 'pv-seal';
     seal.setAttribute('data-seal', vs.seal);
     seal.innerHTML = pvSealSvg();
@@ -1241,7 +1256,7 @@
     seal.style.animationDelay = (t + 0.5).toFixed(2) + 's';
     nm.appendChild(seal);
     PV.items = items;
-    PV.total = t + 1.5;
+    PV.total = Math.max(t + 1.5, nameIn + 0.9);
     pvLayout();
   }
   // her seal, as the receipt's: the same two ink filters (index.html, #receiptStamp)

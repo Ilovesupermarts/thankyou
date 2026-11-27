@@ -265,5 +265,7 @@ var InkWrite = (function () {
   function stop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
 
   return { ready: ready, has: has, item: item, plan: plan, scale: scale, play: play, finish: finish, stop: stop,
+           // seconds after a character's last stroke until its ink has fully dried
+           dryAfter: SETTLE + WET * 4,
            redrawGlyph: glyph };
 })();
