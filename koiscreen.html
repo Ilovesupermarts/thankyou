@@ -131,7 +131,7 @@
   }
   /* a column painted in by the rocks' ink wash (pvLineMode 1): hidden here
      while the wash is drawn over it on #pvFx, shown when its wash is done */
-  .pv-col.wash { opacity: 0; }
+  .pv-col.wash { opacity: 0; transition: opacity 0.6s ease; }
   .pv-col.wash.in, .pv.done .pv-col.wash { opacity: 1; }
   #pvFx { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 5; }
   @keyframes pvBrush {
@@ -1250,7 +1250,7 @@
           it = InkWrite.item(el, c.ch, { em: em, dpr: dpr, font: PV_FONT, weight: 400, vertical: true,
                                          colour: c.red ? V.pvRed : V.pvInk, glow: glow });
         }
-        if (it && !write) { box.appendChild(el); still.push(it); return; }
+        if (it && !write) { box.appendChild(el); el._pvIt = it; still.push(it); return; }
         if (it) { box.appendChild(el); t = InkWrite.plan(it, t) + GAP; items.push(it); return; }
         // no stroke data (strokes.js not loaded): brushed in as text, the old way
         var sp = document.createElement('span');
@@ -1376,7 +1376,7 @@
     if (PW.raf) { cancelAnimationFrame(PW.raf); PW.raf = 0; }
     if (PW.on) {
       PW.on = false;
-      (PW.cols || []).forEach(function (C) { C.mask = C.wet = C.blur = C.pic = null; });
+      (PW.cols || []).forEach(function (C) { C.mask = C.wet = C.blur = C.pic = C.picG = C.bleed = null; });
       if (PW.ink && typeof InkReveal !== 'undefined') InkReveal.stop();
       PW.ink = false;
       if (typeof InkFluid !== 'undefined' && InkFluid.release) InkFluid.release();
@@ -1391,11 +1391,22 @@
     C.R.h = Math.min(pvFx.height, Math.ceil((r.bottom + pad) * pr)) - C.R.y;
     var pic = document.createElement('canvas'); pic.width = Math.max(1, C.R.w); pic.height = Math.max(1, C.R.h);
     var g = pic.getContext('2d');
+    // (and for the ink wash: the letters alone, without their pale glow, so the
+    // wet ink lies only on the strokes, not on the glow's square round them)
+    var picG = document.createElement('canvas'); picG.width = pic.width; picG.height = pic.height;
+    var gg = picG.getContext('2d');
     C.el.querySelectorAll('canvas.pv-c').forEach(function (cv) {
       var b = cv.getBoundingClientRect();
       g.drawImage(cv, b.left * pr - C.R.x, b.top * pr - C.R.y, b.width * pr, b.height * pr);
+      gg.drawImage(cv._pvIt ? cv._pvIt.glyph : cv, b.left * pr - C.R.x, b.top * pr - C.R.y, b.width * pr, b.height * pr);
     });
-    C.pic = pic;
+    C.pic = pic; C.picG = picG;
+    if (C.kind === 'ink') {
+      // the letters bled a little in their own ink, for while they are wet
+      var bl = C.bleed = document.createElement('canvas'); bl.width = pic.width; bl.height = pic.height;
+      var bg = bl.getContext('2d'); bg.filter = 'blur(' + (2.4 * pr).toFixed(1) + 'px)'; bg.drawImage(picG, 0, 0);
+      bg.filter = 'none'; bg.globalAlpha = 0.7; bg.drawImage(picG, 0, 0); bg.globalAlpha = 1;
+    }
     C.box = r;
   }
   // the ink for the poem: the rocks' look, with the drops sized to a column of
@@ -1515,11 +1526,28 @@
         left++; return;
       }
       var st = InkReveal.state(C.id);
-      if (st === 2) { C.el.classList.add('in'); C.shown = true; return; }
+      if (st === 2) {
+        // the wash is done: the column itself (with its glow) fades in over the
+        // dry letters drawn here, which then go
+        if (!C.doneAt) { C.doneAt = el; C.el.classList.add('in'); }
+        if (el - C.doneAt > 0.7) { C.shown = true; return; }
+        left++;
+        c.drawImage(C.picG, R.x, R.y);
+        return;
+      }
       left++;
       if (st === 0) return;
-      l.setTransform(1, 0, 0, 1, 0, 0); l.globalCompositeOperation = 'source-over'; l.clearRect(R.x, R.y, R.w, R.h); l.drawImage(C.pic, R.x, R.y);
+      // the letters, cut to the wet ink and inked while wet (only on the strokes)
+      l.setTransform(1, 0, 0, 1, 0, 0); l.globalCompositeOperation = 'source-over'; l.clearRect(R.x, R.y, R.w, R.h);
+      l.drawImage(C.picG, R.x, R.y);
       InkReveal.composite(c, PW.layer, C.id, PW.pr, R);
+      // and bleeding a little into the paper while wet, drying sharp
+      var wet = 1 - Math.max(0, Math.min(1, (el - C.start - C.dur * 0.5) / (C.dur * 0.9)));
+      if (wet > 0.01) {
+        l.clearRect(R.x, R.y, R.w, R.h);
+        l.globalAlpha = wet; l.drawImage(C.bleed, R.x, R.y); l.globalAlpha = 1;
+        InkReveal.composite(c, PW.layer, C.id, PW.pr, R);
+      }
     });
     if (!left || (PW.ink && !InkReveal.running() && !PW.cols.some(function (C) { return !C.shown && C.kind === 'brush'; }))) {
       PW.cols.forEach(function (C) { C.el.classList.add('in'); });
