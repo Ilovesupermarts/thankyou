@@ -104,10 +104,10 @@
     animation-fill-mode: both, both;
   }
   .pv.done span.pv-c { opacity: 1; -webkit-mask-position: 0 0; mask-position: 0 0; }
-  /* the poem's characters come in a column at a time (pvLineMode), so they
+  /* the poem's characters come in a column at a time, so they
      are shown whole inside their column, not one by one */
   .pv span.pv-c.pv-in { opacity: 1; animation: none; -webkit-mask-image: none; mask-image: none; }
-  /* a column brushed in as one piece (pvLineMode 0): uncovered top to bottom
+  /* a column brushed in as one piece (only if the ink cannot run): uncovered top to bottom
      behind a soft wet edge, then the ink dries sharp */
   .pv-col.sweep {
     opacity: 0;
@@ -129,7 +129,7 @@
     40%  { filter: blur(2px); }
     100% { filter: blur(0); }
   }
-  /* a column painted in by the rocks' ink wash (pvLineMode 1): hidden here
+  /* a column painted in by the rocks' ink wash: hidden here
      while the wash is drawn over it on #pvFx, shown when its wash is done */
   .pv-col.wash { opacity: 0; }
   .pv-col.wash.in, .pv.done .pv-col.wash { opacity: 1; }
@@ -294,8 +294,7 @@
     // the pond's name and poem (section 3f)
     pvName: '桜庭', pvShow: 1, pvX: 0.1, pvY: 0.16, pvSize: 0.034, pvTitle: 1.3, pvPitch: 1.8, pvTitleDrop: 1.3,
     pvGap: 2, pvSeal: 1.35, pvGlow: 1, pvInk: '#3F2A22', pvRed: '#B8402E',
-    pvAt: 0.8, pvWriteMax: 16, pvStagger: 0.11, pvColPause: 0.35, pvBrush: 1.2, pvDry: 1.7,
-    pvLineMode: 1, pvLineDur: 2.2, pvLineGap: 1.1, pvStain: 0.6, pvDry: 1.6, pvShadow: 1, pvEmerge: 0.35
+    pvAt: 0.8, pvColPause: 0.35, pvWashSpeed: 1, pvNameSpeed: 1, pvStain: 0.6, pvShadow: 1
   };
   var V = JSON.parse(JSON.stringify(DEFAULTS));
   try {
@@ -1233,11 +1232,20 @@
      lines split at their commas into four columns, a thin line, the pond's
      name with the seal under it. Written in when the ink transition is
      done (pvAt s later): the poem's four columns each come in as one (the
-     rocks' ink wash or a brush sweep, pvLineMode), then the pond's name is
+     rocks' ink wash, all its times set by pvWashSpeed), then the pond's name is
      written stroke by stroke as the name screen's name is, the seal stamped
      last, then the thin line. Sizes follow the screen's height.
      ============================================================ */
   var pvEl = document.getElementById('pv'), PV = { timer: 0, verse: null };
+  // the poem's ink wash at speed 1 (pvWashSpeed divides every one of these):
+  // each column's time, the gap to the next, the stain drying away, how long
+  // a letter takes to soak in where the ink has reached it
+  var PV_COL = 2.2, PV_COL_GAP = 1.1, PV_WASH_DRY = 1.6, PV_EMERGE = 0.35;
+  // characters with no stroke data (strokes.js not loaded): the CSS brush-in
+  var PV_PLAIN_STAGGER = 0.11, PV_PLAIN_BRUSH = 1.2, PV_PLAIN_DRY = 1.7;
+  // the divider starts when the pond's name is this far written
+  var PV_RULE_AT = 0.8;
+  function pvWs() { return Math.max(0.1, V.pvWashSpeed); }
   function pvGlow() {
     var g = Math.max(0, V.pvGlow);
     return '0 0 ' + (8 * g).toFixed(1) + 'px rgba(255, 248, 240, ' + Math.min(1, 0.92 * g).toFixed(2) + '), 0 0 ' +
@@ -1251,9 +1259,9 @@
     pvEl.style.setProperty('--pv-ink', V.pvInk);
     pvEl.style.setProperty('--pv-red', V.pvRed);
     pvEl.style.setProperty('--pv-glow', pvGlow());
-    pvEl.style.setProperty('--pv-brush', Math.max(0.1, V.pvBrush) + 's');
-    pvEl.style.setProperty('--pv-dry', Math.max(0.1, V.pvDry) + 's');
-    pvEl.style.setProperty('--pv-line', Math.max(0.3, V.pvLineDur) + 's');
+    pvEl.style.setProperty('--pv-brush', PV_PLAIN_BRUSH + 's');
+    pvEl.style.setProperty('--pv-dry', PV_PLAIN_DRY + 's');
+    pvEl.style.setProperty('--pv-line', (PV_COL / pvWs()).toFixed(2) + 's');
     pvEl.querySelectorAll('.pv-col').forEach(function (c) { c.style.lineHeight = V.pvPitch; });
     var rule = pvEl.querySelector('.pv-rule');
     if (rule) rule.style.margin = '0 ' + (V.pvGap * 0.5).toFixed(2) + 'em';
@@ -1288,7 +1296,7 @@
                         { c: 'rgba(250, 228, 210, ' + Math.min(1, 0.7 * g).toFixed(2) + ')', blur: 18 * g }] : [];
     var items = [], plain = [], t = 0.15, GAP = 0.2;
     var still = [];
-    var useInk = V.pvLineMode >= 0.5 && typeof InkReveal !== 'undefined';
+    var useInk = typeof InkReveal !== 'undefined';   // (else, or if the ink fails, a brush sweep down each column)
     // write: each character written stroke by stroke (the pond's name);
     // else shown whole inside its column, which comes in as one (the poem)
     function chars(box, list, em, write) {
@@ -1318,16 +1326,16 @@
         box.appendChild(sp);
         if (!write) return;
         plain.push({ el: sp, start: t });
-        t += Math.max(0, V.pvStagger) + GAP;
+        t += PV_PLAIN_STAGGER + GAP;
       });
     }
     var poem = document.createElement('div'); poem.className = 'pv-poem';
     poem.style.display = 'block';
     pvEl.appendChild(poem);
     // the poem: each of its four columns comes in as one, right to left, by the
-    // rocks' ink wash (pvLineMode 1) or a brush sweep down it (0), pvLineGap s
-    // apart, each over pvLineDur s
-    var dur = Math.max(0.3, V.pvLineDur), cols = [];
+    // rocks' ink wash (a brush sweep down it only if the ink cannot run), all
+    // its times set by the one ink-wash speed
+    var dur = PV_COL / pvWs(), cols = [];
     vs.cols.forEach(function (col) {
       if (!col.length) return;
       var d = document.createElement('div');
@@ -1340,7 +1348,7 @@
       d.className = 'pv-col ' + (wash ? 'wash' : 'sweep');
       if (!wash) d.style.animationDelay = t.toFixed(2) + 's, ' + t.toFixed(2) + 's';
       cols.push({ el: d, start: t, dur: dur, wash: wash, kind: useInk ? 'ink' : 'brush' });
-      t += Math.max(0, V.pvLineGap);
+      t += PV_COL_GAP / pvWs();
     });
     if (cols.length) t = cols[cols.length - 1].start + dur;
     InkWrite.finish(still);
@@ -1351,15 +1359,16 @@
     var nItems = items.length, nPlain = plain.length, tName = t;
     // the pond's name: written stroke by stroke, as the name screen writes the name
     chars(nm, vs.title, f * V.pvTitle, true);
-    // longer than pvWriteMax: the name's writing sped up to fit
-    var k = t - tName > V.pvWriteMax ? V.pvWriteMax / (t - tName) : 1;
-    if (k < 1) { InkWrite.scale(items, tName, k); plain.forEach(function (p) { p.start = tName + (p.start - tName) * k; }); t = tName + (t - tName) * k; }
+    // its speed: 1 = the name screen's own pace, 2 = twice as fast
+    var k = 1 / Math.max(0.1, V.pvNameSpeed);
+    if (k !== 1) { InkWrite.scale(items, tName, k); plain.forEach(function (p) { p.start = tName + (p.start - tName) * k; }); t = tName + (t - tName) * k; }
     plain.forEach(function (p) { p.el.style.animationDelay = p.start.toFixed(2) + 's, ' + p.start.toFixed(2) + 's'; });
-    // the divider: drawn only when the pond's name has fully come in (its last
-    // character written and its ink dried)
-    var nameIn = 0;
-    items.slice(nItems).forEach(function (it) { nameIn = Math.max(nameIn, it.end + InkWrite.dryAfter); });
-    plain.slice(nPlain).forEach(function (p) { nameIn = Math.max(nameIn, p.start + Math.max(V.pvBrush, V.pvDry)); });
+    // the divider: drawn as soon as the pond's name is PV_RULE_AT (80 %) written
+    // (from its first stroke's start to its last stroke's end)
+    var n0 = Infinity, n1 = -Infinity;
+    items.slice(nItems).forEach(function (it) { n0 = Math.min(n0, it.start); n1 = Math.max(n1, it.end); });
+    plain.slice(nPlain).forEach(function (p) { n0 = Math.min(n0, p.start); n1 = Math.max(n1, p.start + PV_PLAIN_BRUSH); });
+    var nameIn = n1 > n0 ? n0 + PV_RULE_AT * (n1 - n0) : t;
     rule.style.animationDelay = nameIn.toFixed(2) + 's';
     var seal = document.createElement('span'); seal.className = 'pv-seal';
     seal.setAttribute('data-seal', vs.seal);
@@ -1423,7 +1432,7 @@
     if (document.fonts && document.fonts.load) document.fonts.load('100px "Yuji Syuku"', ch).then(fit, function () {});
   }
   var PV_FONT = '"Yuji Syuku", "Shippori Mincho", serif';
-  /* the poem's columns painted in by the rocks' ink wash (pvLineMode 1): the
+  /* the poem's columns painted in by the rocks' ink wash: the
      same wet ink (inkreveal.js + inkfluid.js, INK_LOOK) as the rocks, after
      theirs is over. Each column a part of its own: drops laid down it from
      top to bottom; its finished characters are drawn on a layer where it
@@ -1518,7 +1527,7 @@
       try {
         for (var k in INK_LOOK) InkReveal.look[k] = INK_LOOK[k];
         for (k in PV_INK) InkReveal.look[k] = PV_INK[k];
-        InkReveal.look.finish = Math.max(0.05, V.pvDry) * sp;   // (the stain drying away, in the ink's own clock)
+        InkReveal.look.finish = PV_WASH_DRY / pvWs() * sp;   // (the stain drying away, in the ink's own clock)
         InkReveal.setup(innerWidth, innerHeight);
         InkReveal.plan(inks.map(function (C) {
           // small drops (0.38 × the column's width, so the wet edge visibly crosses each
@@ -1541,7 +1550,7 @@
     PW.on = true; PW.cols = cols; PW.last = 0; PW.pr = pr; PW.t0 = performance.now() / 1000;
     PW.raf = requestAnimationFrame(pvWashFrame);
   }
-  /* the brush (pvLineMode 0): a loaded brush drawn down the column. Its
+  /* the brush (only if the ink cannot run): a loaded brush drawn down the column. Its
      bristles are lanes across the column, each a little ahead of or behind
      the others (a ragged front); near the front the stroke is still dry-
      brushed (streaks with gaps) and fills in as the brush passes; the part
@@ -1638,12 +1647,12 @@
       // spreads across it; toward the end of the wash (as it starts to dry)
       // the wash's own mask fills in whatever is left
       if (!C.acc) { C.acc = document.createElement('canvas'); C.acc.width = R.w; C.acc.height = R.h; C.accT = 0; }
-      var ac = C.acc.getContext('2d'), tau = Math.max(0.05, V.pvEmerge), ddt = Math.max(dt, 1 / 120);
+      var ac = C.acc.getContext('2d'), tau = PV_EMERGE / pvWs(), ddt = Math.max(dt, 1 / 120);
       var mg = PW.maskLayer.getContext('2d');
       mg.setTransform(1, 0, 0, 1, 0, 0); mg.globalCompositeOperation = 'source-over'; mg.clearRect(R.x, R.y, R.w, R.h);
       if (st === 1) {
         InkReveal.inkOnto(mg, C.id, PW.pr, R, 1);
-        // (the ink's darkest is about 0.75: soaked in fully in about pvEmerge s)
+        // (the ink's darkest is about 0.75: soaked in fully in about PV_EMERGE / pvWashSpeed s)
         ac.globalAlpha = Math.min(1, ddt / (tau * 0.75)); ac.drawImage(PW.maskLayer, R.x, R.y, R.w, R.h, 0, 0, R.w, R.h);
         mg.clearRect(R.x, R.y, R.w, R.h);
       }
@@ -1657,7 +1666,7 @@
       if (st === 2) {
         // (the wash's last fill has shown everything: the letters finish coming in)
         C.accT += dt;
-        if (C.accT > 6 * Math.max(0.05, V.pvEmerge)) { C.dry = true; c.drawImage(C.picGlow, R.x, R.y); c.drawImage(C.picD, R.x, R.y); return; }
+        if (C.accT > 6 * tau) { C.dry = true; c.drawImage(C.picGlow, R.x, R.y); c.drawImage(C.picD, R.x, R.y); return; }
       }
       // the ink's own stain on the paper, spreading down the column with its
       // ragged wet edges, darker where it pools, drying away as it finishes
@@ -1833,17 +1842,10 @@
     { k: 'pvGlow', l: 'Soft pale glow round the characters', min: 0, max: 2, step: 0.05, re: 'pv' },
     { k: 'pvAt', l: 'Writing starts this long after the ink transition is done (s; below 0 = before it is done, at most as early as the rocks\u2019 and fountain\u2019s last brush stroke)', min: -3, max: 10, step: 0.1, re: 'pvt' },
     { k: 'pvStain', l: 'Poem ink wash: how dark the ink stain on the paper (0 = none)', min: 0, max: 1, step: 0.05, re: 'pvt' },
-    { k: 'pvDry', l: 'Poem ink wash: how long the stain takes to dry away (s)', min: 0.2, max: 4, step: 0.1, re: 'pvt' },
-    { k: 'pvEmerge', l: 'Poem ink wash: how slowly each letter comes in where the ink has reached it (s)', min: 0.05, max: 1.5, step: 0.05, re: 'pvt' },
+    { k: 'pvWashSpeed', l: 'Poem ink wash: speed (1 = as now, 2 = twice as fast; the columns, the gaps between them, the letters coming in and the stain drying all follow it)', min: 0.25, max: 4, step: 0.05, re: 'pvt' },
     { k: 'pvShadow', l: 'Poem ink wash: soft ink shadow round the letters (0 = none)', min: 0, max: 2, step: 0.05, re: 'pvt' },
-    { k: 'pvLineMode', l: 'Poem: each column comes in by (1 = the rocks’ ink wash, 0 = a brush sweep down it)', min: 0, max: 1, step: 1, re: 'pvt' },
-    { k: 'pvLineDur', l: 'Poem: each column comes in over (s)', min: 0.3, max: 8, step: 0.1, re: 'pvt' },
-    { k: 'pvLineGap', l: 'Poem: the next column starts this long after the one before (s)', min: 0, max: 6, step: 0.1, re: 'pvt' },
-    { k: 'pvWriteMax', l: 'Pond’s name: writing it takes at most (s; each character brushed stroke by stroke, as the name on the name screen)', min: 1, max: 40, step: 0.5, re: 'pvt' },
-    { k: 'pvStagger', l: 'Characters with no stroke data: time between them (s)', min: 0, max: 0.6, step: 0.01, re: 'pvt' },
     { k: 'pvColPause', l: 'Pause before the pond’s name is written (s)', min: 0, max: 2, step: 0.05, re: 'pvt' },
-    { k: 'pvBrush', l: 'Characters with no stroke data: brushed in over (s)', min: 0.2, max: 4, step: 0.05, re: 'pvt' },
-    { k: 'pvDry', l: 'Characters with no stroke data: the wet ink dries over (s)', min: 0.2, max: 5, step: 0.05, re: 'pvt' }
+    { k: 'pvNameSpeed', l: 'Pond’s name: writing speed (1 = the name screen’s own pace, 2 = twice as fast; stroke by stroke)', min: 0.25, max: 4, step: 0.05, re: 'pvt' }
   ];
 
   function mixPanel() {
