@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v358';
+const CACHE = 'thankyou-v359';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
@@ -23,6 +23,9 @@ const ASSETS = [
   './inkreveal.js',
   './koi.js',
   './koipond.js',
+  './pondverse.js',
+  './inkwrite.js',
+  './koipoem.js',
   './koipage.js',
   './koi-rocks/rock01.webp',
   './koi-rocks/rock02.webp',

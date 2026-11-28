@@ -3377,6 +3377,116 @@
   .koi-stage.shown { opacity: 1; pointer-events: auto; }
   .koi-stage .koi-cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
   .koi-stage .koi-fx { opacity: 0; transition: opacity 1.6s ease; }
+
+  /* ---------- the pond's name and poem (koipoem.js: koiscreen.html's section 3f; copy its CSS again when it changes) ----------
+     Vertical, read right to left: the poem's two lines (each split at its
+     comma into two columns), a thin upright line, then the pond's name
+     with her seal under it. Each character is brushed in like the name on
+     the name screen (the app's inkBrush / inkDry: brushed from the top
+     down behind a soft edge while the wet ink blooms, then dries sharp).
+     Taps pass through it to the water. */
+  .koi-stage .pv {
+    position: absolute; z-index: 4; pointer-events: none;
+    writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl;
+    font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+    color: var(--pv-ink, #3F2A22); white-space: nowrap;
+  }
+  .pv.off { display: none; }
+  .pv-col { display: block; font-weight: 400; letter-spacing: 0.06em; }
+  .pv-rule { display: block; width: 0; border-left: 1px solid var(--pv-rule, rgba(120, 72, 52, 0.35)); opacity: 0; }
+  /* the thin line is drawn in, top to bottom, only once the pond's name has
+     fully come in (its delay is set by pvBuild) */
+  .pv.writing .pv-rule { animation: pvRule 0.9s cubic-bezier(0.45, 0.05, 0.35, 1) both; }
+  .pv.done .pv-rule { opacity: 1; }
+  @keyframes pvRule {
+    0%   { opacity: 0; clip-path: inset(0 0 100% 0); }
+    100% { opacity: 1; clip-path: inset(0 0 0 0); }
+  }
+  .pv-name { display: block; font-weight: 400; letter-spacing: 0.1em; }
+  span.pv-c {
+    display: inline-block; padding: 0.3em; margin: -0.3em;
+    text-shadow: var(--pv-glow);
+    opacity: 0;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 58%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 58%);
+    -webkit-mask-size: 100% 320%; mask-size: 100% 320%;
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    -webkit-mask-position: 0 86%; mask-position: 0 86%;
+  }
+  span.pv-c.red { color: var(--pv-red, #B8402E); }
+  .pv.writing span.pv-c {
+    animation-name: pvBrush, pvDry;
+    animation-duration: var(--pv-brush, 1.2s), var(--pv-dry, 1.7s);
+    animation-timing-function: cubic-bezier(0.45, 0.05, 0.35, 1), cubic-bezier(0.3, 0.6, 0.3, 1);
+    animation-fill-mode: both, both;
+  }
+  .pv.done span.pv-c { opacity: 1; -webkit-mask-position: 0 0; mask-position: 0 0; }
+  /* the poem's characters come in a column at a time, so they
+     are shown whole inside their column, not one by one */
+  .pv span.pv-c.pv-in { opacity: 1; animation: none; -webkit-mask-image: none; mask-image: none; }
+  /* a column brushed in as one piece (only if the ink cannot run): uncovered top to bottom
+     behind a soft wet edge, then the ink dries sharp */
+  .pv-col.sweep {
+    opacity: 0;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 58%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 58%);
+    -webkit-mask-size: 100% 320%; mask-size: 100% 320%;
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    -webkit-mask-position: 0 86%; mask-position: 0 86%;
+  }
+  .pv.writing .pv-col.sweep {
+    animation-name: pvBrush, pvColDry;
+    animation-duration: var(--pv-line, 2.2s), calc(var(--pv-line, 2.2s) * 1.3);
+    animation-timing-function: cubic-bezier(0.45, 0.05, 0.35, 1), cubic-bezier(0.3, 0.6, 0.3, 1);
+    animation-fill-mode: both, both;
+  }
+  .pv.done .pv-col.sweep { opacity: 1; -webkit-mask-position: 0 0; mask-position: 0 0; }
+  @keyframes pvColDry {
+    0%   { filter: blur(5px); }
+    40%  { filter: blur(2px); }
+    100% { filter: blur(0); }
+  }
+  /* a column painted in by the rocks' ink wash: hidden here
+     while the wash is drawn over it on #pvFx, shown when its wash is done */
+  .pv-col.wash { opacity: 0; }
+  .pv-col.wash.in, .pv.done .pv-col.wash { opacity: 1; }
+  .pv .pv-col.wash.kept { opacity: 0; }
+  .koi-stage .pv-fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 5; }
+  @keyframes pvBrush {
+    0%   { opacity: 0; -webkit-mask-position: 0 86%; mask-position: 0 86%; }
+    12%  { opacity: 1; }
+    100% { opacity: 1; -webkit-mask-position: 0 0; mask-position: 0 0; }
+  }
+  @keyframes pvDry {
+    0%   { filter: blur(6px);   transform: scale(1.035); text-shadow: 0 0 30px rgba(255, 246, 230, 0.55); }
+    40%  { filter: blur(2.4px); transform: scale(1.015); text-shadow: 0 0 26px rgba(255, 246, 230, 0.45); }
+    100% { filter: blur(0);     transform: scale(1);     text-shadow: var(--pv-glow); }
+  }
+  /* a character written stroke by stroke (inkwrite.js): its canvas is 1.6 em,
+     the character's 1 em cell in its middle */
+  canvas.pv-c { display: inline-block; width: 1.6em; height: 1.6em; margin: -0.3em; vertical-align: middle; }
+  /* her seal: the first character of her name, stamped in vermilion, drawn
+     as the receipt's seal is (index.html #receiptStamp): an SVG with the same
+     rough ink filters (uneven, speckled edges and grain), a thick square
+     border, the character in a brush font scaled to fill the square so it
+     touches the border (pvSealFit) */
+  .pv-seal {
+    display: inline-block; writing-mode: horizontal-tb; -webkit-writing-mode: horizontal-tb;
+    color: var(--pv-red, #B8402E); mix-blend-mode: multiply;
+    opacity: 0;
+  }
+  .pv-seal svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  /* stamped gently: the seal comes down softly (a little larger and blurred
+     while it is still above the paper), touches without bouncing, and its
+     ink deepens as it is pressed, then lifts away leaving the print */
+  .pv.writing .pv-seal { animation: pvStamp 1.8s cubic-bezier(0.45, 0, 0.25, 1) both; }
+  .pv.done .pv-seal { opacity: 0.92; }
+  @keyframes pvStamp {
+    0%   { opacity: 0;    transform: scale(1.06);  filter: blur(1.6px); }
+    35%  { opacity: 0.35; transform: scale(1.01);  filter: blur(0.5px); }
+    60%  { opacity: 0.8;  transform: scale(1);     filter: blur(0); }
+    100% { opacity: 0.92; transform: scale(1);     filter: blur(0); }
+  }
   .koi-stage.water-on .koi-fx { opacity: 1; }
   .koi-stage.soft-in .koi-shade, .koi-stage.soft-in .koi-rocks, .koi-stage.soft-in .koi-fountain { animation: koiSoftIn 1.2s ease both; }
   @keyframes koiSoftIn { from { opacity: 0; } to { opacity: 1; } }
