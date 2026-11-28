@@ -10607,7 +10607,14 @@ var KOI_SCREEN = {
      washes (start, length), the last soft fill, the water's and its sound's fade-in, the koi's wait after the ink
      and how long they take to come in, and how much deeper than usual they may be as they come (they rise back) */
   inkPlay: 1, inkStart: 0.9, inkRocksAt: 0, inkRocksDur: 4, inkFnAt: 1.8, inkFnDur: 1.5, inkFinish: 1.9,
-  waterFade: 1.6, soundFade: 2, koiAfter: 0, enterOver: 7, enterDepth: 0.6
+  waterFade: 1.6, soundFade: 2, koiAfter: 0, enterOver: 7, enterDepth: 0.6,
+  /* the pond's name and poem (koipoem.js; the test bed's group "The pond's name and poem (from her name)"),
+     made from the name typed on the name screen: place and size, the poem's colours, when it starts (pvAt, s
+     after the transition is done; below 0 before it), the pause before the pond's name, the ink wash's speed,
+     the pond name's writing speed, the stain's darkness, the soft ink shadow */
+  pvShow: 1, pvX: 0.1, pvY: 0.16, pvSize: 0.034, pvTitle: 1.3, pvPitch: 1.8, pvTitleDrop: 1.3, pvGap: 2, pvSeal: 1.35,
+  pvGlow: 1, pvInk: '#3F2A22', pvRed: '#B8402E', pvAt: -1, pvColPause: 0, pvWashSpeed: 0.5, pvNameSpeed: 1.9,
+  pvStain: 0.35, pvShadow: 1
 };
 var KOI_PAGE_INK_AT = KOI_SCREEN.inkStart * 1000;      /* ms after the swipe: the ink starts as the message (1.6 s fade) is nearly gone */
 var _koiPageInit = false;
@@ -10619,7 +10626,8 @@ function koiPage() {
       look: DynBG.inkLook(),
       audio: function() { return soundAudioCtx; },
       reduceMotion: DynBG.reduceMotion(),
-      beforeInk: function() { DynBG.inkStop(); }   /* (the one ink: the autumn reveal is long over by now) */
+      beforeInk: function() { DynBG.inkStop(); },  /* (the one ink: the autumn reveal is long over by now) */
+      name: function() { return String(therapistDisplayName || '').replace(/さん$/, ''); }   /* the poem is made from the name typed on the name screen */
     });
   }
   return KoiPage;

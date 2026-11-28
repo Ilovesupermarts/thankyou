@@ -44,6 +44,7 @@ var V = null, OPT = {}, root = null, pond = null, pondCv = null, made = false, r
 var CV = {};                 // the page's canvases: shade, pond, fountain, rocks, fx
 var PIC = {};                // the rocks', their shade's and the fountain's pictures, cut to where they lie
 var koiTimer = 0, active = false, raf = 0, phase = 'off', inkLayer = null, tStart = 0, lastNow = 0, waitReady = 0;
+var poemEarly = false, inkFade = null;   // the poem (koipoem.js) started before the ink was done, and the fade that finishes it
 var KINDS = ['kohaku', 'ogon', 'showa', 'tancho', 'sanke', 'platinum', 'asagi', 'shiro', 'bekko', 'goshiki'];
 
 function kindList() {
@@ -706,10 +707,13 @@ function canvas(cls) {
 function init(el, values, opt) {
   root = el; OPT = opt || {};
   V = JSON.parse(JSON.stringify(values));
+  // the pond's name and poem (koipoem.js), over the rest of the page
+  var poemInit = function () { if (typeof KoiPoem !== 'undefined') KoiPoem.init(root, V, { look: OPT.look, name: OPT.name }); };
   // in the test bed's order, bottom to top: the rocks' shade on the water,
   // the koi, the bamboo, the rocks, the fountain's water
   CV.shade = canvas('koi-shade'); CV.pond = canvas('koi-pond'); CV.fountain = canvas('koi-fountain');
   CV.rocks = canvas('koi-rocks'); CV.fx = canvas('koi-fx');
+  poemInit();
   shadeCv = CV.shade; rocksCv = CV.rocks; fnCv = CV.fountain; fxCv = CV.fx;
   // tap the water: food (only once the koi are in)
   root.addEventListener('pointerdown', function (e) {
@@ -722,7 +726,8 @@ function init(el, values, opt) {
     var dpr = dprNow();
     if (rocksCv.width === Math.round(innerWidth * dpr) && rocksCv.height === Math.round(innerHeight * dpr)) return;
     ready = false; draw();
-    if (active && phase !== 'ink') showAll();
+    if (active && phase === 'inkfade') { inkFade = null; showAll(); goLive(); }
+    else if (active && phase !== 'ink') showAll();
   });
 }
 /* Made ahead, while the messages show, a piece at a time: the koi (their
@@ -864,7 +869,29 @@ function frame(now) {
     inkLay(CV.shade, PIC.shade, PIC.rocksR, 'rocks');
     inkLay(CV.rocks, PIC.rocks, PIC.rocksR, 'rocks');
     if (PIC.fountain) inkLay(CV.fountain, PIC.fountain, PIC.fnR, 'fountain');
-    if (!InkReveal.running() || t - tStart > 30) { stopInk(); showAll(); goLive(); }
+    if (!InkReveal.running() || t - tStart > 30) { stopInk(); showAll(); goLive(); return; }
+    // the poem may start before the transition is done (pvAt below 0), as the
+    // test bed does: as early as the rocks' and the fountain's last brush stroke
+    // has ended (only their last soft fill is left). The ink serves one look at
+    // a time, so the rest of that fill is finished by a plain fade and the
+    // poem's own ink starts at once.
+    if (V.pvAt < 0 && typeof KoiPoem !== 'undefined') {
+      var sp = InkReveal.look.speed || 0.5, clk = InkReveal.clock(), P = inkParts();
+      var strokesEnd = Math.max(P[0][1] + P[0][2], P[1][1] + P[1][2]);
+      var rem = (strokesEnd + (V.inkFinish || 0) * sp - clk) / sp;
+      if (clk >= strokesEnd && rem <= -V.pvAt) handOver(t, Math.max(0.05, rem));
+    }
+    return;
+  }
+  if (phase === 'inkfade') {
+    var u = Math.min(1, (t - inkFade.t0) / inkFade.dur), a = u * u * (3 - 2 * u);
+    inkFade.list.forEach(function (F) {
+      var c = F.cv.getContext('2d');
+      c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(F.R.x, F.R.y, F.R.w, F.R.h);
+      c.drawImage(F.snap, F.R.x, F.R.y);
+      c.globalAlpha = a; c.drawImage(F.pic, F.R.x, F.R.y); c.globalAlpha = 1;
+    });
+    if (u >= 1) { inkFade = null; showAll(); goLive(); }
     return;
   }
   if (phase === 'fade') {
@@ -872,6 +899,21 @@ function frame(now) {
     return;
   }
   if (phase === 'live' && FN && V.fnShow) fnFrame(now);
+}
+// the poem starts early: the ink's last frame of the rocks and the fountain is
+// kept, the ink let go, and the remaining fill done as a fade over rem s
+function handOver(t, rem) {
+  var list = [];
+  [[CV.shade, PIC.shade, PIC.rocksR], [CV.rocks, PIC.rocks, PIC.rocksR], [CV.fountain, PIC.fountain, PIC.fnR]].forEach(function (L) {
+    if (!L[1] || !L[2]) return;
+    var R = L[2], sn = document.createElement('canvas'); sn.width = Math.max(1, R.w); sn.height = Math.max(1, R.h);
+    sn.getContext('2d').drawImage(L[0], R.x, R.y, R.w, R.h, 0, 0, R.w, R.h);
+    list.push({ cv: L[0], pic: L[1], R: R, snap: sn });
+  });
+  stopInk();
+  inkFade = { t0: t, dur: rem, list: list };
+  phase = 'inkfade'; poemEarly = true;
+  KoiPoem.write(0);
 }
 function begin(t) {
   tStart = t;
@@ -887,6 +929,8 @@ function goLive() {
   CV.fx.style.transition = 'opacity ' + Math.max(0, V.waterFade === undefined ? 1.6 : V.waterFade) + 's ease';   // the fountain's water fades in over waterFade s
   root.classList.add('water-on');
   fnSoundOn();
+  if (!poemEarly && typeof KoiPoem !== 'undefined') KoiPoem.write(Math.max(0, V.pvAt || 0));
+  poemEarly = false;
   clearTimeout(koiTimer);
   // the koi start coming in koiAfter s after the ink is done
   koiTimer = setTimeout(function () {
@@ -900,6 +944,8 @@ function start() {
   prepare();
   if (active) return;
   active = true; phase = 'wait'; lastNow = 0; waitReady = performance.now() / 1000;
+  poemEarly = false; inkFade = null;
+  if (typeof KoiPoem !== 'undefined') KoiPoem.hide();
   root.classList.remove('water-on', 'soft-in');
   [CV.shade, CV.rocks, CV.fountain, CV.fx].forEach(function (c) { c.getContext('2d').setTransform(1, 0, 0, 1, 0, 0); c.getContext('2d').clearRect(0, 0, c.width, c.height); });
   if (pond) pond.stop();                                      // (no koi until the rocks are in)
@@ -913,14 +959,15 @@ function stop() {
   clearTimeout(koiTimer);
   if (raf) { cancelAnimationFrame(raf); raf = 0; }
   if (phase === 'ink') stopInk();
-  phase = 'off';
+  phase = 'off'; poemEarly = false; inkFade = null;
+  if (typeof KoiPoem !== 'undefined') KoiPoem.hide();
   fnSoundOff();
   if (pond) pond.stop();
   root.classList.remove('shown', 'water-on', 'soft-in');
 }
 function info() {
   return { phase: phase, ready: ready, koi: pond ? pond.info() : null, ink: typeof InkReveal !== 'undefined' && phase === 'ink' ? InkReveal.stats() : '',
-           sound: { loaded: !!fnBuf, playing: !!fnSrc } };
+           sound: { loaded: !!fnBuf, playing: !!fnSrc }, poem: typeof KoiPoem !== 'undefined' ? KoiPoem.info() : null };
 }
 
 window.KoiPage = { init: init, prepare: prepare, start: start, stop: stop, info: info, get pond() { return pond; } };
