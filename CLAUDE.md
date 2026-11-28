@@ -715,4 +715,6 @@ PR #423 merged (the timing settings simplified, above); the branch was restarted
 
 The seal stamped gently (the user: "Seal is stamped without any elegance. Make it stamped more gently."): `@keyframes pvStamp` in `koiscreen.html`'s CSS was 0.9 s, dropping from 1.35× with a 3 px blur and overshooting to 0.97× (a thump); now 1.8 s (ease-in-out), from 1.06× with a 1.6 px blur, settling to 1× without any bounce while its ink deepens (opacity 0 → 0.35 at 35 % → 0.8 at 60 % → 0.92). It still starts 0.5 s after the name's last stroke. Checked in the sandbox at 2× by stepping the animation (0, 0.3, 0.6, 0.9, 1.2, 1.8 s); not on the tablet.
 
+PR #424 merged (the seal stamped gently); the branch was restarted from `main`.
+
 **What to offer first (ask; do nothing until they name it):** (1) their verdict on the tablet on the pixel-by-pixel wash and on the early start (try `pvAt` −1 … −3); (2) the doubled `pvDry` above (whether the brush-in fallback and the ink should dry over different times); (3) night colours for the poem; (4) putting the poem into the app (`koipage.js`: it copies koiscreen.html's sections; add `pondverse.js`, `inkwrite.js` and any other new file the app loads to `sw.js` `ASSETS` and bump `CACHE`), only when asked; (5) a native speaker's reading of `pondverse.js` (the review page `pondverse-review.html`).
