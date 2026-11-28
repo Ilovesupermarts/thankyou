@@ -5278,10 +5278,13 @@ window.addEventListener('resize', function() {
 /* Autumn: where the swipe hint's middle stands, as a share of the page's height (the lake scene,
    LAKE.navY in the DynBG part of this file). */
 var HINT_NAV_Y = 0.86;
-function repositionHintGroup() {
-  if (!panels.length || !stage) return;
+/* Where the swipe hint and the dots stand (their bottoms, px from the stage's
+   bottom) and the panels' padding, with the stage's top at stageTop on the
+   screen. Returns null before the stage has a size. */
+function hintGroupLayout(stageTop) {
+  if (!panels.length || !stage) return null;
   var stageHeight = stage.offsetHeight;
-  if (stageHeight <= 0) return;
+  if (stageHeight <= 0) return null;
   var maxContentH = 0;
   for (var i = 0; i < panels.length; i++) {
     var content = panels[i].querySelector('.panel-content');
@@ -5301,10 +5304,6 @@ function repositionHintGroup() {
   var pTop = infoBottom + gap;
   var pBottom = stageHeight - (infoBottom + gap + maxContentH);
   if (pBottom < 0) pBottom = 0;
-  for (var j = 0; j < panels.length; j++) {
-    panels[j].style.paddingTop = pTop + 'px';
-    panels[j].style.paddingBottom = pBottom + 'px';
-  }
   var textBottom = infoBottom + gap + maxContentH;
   var actualDotsTop = textBottom + gap;
   var actualDotsBottomFromStage = stageHeight - (actualDotsTop + totalDotsBlockH);
@@ -5317,7 +5316,6 @@ function repositionHintGroup() {
     // dots as one group, down on the water below the torii line's far end,
     // the button's middle at HINT_NAV_Y of the page's height (the button is
     // 32px tall) and the dots' middle 33px below it (the dots are 6px).
-    var stageTop = stage.getBoundingClientRect().top;
     var navMid = HINT_NAV_Y * window.innerHeight - stageTop;
     hintBottom = stageHeight - navMid - 16;
     dotsBottom = stageHeight - (navMid + 33) - 3;
@@ -5328,8 +5326,17 @@ function repositionHintGroup() {
     var liftW = Math.max(0, 140 - dotsBottom, 208 - hintBottom);
     dotsBottom += liftW; hintBottom += liftW;
   }
-  if (globalHint) globalHint.style.bottom = hintBottom + 'px';
-  if (dotsEl) dotsEl.style.bottom = dotsBottom + 'px';
+  return { pTop: pTop, pBottom: pBottom, hint: hintBottom, dots: dotsBottom, stageHeight: stageHeight };
+}
+function repositionHintGroup() {
+  var L = hintGroupLayout(stage ? stage.getBoundingClientRect().top : 0);
+  if (!L) return;
+  for (var j = 0; j < panels.length; j++) {
+    panels[j].style.paddingTop = L.pTop + 'px';
+    panels[j].style.paddingBottom = L.pBottom + 'px';
+  }
+  if (globalHint) globalHint.style.bottom = L.hint + 'px';
+  if (dotsEl) dotsEl.style.bottom = L.dots + 'px';
 }
 function repositionHintGroupAfterLayout() {
   requestAnimationFrame(function() {
@@ -10300,17 +10307,19 @@ var tyExited = false;
 function repositionTySwipeHint() {
   if (!tySwipeHint || !thankyouScreen) return;
   // The main message panel's swipe hint and dots are the standard: the
-  // thank-you screens use exactly the same distance from the bottom.
-  repositionHintGroup();
+  // thank-you screens put them on the same spot of the screen as the main
+  // message shows them (the stage at the top of the page). They are worked
+  // out for that place, not where the stage is now: when the thank-you
+  // screen opens the page is scrolled down to the table, the stage is far
+  // above the screen, and its numbers then put them above the screen.
+  var L = hintGroupLayout(0);
+  if (!L) { tySwipeHint.style.bottom = ''; if (tyDotsEl) tyDotsEl.style.bottom = ''; return; }
   // The main message's offsets are measured from the stage's bottom edge
-  // (100vh tall); the thank-you screen is fixed to the visible viewport.
-  // Add the difference between the two bottoms so both land on the same
-  // spot on the screen.
-  var tyShift = 0;
-  if (stage) tyShift = thankyouScreen.getBoundingClientRect().bottom - stage.getBoundingClientRect().bottom;
-  function tyBottom(el) { return (el && el.style.bottom) ? (parseFloat(el.style.bottom) + tyShift) + 'px' : ''; }
-  tySwipeHint.style.bottom = tyBottom(globalHint);
-  if (tyDotsEl) tyDotsEl.style.bottom = tyBottom(dotsEl);
+  // (100vh tall, at the top of the page); the thank-you screen is fixed to
+  // the visible viewport. Add the difference between the two bottoms.
+  var tyShift = thankyouScreen.getBoundingClientRect().bottom - L.stageHeight;
+  tySwipeHint.style.bottom = (L.hint + tyShift) + 'px';
+  if (tyDotsEl) tyDotsEl.style.bottom = (L.dots + tyShift) + 'px';
 }
 function updateTySwipeHint() {
   if (!tySwipeHint || !tySwipeHintLabel) return;
